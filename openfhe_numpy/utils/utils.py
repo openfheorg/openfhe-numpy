@@ -145,7 +145,7 @@ def get_shape(data):
 
 
 def rotate_vector(vec, k):
-    """Rotate a vector by k positions.
+    """Rotate a vector k positions to the left.
 
     Parameters
     ----------
@@ -159,9 +159,7 @@ def rotate_vector(vec, k):
     list
         Rotated vector.
     """
-    n = len(vec)
-    new_vec = vec[:]
-    return [new_vec[(i + k) % n] for i in range(n)]
+    return vec[k % len(vec):] + vec[:k % len(vec)]
 
 
 def pack_vec_row_wise(v, block_size, num_slots):
