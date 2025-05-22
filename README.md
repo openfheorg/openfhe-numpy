@@ -57,8 +57,8 @@ pip install openfhe_numpy
 
 1. Clone the repository
 ```
-git clone https://github.com/openfheorg/openfhe_numpy.git
-cd openfhe_numpy
+git clone https://github.com/openfheorg/openfhe-numpy.git
+cd openfhe-numpy
 ```
 
 2. Create build directory
@@ -192,9 +192,5 @@ Contributions to OpenFHE-NumPy are welcome! Please see our contributing guidelin
 ## License
 
 OpenFHE-NumPy is licensed under the BSD 3-Clause License. See the LICENSE file for details.
-
-## License
-
----
 
 OpenFHE-NumPy is an independent project and is not officially affiliated with NumPy.
