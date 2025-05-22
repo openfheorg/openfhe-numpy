@@ -2,9 +2,9 @@
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![Python Versions](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
-[![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.2.3%2B-green)](https://github.com/openfheorg/openfhe-development)
+[![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.3.0%2B-green)](https://github.com/openfheorg/openfhe-development)
 
-A NumPy-compatible API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax. 
+A NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax. 
 
 The project is currently in development, with a planned release shortly.
 
@@ -12,9 +12,8 @@ The project is currently in development, with a planned release shortly.
 ## Table of Contents
 - [Features](#features)
 - [Installation](#installation)
-  - [Prerequisites](#prerequisites)
-  - [Installing OpenFHE-Python](#installing-openfhe-python)
-  - [Installing OpenFHE-NumPy](#installing-openfhe_numpy)
+  - [Installing using pip](#installing-using-pip)
+  - [Installing from Source](#installing-from-source)
 - [Example Usage](#example-usage)
 - [Available Operations](#available-operations)
 - [Documentation](#documentation)
@@ -25,7 +24,7 @@ The project is currently in development, with a planned release shortly.
 
 ## Features
 
-- **NumPy-compatible API**: Use familiar NumPy-style syntax for homomorphic operations
+- **NumPy-like API**: Use familiar NumPy-style syntax for homomorphic operations
 - **Encrypted tensor manipulation**: Create and manipulate encrypted multi-dimensional arrays
 - **Matrix operations**: Perform matrix addition, multiplication, transposition on encrypted data
 - **Optimized implementation**: Built on top of OpenFHE for optimal performance
@@ -34,55 +33,59 @@ The project is currently in development, with a planned release shortly.
 
 ## Installation
 
-### Prerequisites
-
-- **OpenFHE**: Version 1.2.3 or newer
-- **C++ compiler**: Supporting C++20 standard
-- **CMake**: Version 3.16 or newer
-- **Python**: Version 3.8 or newer
-- **NumPy**: Recent version
-
-### Installing OpenFHE-Python
-
-OpenFHE-NumPy requires the OpenFHE-Python bindings:
-
-```bash
-# Clone OpenFHE-Python
-git clone https://github.com/openfheorg/openfhe-python.git
-cd openfhe-python
-
-# Install with pip
-pip install .
-```
-
-### Installing OpenFHE-NumPy
-
-#### From PyPI (coming soon)
+### Installing using pip (for Ubuntu)
 
 ```bash
 pip install openfhe_numpy
 ```
 
-#### From Source
+### Installing from Source
 
-```bash
-# Clone the repository
-git clone https://github.com/openfheorg/openfhe_numpy.git
-cd openfhe_numpy
+#### Prerequisites
 
-# Create build directory
-mkdir build && cd build
+- **C++ compiler**: Supporting C++20 standard
+- **CMake**: Version 3.16 or newer
+- **Python**: Version 3.8 or newer
+- **NumPy**: Recent version
 
-# Configure with CMake
-# Set OpenFHE_DIR to your OpenFHE installation path if needed
-cmake ..  -DCMAKE_INSTALL_PREFIX=/path/to/openfhe/install
+#### Install OpenFHE Prerequisites
 
-# Build the package
+1. Install OpenFHE 1.3.0+ from source using [OpenFHE installation instructions](https://github.com/openfheorg/openfhe-development?tab=readme-ov-file#installation)
+2. Install OpenFHE-Python 1.3.0+ bindings from source using [OpenFHE-Python instructions](https://github.com/openfheorg/openfhe-python?tab=readme-ov-file#building-from-source)
+
+#### Installing OpenFHE-NumPy
+
+1. Clone the repository
+```
+git clone https://github.com/openfheorg/openfhe-numpy.git
+cd openfhe-numpy
+```
+
+2. Create build directory
+```
+mkdir build
+cd build
+```
+
+3. Configure with CMake. 
+```
+cmake .. 
+```
+
+Alternatively, enter 
+```
+cmake .. -DCMAKE_PREFIX_PATH=/path/to/installed/openfhe
+```
+if you installed OpenFHE elsewhere.
+
+4. Build the package
+```
 make 
+```
 
-# Install
+5. Install
+```
 make install
-
 ```
 
 ## Example Usage
@@ -189,9 +192,5 @@ Contributions to OpenFHE-NumPy are welcome! Please see our contributing guidelin
 ## License
 
 OpenFHE-NumPy is licensed under the BSD 3-Clause License. See the LICENSE file for details.
-
-## License
-
----
 
 OpenFHE-NumPy is an independent project and is not officially affiliated with NumPy.
