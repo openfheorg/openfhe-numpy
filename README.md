@@ -4,7 +4,7 @@
 [![Python Versions](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.2.3%2B-green)](https://github.com/openfheorg/openfhe-development)
 
-A NumPy-compatible API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax. 
+A NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax. 
 
 The project is currently in development, with a planned release shortly.
 
