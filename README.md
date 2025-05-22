@@ -25,7 +25,7 @@ The project is currently in development, with a planned release shortly.
 
 ## Features
 
-- **NumPy-compatible API**: Use familiar NumPy-style syntax for homomorphic operations
+- **NumPy-like API**: Use familiar NumPy-style syntax for homomorphic operations
 - **Encrypted tensor manipulation**: Create and manipulate encrypted multi-dimensional arrays
 - **Matrix operations**: Perform matrix addition, multiplication, transposition on encrypted data
 - **Optimized implementation**: Built on top of OpenFHE for optimal performance
