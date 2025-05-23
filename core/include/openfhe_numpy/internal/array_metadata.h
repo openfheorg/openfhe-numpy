@@ -1,7 +1,7 @@
 //==================================================================================
 // BSD 2-Clause License
 //
-// Copyright (c) 2014-2022, NJIT, Duality Technologies Inc. and other contributors
+// Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
 //
 // All rights reserved.
 //
@@ -38,9 +38,9 @@
 #include <memory>
 
 #define ARRAY_METADATA_API
-/* ------------------------------------------------------------------ */
-/*  ArrayMetadata declaration                                         */
-/* ------------------------------------------------------------------ */
+// ------------------------------------------------------------------
+//  ArrayMetadata declaration
+// ------------------------------------------------------------------
 namespace openfhe_numpy {
 class ArrayMetadata : public lbcrypto::Metadata {
 public:
@@ -101,7 +101,7 @@ public:
     /* Metadata interface overrides */
     std::shared_ptr<lbcrypto::Metadata> Clone() const override;
     bool operator==(const lbcrypto::Metadata& rhs) const override;
-    std::ostream& print(std::ostream& os) const override;
+    std::ostream& print(std::ostream& os) const;
 
     template <class Archive>
     void save(Archive& ar, std::uint32_t) const;

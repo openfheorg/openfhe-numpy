@@ -13,8 +13,8 @@ set(OPENFHE_NUMPY_VERSION ${OPENFHE_NUMPY_VERSION_MAJOR}.${OPENFHE_NUMPY_VERSION
 # -----------------------------------------------------------------------------
 # C++ Standards and Build Options
 # -----------------------------------------------------------------------------
-set(CMAKE_CXX_STANDARD 20)               # Use C++20 standard
-set(CMAKE_CXX_STANDARD_REQUIRED ON)      # Require C++20 (don't fall back)
+set(CMAKE_CXX_STANDARD 17)               # Use C++17 standard
+set(CMAKE_CXX_STANDARD_REQUIRED ON)      # Require C++17 (don't fall back)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)  # Make position-independent code for shared libs
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF) # Disable link-time optimization
 
@@ -38,7 +38,7 @@ endif()
 # External Dependencies
 # -----------------------------------------------------------------------------
 # Find required and optional libraries
-find_package(OpenFHE 1.2.3 REQUIRED)     # Homomorphic Encryption library
+find_package(OpenFHE 1.3.0 REQUIRED)     # Homomorphic Encryption library
 find_package(pybind11 REQUIRED)          # Python binding generator
 find_package(OpenMP QUIET)               # Optional parallel processing 
 find_package(Python REQUIRED             # Python interpreter and libraries

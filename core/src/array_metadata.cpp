@@ -1,7 +1,7 @@
 //==================================================================================
 // BSD 2-Clause License
 //
-// Copyright (c) 2014-2022, NJIT, Duality Technologies Inc. and other contributors
+// Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
 //
 // All rights reserved.
 //
@@ -34,10 +34,10 @@ using namespace lbcrypto;
 
 namespace openfhe_numpy {
 
-/* ---- Metadata contructor ------------------------------------- */
+// ---- Metadata contructor -------------------------------------
 
 
-/* ---- Metadata interface ------------------------------------- */
+// ---- Metadata interface -------------------------------------
 std::shared_ptr<Metadata> ArrayMetadata::Clone() const {
     return std::make_shared<ArrayMetadata>(*this);
 }
@@ -52,7 +52,7 @@ std::ostream& ArrayMetadata::print(std::ostream& os) const {
               << ", encodeType=" << static_cast<int>(m_encodeType) << ']';
 }
 
-/* ---------- template bodies (header‑only) ------------------------ */
+// ---------- template bodies (header‑only) ------------------------
 template <class Archive>
 inline void ArrayMetadata::save(Archive& ar, std::uint32_t) const {
     ar(cereal::base_class<lbcrypto::Metadata>(this),
@@ -76,7 +76,7 @@ inline void ArrayMetadata::load(Archive& ar, std::uint32_t ver) {
        m_encodeType);
 }
 
-/* helper templates */
+// helper templates
 template <class Element>
 std::shared_ptr<ArrayMetadata> ArrayMetadata::GetMetadata(
     const std::shared_ptr<const lbcrypto::CiphertextImpl<Element>>& ct) {
