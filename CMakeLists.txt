@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Project declaration with name, version, and languages
-project(OpenFHE-Numpy VERSION 0.0.1 LANGUAGES CXX)
+project(OpenFHE-Numpy)
 
 # Version variables
 set(OPENFHE_NUMPY_VERSION_MAJOR 0)
@@ -19,29 +19,6 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 option(ENABLE_DEBUG_LOGGING "Enable debug logging (defines DEBUG)" OFF)
 option(BUILD_EXAMPLES "Build C++ example executables" ON)
 option(BUILD_TESTING "Enable building of tests" OFF)
-
-# Custom OpenFHE options
-option(WITH_CUSTOM_OPENFHE "Use OpenFHE from a custom location" OFF)
-set(CUSTOM_OPENFHE_ROOT "" CACHE PATH "Path to custom OpenFHE installation")
-set(CUSTOM_OPENFHE_PYTHON "" CACHE PATH "Path to custom OpenFHE Python wrapper")
-
-# Set up OpenFHE search paths if custom installation is specified
-if(WITH_CUSTOM_OPENFHE)
-    if(NOT CUSTOM_OPENFHE_ROOT)
-        message(FATAL_ERROR "WITH_CUSTOM_OPENFHE is ON but CUSTOM_OPENFHE_ROOT is not specified")
-    endif()
-    
-    set(OpenFHE_DIR "${CUSTOM_OPENFHE_ROOT}/lib/cmake/OpenFHE" CACHE PATH "Path to OpenFHE cmake config" FORCE)
-    list(APPEND CMAKE_PREFIX_PATH "${CUSTOM_OPENFHE_ROOT}")
-    
-    message(STATUS "Using custom OpenFHE installation: ${CUSTOM_OPENFHE_ROOT}")
-    
-    if(CUSTOM_OPENFHE_PYTHON)
-        message(STATUS "Using custom OpenFHE Python wrapper: ${CUSTOM_OPENFHE_PYTHON}")
-        # Add Python wrapper to PYTHONPATH at build time
-        set(ENV{PYTHONPATH} "${CUSTOM_OPENFHE_PYTHON}:$ENV{PYTHONPATH}")
-    endif()
-endif()
 
 if(APPLE)
     set(CMAKE_CXX_VISIBILITY_PRESET default)
