@@ -28,10 +28,17 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#include "openfhe_numpy/enc_matrix.h"
-#include <iostream>
-#include <stdexcept>
-#include <format>
+#include "enc_matrix.h"
+
+#include "constants-defs.h"
+#include "utils.h"
+
+#include "cryptocontext.h"
+// #include "key/privatekey.h"
+// #include "key/evalkey.h"
+// #include <iostream>
+// #include <stdexcept>
+// #include <format>
 
 namespace openfhe_numpy {
 
@@ -45,7 +52,6 @@ using namespace lbcrypto;
 * @param numRepeats   Optional offset used by PHI and PSI types.
 * @return std::vector<int32_t> List of rotation indices to be used for EvalRotateKeyGen.
 **/
-
 std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int32_t numRepeats = 0) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
@@ -107,15 +113,13 @@ std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int3
 * computed via GenLinTransIndices. It ensures the crypto context is properly prepared
 * for applying a matrix-based linear transformation.
 *
-* @param secretKey   The KeyPair<Element> containing the secret key used to generate
-* rotation keys.
+* @param secretKey   The KeyPair<DCRTPoly> containing the secret key used to generate rotation keys.
 * @param numCols   The row size of the matrix being transformed.
 * @param type The type of linear transformation.
 * @param numRepeats  Optional numRepeats used by PHI and PSI transformations.
 **/
 
-template <typename Element>
-void EvalLinTransKeyGen(PrivateKey<Element>& secretKey, int32_t numCols, LinTransType type, int32_t numRepeats) {
+void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols, LinTransType type, int32_t numRepeats) {
     auto rotationIndices = GenLinTransIndices(numCols, type, numRepeats);
     auto cryptoContext   = secretKey->GetCryptoContext();
     cryptoContext->EvalRotateKeyGen(secretKey, rotationIndices);
@@ -126,8 +130,7 @@ void EvalLinTransKeyGen(PrivateKey<Element>& secretKey, int32_t numCols, LinTran
  * @param secretKey The private key used for key generation.
  * @param numCols The number of columns in the square matrix.
  */
-template <typename Element>
-void EvalSquareMatMultRotateKeyGen(PrivateKey<Element>& secretKey, int32_t numCols) {
+void EvalSquareMatMultRotateKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
     auto indicesSigma = GenLinTransIndices(numCols, LinTransType::SIGMA);
     auto indicesTau   = GenLinTransIndices(numCols, LinTransType::TAU);
 
@@ -149,8 +152,7 @@ void EvalSquareMatMultRotateKeyGen(PrivateKey<Element>& secretKey, int32_t numCo
  * @param secretKey The private key used for key generation.
  * @param numCols The number of columns in the matrix.
  */
-template <typename Element>
-void EvalSumCumRowsKeyGen(PrivateKey<Element>& secretKey, int32_t numCols) {
+void EvalSumCumRowsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
     auto cryptoContext = secretKey->GetCryptoContext();
     cryptoContext->EvalRotateKeyGen(secretKey, {-numCols});
 }
@@ -160,8 +162,7 @@ void EvalSumCumRowsKeyGen(PrivateKey<Element>& secretKey, int32_t numCols) {
  * @param secretKey The private key used for key generation.
  * @param numCols The number of columns in the matrix.
  */
-template <typename Element>
-void EvalSumCumColsKeyGen(PrivateKey<Element>& secretKey, int32_t numCols) {
+void EvalSumCumColsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
     auto cryptoContext = secretKey->GetCryptoContext();
     cryptoContext->EvalRotateKeyGen(secretKey, {-1});
 }
@@ -184,16 +185,15 @@ void EvalSumCumColsKeyGen(PrivateKey<Element>& secretKey, int32_t numCols) {
 *
 */
 
-template <typename Element>
-Ciphertext<Element> EvalMultMatVec(MatKeys<Element> evalKeys,
+Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>> evalKeys,
                                    MatVecEncoding encodeType,
                                    int32_t numCols,
-                                   const Ciphertext<Element>& ctVector,
-                                   const Ciphertext<Element>& ctMatrix) {
+                                   const Ciphertext<DCRTPoly>& ctVector,
+                                   const Ciphertext<DCRTPoly>& ctMatrix) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
-    Ciphertext<Element> ctProduct;
+    Ciphertext<DCRTPoly> ctProduct;
     auto cryptoContext = ctVector->GetCryptoContext();
     auto multiplied    = cryptoContext->EvalMult(ctMatrix, ctVector);
     if (encodeType == MatVecEncoding::MM_CRC) {
@@ -203,7 +203,7 @@ Ciphertext<Element> EvalMultMatVec(MatKeys<Element> evalKeys,
         ctProduct = cryptoContext->EvalSumRows(multiplied, numCols, *evalKeys);
     }
     else {
-        OPENFHE_THROW("EvalMultMatVec: Unsupported encoding style selected.");
+        OPENFHE_THROW("Unsupported encoding style selected.");
     }
 
     return ctProduct;
@@ -224,9 +224,8 @@ Ciphertext<Element> EvalMultMatVec(MatKeys<Element> evalKeys,
  * @return The resulting ciphertext after the transformation.
 */
 
-template <typename Element>
-Ciphertext<Element> EvalLinTransSigma(PrivateKey<Element>& secretKey,
-                                      const Ciphertext<Element>& ciphertext,
+Ciphertext<DCRTPoly> EvalLinTransSigma(PrivateKey<DCRTPoly>& secretKey,
+                                      const Ciphertext<DCRTPoly>& ciphertext,
                                       int32_t numCols) {
     EvalLinTransKeyGen(secretKey, numCols, LinTransType::SIGMA);
     return EvalLinTransSigma(ciphertext, numCols);
@@ -238,15 +237,14 @@ Ciphertext<Element> EvalLinTransSigma(PrivateKey<Element>& secretKey,
  * @param numCols The number of columns in the transformation matrix.
  * @return The resulting ciphertext after the transformation.
  */
-template <typename Element>
-Ciphertext<Element> EvalLinTransSigma(const Ciphertext<Element>& ciphertext, int32_t numCols) {
+Ciphertext<DCRTPoly> EvalLinTransSigma(const Ciphertext<DCRTPoly>& ciphertext, int32_t numCols) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
 
     auto cryptoContext = ciphertext->GetCryptoContext();
     bool flag          = true;
-    Ciphertext<Element> ctResult;
+    Ciphertext<DCRTPoly> ctResult;
 
     for (int k = -numCols; k < numCols; ++k) {
         auto diag       = GenSigmaDiag(numCols, k);  // returns std::vector<double>
@@ -277,14 +275,13 @@ Ciphertext<Element> EvalLinTransSigma(const Ciphertext<Element>& ciphertext, int
  * @param numCols The number of columns in the transformation matrix.
  * @return The resulting ciphertext after the transformation.
 */
-template <typename Element>
-Ciphertext<Element> EvalLinTransTau(const Ciphertext<Element>& ctVector, int32_t numCols) {
+Ciphertext<DCRTPoly> EvalLinTransTau(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
     auto cryptoContext = ctVector->GetCryptoContext();
     bool flag          = true;
-    Ciphertext<Element> ctResult;
+    Ciphertext<DCRTPoly> ctResult;
 
     int32_t slots = cryptoContext->GetEncodingParams()->GetBatchSize();
     for (auto k = 0; k < numCols; ++k) {
@@ -303,9 +300,8 @@ Ciphertext<Element> EvalLinTransTau(const Ciphertext<Element>& ctVector, int32_t
 
     return ctResult;
 }
-template <typename Element>
-Ciphertext<Element> EvalLinTransTau(PrivateKey<Element>& secretKey,
-                                    const Ciphertext<Element>& ciphertext,
+Ciphertext<DCRTPoly> EvalLinTransTau(PrivateKey<DCRTPoly>& secretKey,
+                                    const Ciphertext<DCRTPoly>& ciphertext,
                                     int32_t numCols) {
     EvalLinTransKeyGen(secretKey, numCols, LinTransType::TAU);
     return EvalLinTransTau(ciphertext, numCols);
@@ -322,14 +318,13 @@ Ciphertext<Element> EvalLinTransTau(PrivateKey<Element>& secretKey,
 *
 * @param numCols   The number of padded cols in the encoded matrix
 */
-template <typename Element>
-Ciphertext<Element> EvalLinTransPhi(const Ciphertext<Element>& ctVector, int32_t numCols, int32_t numRepeats) {
+Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats) {
     if (numCols < 0 or numRepeats < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
     auto cryptoContext = ctVector->GetCryptoContext();
     bool flag          = true;
-    Ciphertext<Element> ctResult;
+    Ciphertext<DCRTPoly> ctResult;
 
     for (auto i = 0; i < 2; ++i) {
         auto rotateIdx  = numRepeats - i * numCols;
@@ -347,9 +342,8 @@ Ciphertext<Element> EvalLinTransPhi(const Ciphertext<Element>& ctVector, int32_t
 
     return ctResult;
 }
-template <typename Element>
-Ciphertext<Element> EvalLinTransPhi(PrivateKey<Element>& secretKey,
-                                    const Ciphertext<Element>& ctVector,
+Ciphertext<DCRTPoly> EvalLinTransPhi(PrivateKey<DCRTPoly>& secretKey,
+                                    const Ciphertext<DCRTPoly>& ctVector,
                                     int32_t numCols,
                                     int32_t numRepeats) {
     EvalLinTransKeyGen(secretKey, numCols, LinTransType::PHI, numRepeats);
@@ -367,16 +361,14 @@ Ciphertext<Element> EvalLinTransPhi(PrivateKey<Element>& secretKey,
 *
 * @param numCols   The number of padded cols in the encoded matrix
 */
-template <typename Element>
-Ciphertext<Element> EvalLinTransPsi(PrivateKey<Element>& secretKey,
-                                    const Ciphertext<Element>& ctVector,
+Ciphertext<DCRTPoly> EvalLinTransPsi(PrivateKey<DCRTPoly>& secretKey,
+                                    const Ciphertext<DCRTPoly>& ctVector,
                                     int32_t numCols,
                                     int32_t numRepeats) {
     EvalLinTransKeyGen(secretKey, numCols, LinTransType::PSI, numRepeats);
     return EvalLinTransPsi(ctVector, numCols, numRepeats);
 }
-template <typename Element>
-Ciphertext<Element> EvalLinTransPsi(const Ciphertext<Element>& ctVector, int32_t numCols, int32_t numRepeats) {
+Ciphertext<DCRTPoly> EvalLinTransPsi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats) {
     if (numCols < 0 or numRepeats < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
@@ -392,17 +384,16 @@ Ciphertext<Element> EvalLinTransPsi(const Ciphertext<Element>& ctVector, int32_t
  * @param numCols The number of columns in the matrices.
  * @return The resulting ciphertext after the matrix multiplication.
  */
-template <typename Element>
-Ciphertext<Element> EvalMatMulSquare(const Ciphertext<Element>& matrixA,
-                                     const Ciphertext<Element>& matrixB,
+Ciphertext<DCRTPoly> EvalMatMulSquare(const Ciphertext<DCRTPoly>& matrixA,
+                                     const Ciphertext<DCRTPoly>& matrixB,
                                      int32_t numCols) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
     auto cryptoContext               = matrixA->GetCryptoContext();
-    Ciphertext<Element> transformedA = EvalLinTransSigma(matrixA, numCols);
-    Ciphertext<Element> transformedB = EvalLinTransTau(matrixB, numCols);
-    Ciphertext<Element> ctProduct    = cryptoContext->EvalMult(transformedA, transformedB);
+    Ciphertext<DCRTPoly> transformedA = EvalLinTransSigma(matrixA, numCols);
+    Ciphertext<DCRTPoly> transformedB = EvalLinTransTau(matrixB, numCols);
+    Ciphertext<DCRTPoly> ctProduct    = cryptoContext->EvalMult(transformedA, transformedB);
 
     for (auto k = 1; k < numCols; ++k) {
         auto transformedAk = EvalLinTransPhi(transformedA, numCols, k);
@@ -420,15 +411,13 @@ Ciphertext<Element> EvalMatMulSquare(const Ciphertext<Element>& matrixA,
  * @param numCols The number of columns in the matrix.
  * @return The resulting ciphertext after the transpose operation.
  */
-template <typename Element>
-Ciphertext<Element> EvalTranspose(PrivateKey<Element>& secretKey,
-                                  const Ciphertext<Element>& ciphertext,
+Ciphertext<DCRTPoly> EvalTranspose(PrivateKey<DCRTPoly>& secretKey,
+                                  const Ciphertext<DCRTPoly>& ciphertext,
                                   int32_t numCols) {
     EvalLinTransKeyGen(secretKey, numCols, LinTransType::TRANSPOSE);
     return EvalTranspose(ciphertext, numCols);
 }
-template <typename Element>
-Ciphertext<Element> EvalTranspose(const Ciphertext<Element>& ciphertext, int32_t numCols) {
+Ciphertext<DCRTPoly> EvalTranspose(const Ciphertext<DCRTPoly>& ciphertext, int32_t numCols) {
     try {
         if (numCols < 0) {
             OPENFHE_THROW("numCols must be positive");
@@ -436,7 +425,7 @@ Ciphertext<Element> EvalTranspose(const Ciphertext<Element>& ciphertext, int32_t
         auto cryptoContext = ciphertext->GetCryptoContext();
         uint32_t slots     = cryptoContext->GetEncodingParams()->GetBatchSize();
         bool flag          = true;
-        Ciphertext<Element> ctResult;
+        Ciphertext<DCRTPoly> ctResult;
 
         for (int32_t index = -numCols + 1; index < numCols; ++index) {
             int32_t rotationIndex = (numCols - 1) * index;
@@ -509,8 +498,7 @@ std::size_t MulDepthAccumulation(std::size_t numRows, std::size_t numCols, bool 
  * @return The resulting ciphertext after the reduction.
  */
 
-template <typename Element>
-Ciphertext<Element> EvalSumCumCols(const Ciphertext<Element>& ciphertext, uint32_t numCols, uint32_t subringDim) {
+Ciphertext<DCRTPoly> EvalSumCumCols(const Ciphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t subringDim) {
     if (ciphertext->GetEncodingType() != CKKS_PACKED_ENCODING)
         OPENFHE_THROW("Matrix summation of row-vectors is only supported for CKKS packed encoding.");
 
@@ -544,8 +532,7 @@ Ciphertext<Element> EvalSumCumCols(const Ciphertext<Element>& ciphertext, uint32
  * @param subringDim The subring dimension (optional).
  * @return The resulting ciphertext after the cumulative column sum.
  */
-template <typename Element>
-Ciphertext<Element> EvalReduceCumCols(const Ciphertext<Element>& ciphertext, uint32_t numCols, uint32_t subringDim) {
+Ciphertext<DCRTPoly> EvalReduceCumCols(const Ciphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t subringDim) {
     if (ciphertext->GetEncodingType() != CKKS_PACKED_ENCODING)
         OPENFHE_THROW("Matrix summation of row-vectors is only supported for CKKS packed encoding.");
 
@@ -571,8 +558,7 @@ Ciphertext<Element> EvalReduceCumCols(const Ciphertext<Element>& ciphertext, uin
     return ctSum;
 };
 
-template <class Element>
-Ciphertext<Element> EvalSumCumRows(const Ciphertext<Element>& ciphertext,
+Ciphertext<DCRTPoly> EvalSumCumRows(const Ciphertext<DCRTPoly>& ciphertext,
                                    uint32_t numCols,
                                    uint32_t numRows,
                                    uint32_t slots) {
@@ -605,8 +591,7 @@ Ciphertext<Element> EvalSumCumRows(const Ciphertext<Element>& ciphertext,
     return ctSum;
 };
 
-template <class Element>
-Ciphertext<Element> EvalReduceCumRows(const Ciphertext<Element>& ciphertext,
+Ciphertext<DCRTPoly> EvalReduceCumRows(const Ciphertext<DCRTPoly>& ciphertext,
                                       uint32_t numCols,
                                       uint32_t numRows,
                                       uint32_t slots) {
@@ -642,68 +627,5 @@ Ciphertext<Element> EvalReduceCumRows(const Ciphertext<Element>& ciphertext,
     return ctSum;
 };
 
-// template instantiations
 
-template void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey,
-                                 int32_t numCols,
-                                 LinTransType type,
-                                 int32_t numRepeats);
-
-template void EvalSquareMatMultRotateKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
-
-template void EvalSumCumColsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
-
-template void EvalSumCumRowsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
-
-template Ciphertext<DCRTPoly> EvalMultMatVec(MatKeys<DCRTPoly> evalKeys,
-                                             MatVecEncoding encodeType,
-                                             int32_t numCols,
-                                             const Ciphertext<DCRTPoly>& ctVector,
-                                             const Ciphertext<DCRTPoly>& ctMatrix);
-
-template Ciphertext<DCRTPoly> EvalLinTransSigma(const Ciphertext<DCRTPoly>& ciphertext, int32_t numCols);
-
-template Ciphertext<DCRTPoly> EvalLinTransSigma(PrivateKey<DCRTPoly>& secretKey,
-                                                const Ciphertext<DCRTPoly>& ciphertext,
-                                                int32_t numCols);
-
-template Ciphertext<DCRTPoly> EvalLinTransTau(PrivateKey<DCRTPoly>& secretKey,
-                                              const Ciphertext<DCRTPoly>& ciphertext,
-                                              int32_t numCols);
-template Ciphertext<DCRTPoly> EvalLinTransTau(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols);
-
-template Ciphertext<DCRTPoly> EvalLinTransPhi(PrivateKey<DCRTPoly>& secretKey,
-                                              const Ciphertext<DCRTPoly>& ctVector,
-                                              int32_t numCols,
-                                              int32_t numRepeats);
-
-template Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector,
-                                              int32_t numCols,
-                                              int32_t numRepeats);
-
-template Ciphertext<DCRTPoly> EvalLinTransPsi(PrivateKey<DCRTPoly>& secretKey,
-                                              const Ciphertext<DCRTPoly>& ctVector,
-                                              int32_t numCols,
-                                              int32_t numRepeats);
-
-template Ciphertext<DCRTPoly> EvalLinTransPsi(const Ciphertext<DCRTPoly>& ctVector,
-                                              int32_t numCols,
-                                              int32_t numRepeats);
-
-template Ciphertext<DCRTPoly> EvalMatMulSquare(const Ciphertext<DCRTPoly>& matrixA,
-                                               const Ciphertext<DCRTPoly>& matrixB,
-                                               int32_t numCols);
-
-template Ciphertext<DCRTPoly> EvalTranspose(PrivateKey<DCRTPoly>& secretKey,
-                                            const Ciphertext<DCRTPoly>& ciphertext,
-                                            int32_t numCols);
-template Ciphertext<DCRTPoly> EvalTranspose(const Ciphertext<DCRTPoly>& ctMatrix, int32_t numCols);
-
-template Ciphertext<DCRTPoly> EvalSumCumRows(const Ciphertext<DCRTPoly>&, uint32_t, uint32_t, uint32_t);
-
-template Ciphertext<DCRTPoly> EvalSumCumCols(const Ciphertext<DCRTPoly>&, uint32_t, uint32_t);
-
-template Ciphertext<DCRTPoly> EvalReduceCumRows(const Ciphertext<DCRTPoly>&, uint32_t, uint32_t, uint32_t);
-
-template Ciphertext<DCRTPoly> EvalReduceCumCols(const Ciphertext<DCRTPoly>&, uint32_t, uint32_t);
 }  // namespace openfhe_numpy

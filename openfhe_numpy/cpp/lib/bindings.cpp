@@ -30,7 +30,8 @@
 //==================================================================================
 #include <pybind11/pybind11.h>
 // #include <pybind11/enum.h>
-#include "openfhe_numpy/enc_matrix.h"
+#include "enc_matrix.h"
+#include "config/config.h"
 // #include "openfhe_numpy/array_metadata.h"
 
 using namespace openfhe_numpy;
@@ -191,7 +192,7 @@ void bind_matrix_funcs(py::module& m) {
     // EvalMultMatVec
     m.def("EvalMultMatVec",
           static_cast<Ciphertext<DCRTPoly> (*)(
-              MatKeys<DCRTPoly>, MatVecEncoding, int32_t, const Ciphertext<DCRTPoly>&, const Ciphertext<DCRTPoly>&)>(
+            std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>>, MatVecEncoding, int32_t, const Ciphertext<DCRTPoly>&, const Ciphertext<DCRTPoly>&)>(
               &EvalMultMatVec),
           "EvalMultMatVec with MatKeys<DCRTPoly>");
 

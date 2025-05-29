@@ -43,19 +43,18 @@ message(STATUS "OpenFHE include path: ${OpenFHE_INCLUDE}")
 message(STATUS "OpenFHE library path: ${OpenFHE_LIBDIR}")
 
 # Project Structure
-set(OpenFHE_Numpy_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/core/src)
-set(OpenFHE_Numpy_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/core/include)
+set(OpenFHE_Numpy_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/openfhe_numpy/cpp/lib)
+set(OpenFHE_Numpy_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/openfhe_numpy/cpp/include)
 set(OpenFHE_Numpy_BINDINGS ${OpenFHE_Numpy_SOURCES}/bindings.cpp)
 # Updated path to reflect new directory structure
-set(OpenFHE_Numpy_PYTHON ${CMAKE_CURRENT_SOURCE_DIR}/python/openfhe_numpy)
+set(OpenFHE_Numpy_PYTHON ${CMAKE_CURRENT_SOURCE_DIR})
 set(OpenFHE_Numpy_BUILD_PYTHON ${CMAKE_BINARY_DIR}/openfhe_numpy)
 
 file(MAKE_DIRECTORY ${OpenFHE_Numpy_BUILD_PYTHON})
 
 # Configuration Header
-configure_file(
-    "${OpenFHE_Numpy_INCLUDES}/openfhe_numpy/config.h.in"
-    "${OpenFHE_Numpy_INCLUDES}/openfhe_numpy/config.h" @ONLY)
+configure_file(./config/config.h.in config/config.h)
+install(FILES ${CMAKE_BINARY_DIR}/config/config_core.h DESTINATION include/config)
 
 # Include Paths
 include_directories(
@@ -65,6 +64,8 @@ include_directories(
     ${OpenFHE_INCLUDE}/pke
     ${OpenFHE_INCLUDE}/binfhe
     ${OpenFHE_Numpy_INCLUDES})
+message(STATUS "================== CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Source Files
 file(GLOB_RECURSE CORE_SOURCES ${OpenFHE_Numpy_SOURCES}/*.cpp)
@@ -171,7 +172,7 @@ if(BUILD_EXAMPLES)
     find_library(OPENFHE_PKE_LIB OPENFHEpke PATHS ${OpenFHE_LIBDIR} REQUIRED)
     find_library(OPENFHE_BINFHE_LIB OPENFHEbinfhe PATHS ${OpenFHE_LIBDIR} REQUIRED)
 
-    file(GLOB EXAMPLES ${CMAKE_CURRENT_SOURCE_DIR}/core/examples/*.cpp)
+    file(GLOB EXAMPLES ${CMAKE_CURRENT_SOURCE_DIR}/openfhe_numpy/cpp/examples/*.cpp)
     foreach(ex IN LISTS EXAMPLES)
         get_filename_component(name ${ex} NAME_WE)
         file(READ ${ex} FILE_CONTENT)

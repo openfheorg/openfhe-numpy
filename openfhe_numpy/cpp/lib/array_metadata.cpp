@@ -29,13 +29,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
 
-#include "openfhe_numpy/internal/array_metadata.h"
+#include "array_metadata.h"
 using namespace lbcrypto;
 
 namespace openfhe_numpy {
 
-// ---- Metadata contructor -------------------------------------
-
+const static std::string METADATA_ARRAYINFO_TAG{"arrayInfo"};
 
 // ---- Metadata interface -------------------------------------
 std::shared_ptr<Metadata> ArrayMetadata::Clone() const {
@@ -77,24 +76,16 @@ inline void ArrayMetadata::load(Archive& ar, std::uint32_t ver) {
 }
 
 // helper templates
-template <class Element>
 std::shared_ptr<ArrayMetadata> ArrayMetadata::GetMetadata(
-    const std::shared_ptr<const lbcrypto::CiphertextImpl<Element>>& ct) {
+    const std::shared_ptr<const lbcrypto::CiphertextImpl<DCRTPoly>>& ct) {
     auto it = ct->FindMetadataByKey(METADATA_ARRAYINFO_TAG);
     if (!ct->MetadataFound(it))
         OPENFHE_THROW("ArrayMetadata not set");
     return std::dynamic_pointer_cast<ArrayMetadata>(ct->GetMetadata(it));
 }
-template <class Element>
-void ArrayMetadata::StoreMetadata(std::shared_ptr<lbcrypto::CiphertextImpl<Element>> ct,
+void ArrayMetadata::StoreMetadata(std::shared_ptr<lbcrypto::CiphertextImpl<DCRTPoly>> ct,
                                   std::shared_ptr<ArrayMetadata> meta) {
     ct->SetMetadataByKey(METADATA_ARRAYINFO_TAG, std::move(meta));
 }
-
-template std::shared_ptr<ArrayMetadata> ArrayMetadata::GetMetadata(
-    const std::shared_ptr<const lbcrypto::CiphertextImpl<DCRTPoly>>& ct);
-
-template void ArrayMetadata::StoreMetadata(std::shared_ptr<lbcrypto::CiphertextImpl<DCRTPoly>> ct,
-                                           std::shared_ptr<ArrayMetadata> meta);
 
 }  // namespace openfhe_numpy

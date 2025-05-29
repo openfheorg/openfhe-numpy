@@ -32,16 +32,24 @@
 #ifndef ARRAY_METADATA_H
 #define ARRAY_METADATA_H
 
-#include "../config.h"
-#include <cstdint>
-#include <ostream>
-#include <memory>
+#include "metadata.h"
+#include "constants.h"
 
-#define ARRAY_METADATA_API
+#include "constants-defs.h"
+// #include "lattice/lat-hal.h"
+#include "ciphertext.h"
+// #include "config/config.h"
+// #include <cstdint>
+// #include <ostream>
+// #include <memory>
+
+// #define ARRAY_METADATA_API
 // ------------------------------------------------------------------
 //  ArrayMetadata declaration
 // ------------------------------------------------------------------
 namespace openfhe_numpy {
+using namespace lbcrypto;
+
 class ArrayMetadata : public lbcrypto::Metadata {
 public:
     /* constructors / destructor */
@@ -116,12 +124,10 @@ public:
     }
 
     /* helper to attach / get from ciphertext  (must stay in header) */
-    template <class Element>
     static std::shared_ptr<ArrayMetadata> GetMetadata(
-        const std::shared_ptr<const lbcrypto::CiphertextImpl<Element>>& ct);
+        const std::shared_ptr<const lbcrypto::CiphertextImpl<DCRTPoly>>& ct);
 
-    template <class Element>
-    static void StoreMetadata(std::shared_ptr<lbcrypto::CiphertextImpl<Element>> ct,
+    static void StoreMetadata(std::shared_ptr<lbcrypto::CiphertextImpl<DCRTPoly>> ct,
                               std::shared_ptr<ArrayMetadata> meta);
 
 private:
