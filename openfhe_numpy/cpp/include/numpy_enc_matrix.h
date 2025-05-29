@@ -28,23 +28,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#ifndef ENC_MATRIX_H
-#define ENC_MATRIX_H
+#ifndef __NUMPY_ENC_MATRIX_H__
+#define __NUMPY_ENC_MATRIX_H__
 
-#include "constants.h"
+#include "numpy_constants.h"
+#include "openfhe.h"
 
-#include "ciphertext-fwd.h"
-#include "key/privatekey-fwd.h"
-#include "key/evalkey-fwd.h"
-#include "lattice/lat-hal.h"
-
-#include <cstdint>
-#include <map>
-// #include "helper_functions.h"
-// #include "utils.h"
-// #include "config/config.h"
-
-// #define ENC_MATRIX_API
+using namespace lbcrypto;
 
 // -----------------------------------------------------------------------------
 // OpenFHE Matrix Encryption API
@@ -58,10 +48,6 @@
 // -----------------------------------------------------------------------------
 
 namespace openfhe_numpy {
-
-using namespace lbcrypto;
-
-
 //TODO: Change from const Ciphertext to ConstCiphertext
 //TODO: using references
 
@@ -75,7 +61,7 @@ void EvalSumCumRowsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
 
 void EvalSumCumColsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
 
-Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>> evalKeys,
+Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>>& evalKeys,
                                    MatVecEncoding encodeType,
                                    int32_t numCols,
                                    const Ciphertext<DCRTPoly>& ctVector,
@@ -135,4 +121,5 @@ Ciphertext<DCRTPoly> EvalReduceCumCols(const Ciphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t subringDim = 0);
 }  // namespace openfhe_numpy
-#endif  // ENC_MATRIX_H
+
+#endif  // __NUMPY_ENC_MATRIX_H__

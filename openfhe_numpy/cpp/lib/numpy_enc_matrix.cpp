@@ -28,21 +28,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#include "enc_matrix.h"
+#include "numpy_enc_matrix.h"
 
-#include "constants-defs.h"
-#include "utils.h"
+#include "numpy_utils.h"
 
-#include "cryptocontext.h"
-// #include "key/privatekey.h"
-// #include "key/evalkey.h"
-// #include <iostream>
-// #include <stdexcept>
-// #include <format>
+using namespace lbcrypto;
+
 
 namespace openfhe_numpy {
 
-using namespace lbcrypto;
 /**
 * @brief Generate rotation indices required for linear transformation based on transformation
 * type.
@@ -52,7 +46,7 @@ using namespace lbcrypto;
 * @param numRepeats   Optional offset used by PHI and PSI types.
 * @return std::vector<int32_t> List of rotation indices to be used for EvalRotateKeyGen.
 **/
-std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int32_t numRepeats = 0) {
+static std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int32_t numRepeats = 0) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
@@ -63,17 +57,18 @@ std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int3
     }
 
     std::vector<int32_t> rotationIndices;
-
     switch (type) {
         case LinTransType::SIGMA:
             // Generate indices from -numCols to numCols - 1
-            for (int32_t k = -numCols; k < (numCols); ++k) {
+            rotationIndices.reserve(2*numCols);
+            for (int32_t k = -numCols; k < numCols; ++k) {
                 rotationIndices.push_back(k);
             }
             break;
 
         case LinTransType::TAU:
             // Generate indices: 0, numCols, 2*numCols, ..., (numCols-1)*numCols
+            rotationIndices.reserve(numCols);
             for (int32_t k = 0; k < numCols; ++k) {
                 rotationIndices.push_back(numCols * k);
             }
@@ -81,6 +76,7 @@ std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int3
 
         case LinTransType::PHI:
             // Generate indices: numRepeats, numRepeats - numCols
+            rotationIndices.reserve(2);
             for (int32_t k = 0; k < 2; ++k) {
                 rotationIndices.push_back(numRepeats - k * numCols);
             }
@@ -93,6 +89,7 @@ std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int3
 
         case LinTransType::TRANSPOSE:
             // Generate indices for transposing a square matrix via diagonals
+            rotationIndices.reserve(2*numCols);
             for (int32_t k = -numCols + 1; k < numCols; ++k) {
                 rotationIndices.push_back((numCols - 1) * k);
             }
@@ -185,7 +182,7 @@ void EvalSumCumColsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
 *
 */
 
-Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>> evalKeys,
+Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>>& evalKeys,
                                    MatVecEncoding encodeType,
                                    int32_t numCols,
                                    const Ciphertext<DCRTPoly>& ctVector,

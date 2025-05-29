@@ -28,22 +28,19 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef __NUMPY_CONSTANTS_H__
+#define __NUMPY_CONSTANTS_H__
 
-// load necessary library
-// #include "config/config.h"
-// #include "helper_functions.h"
-#include <vector>
 #include <cstdint>
 
-uint32_t NextPow2(uint32_t x);
-// void Debug(CryptoContext<DCRTPoly> cc, KeyPair<DCRTPoly> keys, Ciphertext<DCRTPoly> ct, std::string msg, int length=16);
-// void Debug(CryptoContext, KeyPair keys, Ciphertext, std::string msg, int length = 16);
-std::vector<double> GenSigmaDiag(std::size_t rowsize, int32_t k);
-std::vector<double> GenTauDiag(std::size_t total_slots, std::size_t rowsize, int32_t k);
-std::vector<double> GenPhiDiag(std::size_t rowsize, int32_t k, int type);
-std::vector<double> GenPsiDiag(std::size_t rowsize, int32_t k);
-std::vector<double> GenTransposeDiag(std::size_t total_slots, std::size_t rowsize, int32_t i);
-void RoundVector(std::vector<double>& vector);
-#endif  // UTILS_H
+namespace openfhe_numpy {
+
+enum class MatVecEncoding : std::uint8_t { MM_CRC = 0, MM_RCR = 1, MM_DIAG = 2 };
+
+enum class LinTransType : std::uint8_t { SIGMA = 0, TAU = 1, PHI = 2, PSI = 3, TRANSPOSE = 4 };
+
+enum class ArrayEncodingType : std::uint8_t { ROW_MAJOR = 0, COL_MAJOR = 1, DIAG_MAJOR = 2 };
+
+}  // namespace openfhe_numpy
+
+#endif  // __NUMPY_CONSTANTS_H__

@@ -25,7 +25,7 @@ import numpy as np
 import openfhe
 from openfhe import *
 
-from .. import _openfhe_numpy  # Import from parent package
+from .. import openfhe_numpy  # Import from parent package
 from openfhe_numpy.utils.log import ONP_ERROR
 from openfhe_numpy.utils.utils import is_power_of_two, next_power_of_two, MatrixOrder
 

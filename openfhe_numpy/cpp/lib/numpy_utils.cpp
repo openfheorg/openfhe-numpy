@@ -28,16 +28,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#include "utils.h"
+#include "numpy_utils.h"
 
-// #include <algorithm>
 #include <cmath>
-// #include <iostream>
-// #include <iterator>
-// #include <vector>
-
-// utils implementation
-// using namespace lbcrypto;
 
 void RoundVector(std::vector<double>& vector) {
     for (double& e : vector)
@@ -48,17 +41,6 @@ uint32_t NextPow2(uint32_t x) {
     return pow(2, std::ceil(log(double(x)) / log(2.0)));
 };
 
-
-// void Debug(CryptoContext<DCRTPoly> cc, KeyPair<DCRTPoly> keys, Ciphertext<DCRTPoly> ct, std::string msg, int length) {
-//     Plaintext pt;
-//     cc->Decrypt(keys.secretKey, ct, &pt);
-//     pt->SetLength(length);
-//     std::vector<double> v = pt->GetRealPackedValue();
-//     std::cout << msg << std::endl;
-//     RoundVector(v);
-//     PrintVector(v);
-//     std::cout << std::endl;
-// };
 
 /*
 Compute diagonals for the permutation matrix Sigma.

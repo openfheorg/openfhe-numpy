@@ -1,7 +1,7 @@
 import openfhe
 import io
 import numpy as np
-from openfhe_numpy import _openfhe_numpy
+from openfhe_numpy import openfhe_numpy
 from .tensor import FHETensor
 from openfhe_numpy.utils.log import ONP_ERROR
 from openfhe_numpy.utils import utils
@@ -276,27 +276,27 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     #         A new tensor with cumulative sums along the specified axis.
     #     """
     #     if axis == 0:
-    #         ciphertext = _openfhe_numpy.EvalSumCumRows(
+    #         ciphertext = openfhe_numpy.EvalSumCumRows(
     #             self.data, self.ncols, self.original_shape[1]
     #         )
     #     else:
-    #         ciphertext = _openfhe_numpy.EvalSumCumCols(self.data, self.ncols)
+    #         ciphertext = openfhe_numpy.EvalSumCumCols(self.data, self.ncols)
     #     return self.clone(ciphertext)
 
     # def _reduce(self, axis=0) -> "CTArray":
     #     if axis == 0:
-    #         ciphertext = _openfhe_numpy.EvalReduceCumRows(
+    #         ciphertext = openfhe_numpy.EvalReduceCumRows(
     #             self.data, self.ncols, self.original_shape[1]
     #         )
     #     else:
-    #         ciphertext = _openfhe_numpy.EvalReduceCumCols(self.data, self.ncols)
+    #         ciphertext = openfhe_numpy.EvalReduceCumCols(self.data, self.ncols)
     #     return self.clone(ciphertext)
 
     def _transpose(self) -> "CTArray":
         """Transpose the encrypted matrix."""
         from openfhe_numpy.utils.matlib import next_power_of_two
 
-        ciphertext = _openfhe_numpy.EvalTranspose(self.data, self.ncols)
+        ciphertext = openfhe_numpy.EvalTranspose(self.data, self.ncols)
         shape = (self.original_shape[1], self.original_shape[0])
         ncols = next_power_of_two(shape[1])
         return CTArray(ciphertext, shape, self.batch_size, ncols, self.order)

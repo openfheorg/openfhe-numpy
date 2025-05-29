@@ -29,26 +29,22 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
 
-#ifndef ARRAY_METADATA_H
-#define ARRAY_METADATA_H
+#ifndef __NUMPY_ARRAY_METADATA_H__
+#define __NUMPY_ARRAY_METADATA_H__
 
 #include "metadata.h"
-#include "constants.h"
+#include "numpy_constants.h"
 
 #include "constants-defs.h"
-// #include "lattice/lat-hal.h"
 #include "ciphertext.h"
-// #include "config/config.h"
-// #include <cstdint>
-// #include <ostream>
-// #include <memory>
 
-// #define ARRAY_METADATA_API
+using namespace lbcrypto;
+
+
 // ------------------------------------------------------------------
 //  ArrayMetadata declaration
 // ------------------------------------------------------------------
 namespace openfhe_numpy {
-using namespace lbcrypto;
 
 class ArrayMetadata : public lbcrypto::Metadata {
 public:
@@ -140,4 +136,4 @@ private:
 };
 
 }  // namespace openfhe_numpy
-#endif  // ARRAY_METADATA_H
+#endif  // __NUMPY_ARRAY_METADATA_H__

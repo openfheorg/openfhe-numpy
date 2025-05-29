@@ -28,14 +28,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#ifndef HELPER_FUNCTIONS_H
-#define HELPER_FUNCTIONS_H
+#ifndef __NUMPY_HELPER_FUNCTIONS_H__
+#define __NUMPY_HELPER_FUNCTIONS_H__
 
 #include "lattice/lat-hal.h"
 
 #include <cstdint>
 #include <vector>
-// #include <iostream>
 
 // Internal helper functions - NOT part of the public API
 // Do not use directly in client code
@@ -106,4 +105,4 @@ std::vector<T> PackVecColWise(const std::vector<T>& v, std::size_t block_size, s
 
 void print_range(const std::vector<DCRTPoly>& v, std::size_t start, std::size_t end);
 
-#endif  // HELPER_FUNCTIONS_H
+#endif  // __NUMPY_HELPER_FUNCTIONS_H__

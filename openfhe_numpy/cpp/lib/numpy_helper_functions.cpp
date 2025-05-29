@@ -28,9 +28,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
-#include "helper_functions.h"
+#include "numpy_helper_functions.h"
 #include "utils/utilities.h"
 #include "utils/exception.h"
+
 #include <iostream>
 
 void PrintMatrix(const std::vector<std::vector<DCRTPoly>>& mat) {
@@ -217,12 +218,12 @@ std::vector<T> PackVecColWise(const std::vector<T>& v, std::size_t block_size, s
         return v;
     }
 
-    // Create and fill packed vector
-    std::vector<T> packed(num_slots, 0);
-
     // Calculate blocks
     if (num_slots % block_size != 0)
         OPENFHE_THROW("num_slots % block_size");
+
+    // Create and fill packed vector
+    std::vector<T> packed(num_slots, 0);
 
     std::size_t total_blocks = num_slots / block_size;
     std::size_t free_slots   = num_slots - n * total_blocks;
@@ -245,6 +246,7 @@ void print_range(const std::vector<DCRTPoly>& v, std::size_t start, std::size_t 
         std::cerr << "Invalid range\n";
         return;
     }
+    
     for (std::size_t i = start; i < end; ++i) {
         std::cout << v[i] << (i + 1 < end ? ' ' : '\n');
     }

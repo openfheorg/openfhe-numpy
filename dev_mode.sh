@@ -17,7 +17,7 @@ echo "Running unit tests..."
 
 # Create symlink to the extension
 echo "Linking C++ extension to package directory..."
-extension_path=$(find build -name "_openfhe_numpy*.so")
+extension_path=$(find build -name "openfhe_numpy*.so")
 if [ -n "$extension_path" ]; then
     ln -sf $(pwd)/$extension_path $(pwd)/openfhe_numpy/
     echo "Extension linked successfully: $extension_path"

@@ -1,4 +1,4 @@
-#include "openfhe_numpy/enc_matrix.h"
+#include "openfhe_numpy/numpy_enc_matrix.h"
 #include "openfhe.h"
 #include "openfhe_numpy/utils.h"
 

@@ -11,7 +11,7 @@ from openfhe_numpy.tensor.ctarray import CTArray
 from openfhe_numpy.tensor.ptarray import PTArray
 from openfhe_numpy.utils.log import ONP_ERROR
 from openfhe_numpy.utils.utils import MatrixOrder, next_power_of_two
-from openfhe_numpy import _openfhe_numpy
+from openfhe_numpy import openfhe_numpy
 from typing import Optional
 from numpy.typing import ArrayLike
 
@@ -157,9 +157,9 @@ def _eval_matvec_ct(lhs, rhs):
             )
         if lhs.order == MatrixOrder.ROW_MAJOR and rhs.order == MatrixOrder.COL_MAJOR:
             sumkey = lhs.extra["colkey"]
-            ciphertext = _openfhe_numpy.EvalMultMatVec(
+            ciphertext = openfhe_numpy.EvalMultMatVec(
                 sumkey,
-                _openfhe_numpy.MatVecEncoding.MM_CRC,
+                openfhe_numpy.MatVecEncoding.MM_CRC,
                 lhs.ncols,
                 rhs.data,
                 lhs.data,
@@ -168,9 +168,9 @@ def _eval_matvec_ct(lhs, rhs):
 
         elif lhs.order == MatrixOrder.COL_MAJOR and rhs.order == MatrixOrder.ROW_MAJOR:
             sumkey = lhs.extra["rowkey"]
-            ciphertext = _openfhe_numpy.EvalMultMatVec(
+            ciphertext = openfhe_numpy.EvalMultMatVec(
                 sumkey,
-                _openfhe_numpy.MatVecEncoding.MM_RCR,
+                openfhe_numpy.MatVecEncoding.MM_RCR,
                 lhs.ncols,
                 rhs.data,
                 lhs.data,
@@ -192,7 +192,7 @@ def _matmul_ct(lhs, rhs):
         if lhs.shape == rhs.shape:
             if rhs.ndim == 1:
                 return _eval_matvec_ct(lhs, rhs)
-            return lhs.clone(_openfhe_numpy.EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
+            return lhs.clone(openfhe_numpy.EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
 
         else:
             ONP_ERROR(f"Matrix dimension mismatch for multiplication: {lhs.shape} and {rhs.shape}")
@@ -228,7 +228,7 @@ def dot_ct(a, b):
 # ------------------------------------------------------------------------------
 def _transpose_ct(ctarray: CTArray) -> "CTArray":
     """Internal function to evaluate transpose of a tensor."""
-    ciphertext = _openfhe_numpy.EvalTranspose(ctarray.data, ctarray.ncols)
+    ciphertext = openfhe_numpy.EvalTranspose(ctarray.data, ctarray.ncols)
     shape = (ctarray.original_shape[1], ctarray.original_shape[0])
     ncols = next_power_of_two(shape[1])
     return CTArray(ciphertext, shape, ctarray.batch_size, ncols, ctarray.order)
@@ -311,11 +311,11 @@ def _cumsum_ct(tensor, axis=0, keepdims=True):
     if axis not in (0, 1):
         ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
     if axis == 0:
-        ciphertext = _openfhe_numpy.EvalSumCumRows(
+        ciphertext = openfhe_numpy.EvalSumCumRows(
             tensor.data, tensor.ncols, tensor.original_shape[1]
         )
     else:
-        ciphertext = _openfhe_numpy.EvalSumCumCols(tensor.data, tensor.ncols)
+        ciphertext = openfhe_numpy.EvalSumCumCols(tensor.data, tensor.ncols)
     return tensor.clone(ciphertext)
 
 
@@ -356,9 +356,9 @@ def _reduce_ct(a, axis=0, keepdims=False):
         ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
 
     if axis == 0:
-        ciphertext = _openfhe_numpy.EvalReduceCumRows(a.data, a.ncols, a.original_shape[1])
+        ciphertext = openfhe_numpy.EvalReduceCumRows(a.data, a.ncols, a.original_shape[1])
     else:
-        ciphertext = _openfhe_numpy.EvalReduceCumCols(a.data, a.ncols)
+        ciphertext = openfhe_numpy.EvalReduceCumCols(a.data, a.ncols)
     return a.clone(ciphertext)
 
 
