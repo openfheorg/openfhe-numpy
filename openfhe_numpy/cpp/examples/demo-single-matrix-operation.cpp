@@ -1,6 +1,7 @@
-#include "openfhe_numpy/numpy_enc_matrix.h"
+#include "numpy_enc_matrix.h"
 #include "openfhe.h"
-#include "openfhe_numpy/utils.h"
+#include "numpy_utils.h"
+#include "numpy_helper_functions.h"
 
 #include <iostream>
 #include <iomanip>
@@ -118,7 +119,7 @@ void DemoAccumulationOperations() {
     std::cout << "\n";
 
     // Encoding the matrix (row-major format)
-    std::vector<double> encMatA = EncodeMatrix<double>(matA, batchSize);
+    std::vector<double> encMatA = EncodeMatrix(matA, batchSize);
 
     // Encrypt the matrix
     Plaintext ptMatA = cc->MakeCKKSPackedPlaintext(encMatA);
@@ -265,7 +266,7 @@ void DemoMatrixTranspose() {
     PrintMatrix(matA);
 
     // Encoding the matrix
-    std::vector<double> encMatA = EncodeMatrix<double>(matA, batchSize);
+    std::vector<double> encMatA = EncodeMatrix(matA, batchSize);
 
     // Encrypt the matrix
     Plaintext ptMatA = cc->MakeCKKSPackedPlaintext(encMatA);

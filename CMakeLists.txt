@@ -22,8 +22,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 
-option(BUILD_EXAMPLES "Build C++ example executables" ON)
-option(BUILD_TESTING "Enable building of tests" OFF)
+option(BUILD_EXAMPLES "Set to ON to build C++ examples for the library" ON)
+# option(BUILD_TESTING "Enable building of tests" OFF)
+# message(STATUS "BUILD_EXAMPLES:     ${BUILD_EXAMPLES}")
 
 if(APPLE)
     set(CMAKE_CXX_VISIBILITY_PRESET default)
@@ -52,15 +53,30 @@ include_directories( ${OpenFHE_Numpy_INCLUDES} )
 set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
 link_libraries(${OpenFHE_SHARED_LIBRARIES})
 
-### Pybind Modules
 set(OpenFHE_Numpy_SOURCE openfhe_numpy/cpp/lib)
-pybind11_add_module(openfhe_numpy 
-                    ${OpenFHE_Numpy_SOURCE}/numpy_array_metadata.cpp
-                    ${OpenFHE_Numpy_SOURCE}/numpy_enc_matrix.cpp
-                    ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
-                    ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
-                    ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp
-                    )
+add_library(openfhe_numpy_cpp STATIC
+    ${OpenFHE_Numpy_INCLUDES}/numpy_constants.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_array_metadata.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_enc_matrix.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_helper_functions.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_utils.h
+    ${OpenFHE_Numpy_SOURCE}/numpy_array_metadata.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_enc_matrix.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
+)
+
+### Pybind Modules
+# pybind11_add_module(openfhe_numpy 
+#                     ${OpenFHE_Numpy_SOURCE}/numpy_array_metadata.cpp
+#                     ${OpenFHE_Numpy_SOURCE}/numpy_enc_matrix.cpp
+#                     ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
+#                     ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
+#                     ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp
+#                     )
+pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
+
+target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 
 # Find Python and its development components
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
@@ -89,3 +105,13 @@ endif()
 message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake with -DCMAKE_INSTALL_PREFIX=/your/path")
 install(TARGETS openfhe_numpy LIBRARY DESTINATION ${Python_Install_Location})
 
+if(BUILD_EXAMPLES)
+    file(GLOB EXAMPLE_SOURCES "openfhe_numpy/cpp/examples/*.cpp")
+
+    foreach(example_file ${EXAMPLE_SOURCES})
+        get_filename_component(example_name ${example_file} NAME_WE)
+        add_executable(${example_name} ${example_file})
+        target_include_directories(${example_name} PRIVATE ${OpenFHE_Numpy_INCLUDES})
+        target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
+    endforeach()
+endif()

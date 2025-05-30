@@ -1,6 +1,7 @@
-#include "openfhe_numpy/numpy_enc_matrix.h"
+#include "numpy_enc_matrix.h"
 #include "openfhe.h"
-#include "openfhe_numpy/numpy_utils.h"
+#include "numpy_utils.h"
+#include "numpy_helper_functions.h"
 
 #include <iostream>
 #include <iomanip>
@@ -109,8 +110,8 @@ void MatrixVectorProduct_CRC() {
     
     std::size_t batchSize         = cc->GetRingDimension() / 2;
 
-    std::vector<double> flatMat = EncodeMatrix<double>(inputMatrix, batchSize);
-    std::vector<double> flatVec = PackVecColWise<double>(inputVector, nCols, batchSize);
+    std::vector<double> flatMat = EncodeMatrix(inputMatrix, batchSize);
+    std::vector<double> flatVec = PackVecColWise(inputVector, nCols, batchSize);
 
 
     print_range(flatMat, 0 , 32);
@@ -206,8 +207,8 @@ void DemoMatrixProduct(bool verbose = true) {
     auto paddedRowCount = NextPow2(nCols);
     auto batchSize      = ringDim / 2;
 
-    std::vector<double> encMatA = EncodeMatrix<double>(matA, batchSize);
-    std::vector<double> encMatB = EncodeMatrix<double>(matB, batchSize);
+    std::vector<double> encMatA = EncodeMatrix(matA, batchSize);
+    std::vector<double> encMatB = EncodeMatrix(matB, batchSize);
 
     std::cout << "\nMatrix Parameters ...\n";
     std::cout << "  nRows = " << nRows << std::endl;

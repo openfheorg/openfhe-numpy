@@ -43,12 +43,14 @@ using namespace lbcrypto;
 /*
  * Displaying the 2D vector
  */
-void PrintMatrix(const std::vector<std::vector<DCRTPoly>>& mat);
+template <typename Element>
+void PrintMatrix(const std::vector<std::vector<Element>>& mat);
 
 /*
  * Displaying the 1D vector
  */
-void PrintVector(const std::vector<DCRTPoly>& vec);
+template <typename Element>
+void PrintVector(const std::vector<Element>& vec);
 
 /*
  * Normal Matrix-Matrix Product
@@ -74,7 +76,8 @@ std::vector<std::vector<double>> RandMatrix(int nrows,
                                             double max_val = 10,
                                             bool verbose   = true);
 
-std::vector<DCRTPoly> EncodeMatrix(const std::vector<std::vector<DCRTPoly>>& mat, long total_slots);
+template <typename Element>
+std::vector<Element> EncodeMatrix(const std::vector<std::vector<Element>>& mat, long total_slots);
 
 /**
  * @brief Clone a vector to fill num_slots by repeating each element block_size times
@@ -103,6 +106,7 @@ std::vector<DCRTPoly> PackVecRowWise(const std::vector<DCRTPoly>& v, std::size_t
 template <typename T>
 std::vector<T> PackVecColWise(const std::vector<T>& v, std::size_t block_size, std::size_t num_slots);
 
-void print_range(const std::vector<DCRTPoly>& v, std::size_t start, std::size_t end);
+template <typename Element>
+void print_range(const std::vector<Element>& v, std::size_t start, std::size_t end);
 
 #endif  // __NUMPY_HELPER_FUNCTIONS_H__

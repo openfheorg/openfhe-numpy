@@ -55,7 +55,7 @@ std::ostream& ArrayMetadata::print(std::ostream& os) const {
 
 // ---------- template bodies (header‑only) ------------------------
 template <class Archive>
-inline void ArrayMetadata::save(Archive& ar, std::uint32_t) const {
+void ArrayMetadata::save(Archive& ar, std::uint32_t) const {
     ar(cereal::base_class<lbcrypto::Metadata>(this),
        m_initialShape,
        m_ndim,
@@ -65,7 +65,7 @@ inline void ArrayMetadata::save(Archive& ar, std::uint32_t) const {
        m_encodeType);
 }
 template <class Archive>
-inline void ArrayMetadata::load(Archive& ar, std::uint32_t ver) {
+void ArrayMetadata::load(Archive& ar, std::uint32_t ver) {
     if (ver > SerializedVersion())
         OPENFHE_THROW("ArrayMetadata: incompatible version");
     ar(cereal::base_class<lbcrypto::Metadata>(this),

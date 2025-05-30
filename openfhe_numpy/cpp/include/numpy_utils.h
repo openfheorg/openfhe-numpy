@@ -35,11 +35,11 @@
 #include <cstdint>
 
 uint32_t NextPow2(uint32_t x);
-std::vector<double> GenSigmaDiag(std::size_t rowsize, int32_t k);
-std::vector<double> GenTauDiag(std::size_t total_slots, std::size_t rowsize, int32_t k);
-std::vector<double> GenPhiDiag(std::size_t rowsize, int32_t k, int type);
-std::vector<double> GenPsiDiag(std::size_t rowsize, int32_t k);
-std::vector<double> GenTransposeDiag(std::size_t total_slots, std::size_t rowsize, int32_t i);
+std::vector<double> GenSigmaDiag(uint32_t rowsize, int32_t k);
+std::vector<double> GenTauDiag(uint32_t total_slots, uint32_t rowsize, int32_t k);
+std::vector<double> GenPhiDiag(uint32_t rowsize, int32_t k, int type);
+std::vector<double> GenPsiDiag(uint32_t rowsize, int32_t k);
+std::vector<double> GenTransposeDiag(uint32_t total_slots, uint32_t rowsize, int32_t i);
 void RoundVector(std::vector<double>& vector);
 
 #endif  // __NUMPY_UTILS_H__

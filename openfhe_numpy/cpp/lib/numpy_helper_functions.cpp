@@ -34,20 +34,26 @@
 
 #include <iostream>
 
-void PrintMatrix(const std::vector<std::vector<DCRTPoly>>& mat) {
+template <typename Element>
+void PrintMatrix(const std::vector<std::vector<Element>>& mat) {
     for (const auto& row : mat) {
         for (const auto& val : row)
             std::cout << val << " ";
         std::cout << std::endl;
     }
 };
+template void PrintMatrix(const std::vector<std::vector<double>>& mat);
+template void PrintMatrix(const std::vector<std::vector<DCRTPoly>>& mat);
 
-void PrintVector(const std::vector<DCRTPoly>& vec) {
+template <typename Element>
+void PrintVector(const std::vector<Element>& vec) {
     std::cout << std::fixed << std::setprecision(2);
     for (const auto& val : vec)
         std::cout << val << " ";
     std::cout << std::endl;
 };
+template void PrintVector(const std::vector<double>& vec);
+template void PrintVector(const std::vector<DCRTPoly>& vec);
 
 std::vector<std::vector<double>> MulMats(std::vector<std::vector<double>>& A, std::vector<std::vector<double>>& B) {
     uint32_t nA = A.size();
@@ -128,14 +134,15 @@ std::vector<std::vector<double>> RandMatrix(int nrows, int numCols, double min_v
     return matrix;
 };
 
-std::vector<DCRTPoly> EncodeMatrix(const std::vector<std::vector<DCRTPoly>>& mat, long total_slots) {
+template <typename Element>
+std::vector<Element> EncodeMatrix(const std::vector<std::vector<Element>>& mat, long total_slots) {
     uint32_t n = mat.size();
     uint32_t m = mat[0].size();
 
     uint32_t size   = n * m;
     uint32_t blocks = total_slots / size;
 
-    std::vector<DCRTPoly> vec;
+    std::vector<Element> vec;
     vec.reserve(total_slots);
     for (uint32_t t = 0; t < blocks; ++t) {
         for (uint32_t i = 0; i < n; ++i) {
@@ -145,6 +152,9 @@ std::vector<DCRTPoly> EncodeMatrix(const std::vector<std::vector<DCRTPoly>>& mat
     }
     return vec;
 }
+template std::vector<double> EncodeMatrix(const std::vector<std::vector<double>>& mat, long total_slots);
+template std::vector<DCRTPoly> EncodeMatrix(const std::vector<std::vector<DCRTPoly>>& mat, long total_slots);
+
 
 std::vector<DCRTPoly> PackVecRowWise(const std::vector<DCRTPoly>& v, std::size_t block_size, std::size_t num_slots) {
     // Check input parameters
@@ -240,8 +250,10 @@ std::vector<T> PackVecColWise(const std::vector<T>& v, std::size_t block_size, s
 
     return packed;
 }
+template std::vector<double> PackVecColWise(const std::vector<double>& v, std::size_t block_size, std::size_t num_slots);
 
-void print_range(const std::vector<DCRTPoly>& v, std::size_t start, std::size_t end) {
+template <typename Element>
+void print_range(const std::vector<Element>& v, std::size_t start, std::size_t end) {
     if (start > end || end > v.size()) {
         std::cerr << "Invalid range\n";
         return;
@@ -251,3 +263,5 @@ void print_range(const std::vector<DCRTPoly>& v, std::size_t start, std::size_t 
         std::cout << v[i] << (i + 1 < end ? ' ' : '\n');
     }
 }
+template void print_range(const std::vector<double>& v, std::size_t start, std::size_t end);
+template void print_range(const std::vector<DCRTPoly>& v, std::size_t start, std::size_t end);
