@@ -1,15 +1,7 @@
 import time
 import numpy as np
-from openfhe import (
-    CCParamsCKKSRNS,
-    GenCryptoContext,
-    PKESchemeFeature,
-    FIXEDAUTO,
-    HYBRID,
-    UNIFORM_TERNARY,
-)
-import openfhe_numpy as onp
-from openfhe_numpy.utils import check_equality_matrix
+from openfhe import *
+from openfhe-numpy.tensor import *
 
 
 def gen_crypto_context(mult_depth):
@@ -52,8 +44,8 @@ def demo():
     print("Matrix B:\n", matB)
 
     # Encrypt both matrices
-    ctm_matA = onp.array(cc, matA, total_slots, public_key=keys.publicKey)
-    ctm_matB = onp.array(cc, matB, total_slots, public_key=keys.publicKey)
+    ctm_matA = array(cc, matA, total_slots, public_key=keys.publicKey)
+    ctm_matB = array(cc, matB, total_slots, public_key=keys.publicKey)
 
     print("\n********** HOMOMORPHIC ADDITIONS **********")
     print("1. Matrix Additions...")

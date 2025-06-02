@@ -2,7 +2,7 @@ import numpy as np
 import openfhe_numpy as onp
 
 # Import directly from main_unittest - aligned with new framework
-from tests.main_unittest import (
+from main_unittest import (
     generate_random_array,
     gen_crypto_context,
     load_ckks_params,

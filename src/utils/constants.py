@@ -1,12 +1,12 @@
-import openfhe
+# import openfhe
 from enum import Enum
 
 
 # Type Aliases for OpenFHE Types
-Plaintext = openfhe.Plaintext
-Ciphertext = openfhe.Ciphertext
-CryptoContext = openfhe.CryptoContext
-KeyPair = openfhe.KeyPair
+# Plaintext = openfhe.Plaintext
+# Ciphertext = openfhe.Ciphertext
+# CryptoContext = openfhe.CryptoContext
+# KeyPair = openfhe.KeyPair
 
 
 # Encoding strategy for matrix packing

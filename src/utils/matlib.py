@@ -1,6 +1,7 @@
 import math
 import numpy as np
-from openfhe_numpy.config import EPSILON, EPSILON_HIGH
+from openfhe_numpy.utils.constants import EPSILON, EPSILON_HIGH
+
 
 
 def next_power_of_two(x):

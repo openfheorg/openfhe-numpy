@@ -12,6 +12,7 @@ import contextlib
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Dict, List
+from utils.constants import EPSILON
 
 import numpy as np
 import unittest
@@ -297,7 +298,7 @@ class MainUnittest(unittest.TestCase):
 
     @classmethod
     def generate_test_case(
-        cls, func, name, test_name, params, input_data, expected, eps=onp.EPSILON, debug=False
+        cls, func, name, test_name, params, input_data, expected, eps=EPSILON, debug=False
     ):
         """Generate a test case function."""
 

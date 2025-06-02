@@ -46,14 +46,14 @@ include_directories(${OpenFHE_INCLUDE}/core)
 include_directories(${OpenFHE_INCLUDE}/pke)
 include_directories(${OpenFHE_INCLUDE}/binfhe)
 
-set(OpenFHE_Numpy_INCLUDES openfhe_numpy/cpp/include)
+set(OpenFHE_Numpy_INCLUDES src/cpp/include)
 include_directories( ${OpenFHE_Numpy_INCLUDES} )
 
 # always link with shared libs
 set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
 link_libraries(${OpenFHE_SHARED_LIBRARIES})
 
-set(OpenFHE_Numpy_SOURCE openfhe_numpy/cpp/lib)
+set(OpenFHE_Numpy_SOURCE src/cpp/lib)
 add_library(openfhe_numpy_cpp STATIC
     ${OpenFHE_Numpy_INCLUDES}/numpy_constants.h
     ${OpenFHE_Numpy_INCLUDES}/numpy_array_metadata.h
@@ -106,7 +106,7 @@ message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake wi
 install(TARGETS openfhe_numpy LIBRARY DESTINATION ${Python_Install_Location})
 
 if(BUILD_EXAMPLES)
-    file(GLOB EXAMPLE_SOURCES "openfhe_numpy/cpp/examples/*.cpp")
+    file(GLOB EXAMPLE_SOURCES "src/cpp/examples/*.cpp")
 
     foreach(example_file ${EXAMPLE_SOURCES})
         get_filename_component(example_name ${example_file} NAME_WE)
