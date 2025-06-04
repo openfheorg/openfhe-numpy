@@ -3,7 +3,9 @@ import openfhe_numpy as onp
 
 # Import directly from main_unittest instead of test_imports
 # to ensure we're using the latest optimized functionality
-from tests.test_imports import *
+from test_imports import *
+from tensor.constructors import array
+from operations.matrix_api import add
 
 
 def fhe_matrix_addition(params, input):
@@ -19,11 +21,11 @@ def fhe_matrix_addition(params, input):
     matrixB = np.array(input[1])
 
     # Encrypt matrices
-    ctm_A = onp.array(cc, matrixA, total_slots, public_key=keys.publicKey)
-    ctm_B = onp.array(cc, matrixB, total_slots, public_key=keys.publicKey)
+    ctm_A = array(cc, matrixA, total_slots, public_key=keys.publicKey)
+    ctm_B = array(cc, matrixB, total_slots, public_key=keys.publicKey)
 
     # Perform homomorphic addition
-    ctm_sum = onp.add(ctm_A, ctm_B)
+    ctm_sum = add(ctm_A, ctm_B)
 
     # Decrypt and format result
     result = ctm_sum.decrypt(keys.secretKey, format_type="reshape")

@@ -1,5 +1,4 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Direct imports from main_unittest
 from tests.main_unittest import (
@@ -10,6 +9,9 @@ from tests.main_unittest import (
     MainUnittest,
 )
 
+from tensor.constructors import array
+from operations.crypto_context import gen_transpose_keys
+from operations.matrix_api import transpose
 
 def fhe_matrix_transpose(params, input):
     """Execute matrix transpose with FHE."""
@@ -22,13 +24,13 @@ def fhe_matrix_transpose(params, input):
         matrixA = np.array(input[0])
 
         # Encrypt matrix
-        ct_matrixA = onp.array(cc, matrixA, total_slots, public_key=public_key)
+        ct_matrixA = array(cc, matrixA, total_slots, public_key=public_key)
 
         # Generate transpose keys
-        onp.gen_transpose_keys(keys.secretKey, ct_matrixA)
+        gen_transpose_keys(keys.secretKey, ct_matrixA)
 
         # Perform transpose operation
-        ct_result = onp.transpose(ct_matrixA)
+        ct_result = transpose(ct_matrixA)
 
         # Decrypt result
         result = ct_result.decrypt(keys.secretKey, format_type="reshape")

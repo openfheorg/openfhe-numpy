@@ -1,5 +1,4 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Direct imports from main_unittest
 from tests.main_unittest import (
@@ -10,6 +9,8 @@ from tests.main_unittest import (
     MainUnittest,
 )
 
+from tensor.constructors import array
+from operations.matrix_api import add
 
 def fhe_addition(params, input):
     """Execute vector addition with FHE."""
@@ -21,10 +22,10 @@ def fhe_addition(params, input):
         vector1 = np.array(input[0])
         vector2 = np.array(input[1])
 
-        tensor1 = onp.array(cc, vector1, total_slots, public_key=keys.publicKey)
-        tensor2 = onp.array(cc, vector2, total_slots, public_key=keys.publicKey)
+        tensor1 = array(cc, vector1, total_slots, public_key=keys.publicKey)
+        tensor2 = array(cc, vector2, total_slots, public_key=keys.publicKey)
 
-        tensor_sum = onp.add(tensor1, tensor2)
+        tensor_sum = add(tensor1, tensor2)
         result = tensor_sum.decrypt(keys.secretKey, format_type="reshape")
 
     return result

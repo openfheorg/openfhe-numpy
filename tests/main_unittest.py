@@ -33,7 +33,8 @@ from openfhe import (
     HEStd_256_classic,
     HEStd_NotSet,
 )
-import openfhe_numpy as onp
+
+from utils.matlib import check_equality_matrix
 
 # ===============================
 # Globals and Paths
@@ -307,7 +308,7 @@ class MainUnittest(unittest.TestCase):
             try:
                 with suppress_stdout(not debug):
                     result = func(params, input_data)
-                    flag, error_size = onp.check_equality_matrix(result, expected, eps)
+                    flag, error_size = check_equality_matrix(result, expected, eps)
                 log_test_result(
                     name, test_name, input_data, expected, result, error_size, passed=flag
                 )

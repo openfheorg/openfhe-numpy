@@ -1,8 +1,7 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Direct imports from main_unittest
-from tests.main_unittest import (
+from main_unittest import (
     generate_random_array,
     gen_crypto_context,
     load_ckks_params,
@@ -10,6 +9,9 @@ from tests.main_unittest import (
     MainUnittest,
 )
 
+from tensor.constructors import array
+from operations.crypto_context import sum_col_keys
+from utils.utils import next_power_of_two, pack_vec_row_wise
 
 def fhe_matrix_vector_product(params, input):
     """Execute matrix-vector product with FHE."""
@@ -23,15 +25,15 @@ def fhe_matrix_vector_product(params, input):
         vector = np.array(input[1])
 
         # Encrypt the matrix
-        ctm_matrix = onp.array(cc, matrix, total_slots, public_key=keys.publicKey)
+        ctm_matrix = array(cc, matrix, total_slots, public_key=keys.publicKey)
         ncols = ctm_matrix.ncols
 
         # Generate column sum keys
-        sumkey = onp.sum_col_keys(cc, keys.secretKey)
+        sumkey = sum_col_keys(cc, keys.secretKey)
         ctm_matrix.extra["colkey"] = sumkey
 
         # Encrypt the vector in column-major format
-        ctv_vector = onp.array(cc, vector, total_slots, ncols, "C", public_key=keys.publicKey)
+        ctv_vector = array(cc, vector, total_slots, ncols, "C", public_key=keys.publicKey)
 
         # Perform matrix-vector multiplication
         ctv_result = ctm_matrix @ ctv_vector
@@ -59,8 +61,8 @@ class TestMatrixVectorProduct(MainUnittest):
                 b = generate_random_array(size, 1)
 
                 # Calculate expected result
-                size = onp.next_power_of_two(size)
-                expected = onp.pack_vec_row_wise((A @ b), size, param["ringDim"] // 2)
+                size = next_power_of_two(size)
+                expected = pack_vec_row_wise((A @ b), size, param["ringDim"] // 2)
 
                 # Create test with descriptive name
                 name = "TestMatrixVectorProduct"

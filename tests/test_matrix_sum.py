@@ -1,5 +1,4 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Import directly from main_unittest - aligned with new framework
 from main_unittest import (
@@ -9,6 +8,10 @@ from main_unittest import (
     suppress_stdout,
     MainUnittest,
 )
+
+from tensor.constructors import array
+from operations.crypto_context import sum_col_keys, sum_row_keys
+from operations.matrix_api import sum
 
 """
 Note: Column-wise cumulative sum requires sufficient multiplicative 
@@ -33,17 +36,17 @@ def fhe_matrix_sum(original_params, input):
         total_slots = params["ringDim"] // 2
 
         public_key = keys.publicKey
-        ctm_matrix = onp.array(cc, matrix, total_slots, public_key=public_key)
+        ctm_matrix = array(cc, matrix, total_slots, public_key=public_key)
 
         if input[1] is None:
             cc.EvalSumKeyGen(keys.secretKey)
-            ctm_result = onp.sum(ctm_matrix)
+            ctm_result = sum(ctm_matrix)
         elif input[1] == 0:
-            onp.sum_row_keys(keys.secretKey, ctm_matrix.ncols)
-            ctm_result = onp.sum(ctm_matrix, 0, True)
+            sum_row_keys(cc, keys.secretKey, ctm_matrix.ncols)
+            ctm_result = sum(ctm_matrix, 0, True)
         elif input[1] == 1:
-            onp.sum_col_keys(keys.secretKey, ctm_matrix.ncols)
-            ctm_result = onp.sum(ctm_matrix, 1, True)
+            sum_col_keys(cc, keys.secretKey, ctm_matrix.ncols)
+            ctm_result = sum(ctm_matrix, 1, True)
         else:
             ctm_result = None
         result = ctm_result.decrypt(keys.secretKey, format_type="reshape")

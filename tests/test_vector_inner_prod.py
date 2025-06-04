@@ -1,5 +1,4 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Direct imports from main_unittest
 from tests.main_unittest import (
@@ -9,6 +8,9 @@ from tests.main_unittest import (
     suppress_stdout,
     MainUnittest,
 )
+
+from tensor.constructors import array
+from operations.matrix_api import dot
 
 
 def fhe_vector_dot(params, input):
@@ -24,13 +26,13 @@ def fhe_vector_dot(params, input):
         input_b = np.array(input[1])
 
         if input_a.ndim == 1:
-            ctm_input_a = onp.array(cc, input_a, total_slots, public_key=keys.publicKey)
-            ctm_input_b = onp.array(cc, input_b, total_slots, public_key=keys.publicKey)
+            ctm_input_a = array(cc, input_a, total_slots, public_key=keys.publicKey)
+            ctm_input_b = array(cc, input_b, total_slots, public_key=keys.publicKey)
         else:
-            ctm_input_a = onp.array(cc, input_a, total_slots, public_key=keys.publicKey)
-            ctm_input_b = onp.array(cc, input_b, total_slots, public_key=keys.publicKey)
+            ctm_input_a = array(cc, input_a, total_slots, public_key=keys.publicKey)
+            ctm_input_b = array(cc, input_b, total_slots, public_key=keys.publicKey)
 
-        ctm_dot = onp.dot(ctm_input_a, ctm_input_b)
+        ctm_dot = dot(ctm_input_a, ctm_input_b)
         result = ctm_dot.decrypt(keys.secretKey, format_type="reshape", new_shape=(1,))
 
     return result

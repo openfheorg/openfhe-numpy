@@ -2,7 +2,7 @@ import numpy as np
 import openfhe_numpy as onp
 
 # Direct imports from main_unittest
-from tests.main_unittest import (
+from main_unittest import (
     generate_random_array,
     gen_crypto_context,
     load_ckks_params,
@@ -10,6 +10,7 @@ from tests.main_unittest import (
     MainUnittest,
 )
 
+from tensor.constructors import array
 
 def fhe_square_matrix_product(params, input):
     """Execute square matrix product with FHE."""
@@ -22,8 +23,8 @@ def fhe_square_matrix_product(params, input):
         A = np.array(input[0])
         B = np.array(input[1])
 
-        ctm_matA = onp.array(cc, A, total_slots, public_key=keys.publicKey)
-        ctm_matB = onp.array(cc, B, total_slots, public_key=keys.publicKey)
+        ctm_matA = array(cc, A, total_slots, public_key=keys.publicKey)
+        ctm_matB = array(cc, B, total_slots, public_key=keys.publicKey)
 
         # Generate rotation keys for matrix multiplication
         onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, ctm_matA.ncols)

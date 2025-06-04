@@ -10,6 +10,10 @@ from tests.main_unittest import (
     MainUnittest,
 )
 
+from tensor.constructors import array
+from operations.crypto_context import sum_col_keys, sum_row_keys
+from operations.matrix_api import mean
+
 """
 Note: Column-wise cumulative mean requires sufficient multiplicative 
 depth and ring dimension to accommodate the computational complexity.
@@ -33,17 +37,17 @@ def fhe_matrix_mean(original_params, input):
         total_slots = params["ringDim"] // 2
 
         public_key = keys.publicKey
-        ctm_matrix = onp.array(cc, matrix, total_slots, public_key=public_key)
+        ctm_matrix = array(cc, matrix, total_slots, public_key=public_key)
 
         if input[1] is None:
             cc.EvalSumKeyGen(keys.secretKey)
-            ctm_result = onp.mean(ctm_matrix)
+            ctm_result = mean(ctm_matrix)
         elif input[1] == 0:
-            onp.sum_row_keys(keys.secretKey, ctm_matrix.ncols)
-            ctm_result = onp.mean(ctm_matrix, 0, True)
+            sum_row_keys(keys.secretKey, ctm_matrix.ncols)
+            ctm_result = mean(ctm_matrix, 0, True)
         elif input[1] == 1:
-            onp.sum_col_keys(cc, keys.secretKey, ctm_matrix.ncols)
-            ctm_result = onp.mean(ctm_matrix, 1, True)
+            sum_col_keys(cc, keys.secretKey, ctm_matrix.ncols)
+            ctm_result = mean(ctm_matrix, 1, True)
         else:
             ctm_result = None
         result = ctm_result.decrypt(keys.secretKey, format_type="reshape")

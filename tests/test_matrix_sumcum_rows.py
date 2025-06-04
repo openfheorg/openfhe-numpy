@@ -1,5 +1,4 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Direct imports from main_unittest
 from tests.main_unittest import (
@@ -10,6 +9,9 @@ from tests.main_unittest import (
     MainUnittest,
 )
 
+from tensor.constructors import array
+from operations.crypto_context import gen_accumulate_rows_key
+from operations.matrix_api import cumsum
 
 def fhe_matrix_sumcum_rows(params, input):
     """Execute matrix row summation with FHE."""
@@ -27,14 +29,14 @@ def fhe_matrix_sumcum_rows(params, input):
         matrixA = np.array(input[0])
 
         # Encrypt matrix
-        ct_matrixA = onp.array(cc, matrixA, total_slots, public_key=public_key)
+        ct_matrixA = array(cc, matrixA, total_slots, public_key=public_key)
         nrows = ct_matrixA.original_shape[0]
 
         # Generate accumulation keys
-        onp.gen_accumulate_rows_key(keys.secretKey, ct_matrixA.ncols)
+        gen_accumulate_rows_key(keys.secretKey, ct_matrixA.ncols)
 
         # Perform row-wise cumulative sum
-        ct_result = onp.cumsum(ct_matrixA, axis=0)
+        ct_result = cumsum(ct_matrixA, axis=0)
 
         # Decrypt result
         result = ct_result.decrypt(keys.secretKey, format_type="reshape")

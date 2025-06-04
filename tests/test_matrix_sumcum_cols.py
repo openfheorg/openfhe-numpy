@@ -1,5 +1,4 @@
 import numpy as np
-import openfhe_numpy as onp
 
 # Import directly from main_unittest - aligned with new framework
 from tests.main_unittest import (
@@ -9,6 +8,10 @@ from tests.main_unittest import (
     suppress_stdout,
     MainUnittest,
 )
+
+from tensor.constructors import array
+from operations.crypto_context import gen_accumulate_cols_key
+from operations.matrix_api import cumsum
 
 """
 Note: Column-wise cumulative sum requires sufficient multiplicative 
@@ -33,10 +36,10 @@ def fhe_matrix_sumcum_cols(original_params, input):
         total_slots = params["ringDim"] // 2
 
         public_key = keys.publicKey
-        ctm_matrix = onp.array(cc, matrix, total_slots, public_key=public_key)
+        ctm_matrix = array(cc, matrix, total_slots, public_key=public_key)
 
-        onp.gen_accumulate_cols_key(keys.secretKey, ctm_matrix.ncols)
-        ctm_result = onp.cumsum(ctm_matrix, 1, True)
+        gen_accumulate_cols_key(keys.secretKey, ctm_matrix.ncols)
+        ctm_result = cumsum(ctm_matrix, 1, True)
         result = ctm_result.decrypt(keys.secretKey, format_type="reshape")
 
     return result
