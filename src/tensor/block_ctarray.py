@@ -1,9 +1,8 @@
-import openfhe
-import numpy as np
-from openfhe_numpy.tensor.block_tensor import BlockFHETensor
+from openfhe import Ciphertext
+from tensor.block_tensor import BlockFHETensor
 
 
-class BlockCTArray(BlockFHETensor[openfhe.Ciphertext]):
+class BlockCTArray(BlockFHETensor[Ciphertext]):
     tensor_priority = 40  # Higher priority than CTArray
 
     def __str__(self):

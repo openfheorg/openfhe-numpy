@@ -1,10 +1,10 @@
 import openfhe
 import io
 import numpy as np
-from openfhe_numpy import openfhe_numpy
-from .tensor import FHETensor
-from openfhe_numpy.utils.log import ONP_ERROR
-from openfhe_numpy.utils import utils
+import openfhe_numpy
+from tensor.tensor import FHETensor
+from utils.log import ONP_ERROR
+from utils.utils import format_array
 
 
 class CTArray(FHETensor[openfhe.Ciphertext]):
@@ -67,7 +67,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         result = plaintext.GetRealPackedValue()
 
         # Define valid format types
-        return utils.format_array(
+        return format_array(
             result, format_type, self.ndim, self.original_shape, self.shape, **format_options
         )
 
@@ -294,7 +294,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
 
     def _transpose(self) -> "CTArray":
         """Transpose the encrypted matrix."""
-        from openfhe_numpy.utils.matlib import next_power_of_two
+        from utils.matlib import next_power_of_two
 
         ciphertext = openfhe_numpy.EvalTranspose(self.data, self.ncols)
         shape = (self.original_shape[1], self.original_shape[0])

@@ -1,3 +1,5 @@
-from .constructors import array
+def _register_all_operations():
+    import operations.matrix_arithmetic
+    # import operations.matrix_api
 
-__all__ = ["array"]
+_register_all_operations()

@@ -1,11 +1,11 @@
 # Import OpenFHE and matrix utilities
 import numpy as np
 from openfhe import *
-import openfhe_numpy as onp
 
-# Import OpenFHE NumPy-style interface
-import openfhe_numpy as onp
-from openfhe_numpy.utils import check_equality_matrix
+from utils.matlib import check_equality_matrix
+from tensor.constructors import array
+from operations.crypto_context import gen_transpose_keys
+from operations.matrix_api import transpose
 
 
 def gen_crypto_context(mult_depth):
@@ -69,13 +69,13 @@ def demo():
     print(params.GetBatchSize(), params.GetRingDim())
 
     # Encrypt matrix A
-    ctm_matA = onp.array(cc, matrix, slots, public_key=keys.publicKey)
+    ctm_matA = array(cc, matrix, slots, public_key=keys.publicKey)
 
     print("\n********** HOMOMORPHIC MATRIX TRANSPOSE **********")
 
     # Perform matrix tranpose on ciphertexts
-    onp.gen_transpose_keys(keys.secretKey, ctm_matA)
-    ctm_result = onp.transpose(ctm_matA)
+    gen_transpose_keys(keys.secretKey, ctm_matA)
+    ctm_result = transpose(ctm_matA)
 
     # Decrypt the result
     result = ctm_result.decrypt(keys.secretKey, format_type="reshape")

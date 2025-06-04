@@ -8,7 +8,11 @@ from openfhe import (
     HYBRID,
     UNIFORM_TERNARY,
 )
-import openfhe_numpy as onp
+
+from tensor.constructors import array
+from operations.crypto_context import (gen_accumulate_rows_key, sum_row_keys, sum_col_keys)
+from operations.matrix_api import sum
+from utils.matlib import check_equality_matrix
 
 
 def gen_crypto_context(mult_depth):
@@ -70,19 +74,19 @@ def demo():
     slots = params.GetBatchSize() if params.GetBatchSize() else cc.GetRingDimension() // 2
 
     # Encrypt matrix A
-    tensor = onp.array(cc, matrix, slots, public_key=keys.publicKey)
+    tensor = array(cc, matrix, slots, public_key=keys.publicKey)
 
     print(f"slots = {slots}, dim = {cc.GetRingDimension()}, ncols = {tensor.ncols}")
 
     print("\n********** HOMOMORPHIC SUM BY ALL ENTRIES **********")
     #  Generate rotation keys for column operations
     start_keygen = time.time()
-    onp.gen_accumulate_rows_key(keys.secretKey, tensor.ncols)
+    gen_accumulate_rows_key(keys.secretKey, tensor.ncols)
     end_keygen = time.time()
 
     # Perform homomorphic column accumulation
     start_acc = time.time()
-    tensor_result = onp.sum(tensor)
+    tensor_result = sum(tensor)
     end_acc = time.time()
 
     # Perform decryption
@@ -99,18 +103,18 @@ def demo():
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = onp.check_equality_matrix(result, expected)
+    is_match, error = check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
     print("\n********** HOMOMORPHIC SUM BY ROWS **********")
     #  Generate rotation keys for column operations
     start_keygen = time.time()
-    tensor.extra["rowkey"] = onp.sum_row_keys(keys.secretKey, tensor.ncols)
+    tensor.extra["rowkey"] = sum_row_keys(keys.secretKey, tensor.ncols)
     end_keygen = time.time()
 
     # Perform homomorphic column accumulation
     start_acc = time.time()
-    tensor_result = onp.sum(tensor, axis=0)
+    tensor_result = sum(tensor, axis=0)
     end_acc = time.time()
 
     # Perform decryption
@@ -127,19 +131,19 @@ def demo():
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = onp.check_equality_matrix(result, expected)
+    is_match, error = check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
     print("\n********** HOMOMORPHIC SUM BY COLUMNS **********")
 
     #  Generate rotation keys for column operations
     start_keygen = time.time()
-    tensor.extra["colkey"] = onp.sum_col_keys(keys.secretKey, tensor.ncols)
+    tensor.extra["colkey"] = sum_col_keys(keys.secretKey, tensor.ncols)
     end_keygen = time.time()
 
     # Perform homomorphic column accumulation
     start_acc = time.time()
-    tensor_result = onp.sum(tensor, axis=1)
+    tensor_result = sum(tensor, axis=1)
     end_acc = time.time()
 
     # Perform decryption
@@ -156,7 +160,7 @@ def demo():
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = onp.check_equality_matrix(result, expected)
+    is_match, error = check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
 

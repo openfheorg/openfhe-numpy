@@ -2,14 +2,12 @@ import numpy as np
 import openfhe
 import copy
 
-from .tensor import BaseTensor, FHETensor
-from .ptarray import PTArray
-from .ctarray import CTArray
-from .block_tensor import BlockFHETensor
-from .block_ctarray import BlockCTArray
-from openfhe_numpy.utils import utils
-from openfhe_numpy.config import MatrixOrder, DataType
-from openfhe_numpy.utils.log import ONP_DEBUG, ONP_ERROR, ONP_WARNING, ONPNotImplementedError
+from tensor.tensor import FHETensor
+from tensor.ptarray import PTArray
+from tensor.ctarray import CTArray
+from utils import utils
+from utils.constants import MatrixOrder, DataType
+from utils.log import ONP_ERROR
 
 
 # TODO: constructor for block matrix

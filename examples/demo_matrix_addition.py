@@ -1,7 +1,9 @@
 import time
 import numpy as np
 from openfhe import *
-from openfhe-numpy.tensor import *
+
+from tensor.constructors import array
+from utils.matlib import check_equality_matrix
 
 
 def gen_crypto_context(mult_depth):

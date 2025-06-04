@@ -8,7 +8,11 @@ from openfhe import (
     HYBRID,
     UNIFORM_TERNARY,
 )
-import openfhe_numpy as onp
+
+from operations.crypto_context import gen_accumulate_rows_key, gen_accumulate_cols_key
+from operations.matrix_api import cumsum
+from tensor.constructors import array
+from utils.matlib import check_equality_matrix
 
 
 def gen_crypto_context(mult_depth):
@@ -70,19 +74,19 @@ def demo():
     slots = params.GetBatchSize() if params.GetBatchSize() else cc.GetRingDimension() // 2
 
     # Encrypt matrix A
-    ctm_matA = onp.array(cc, matrix, slots, public_key=keys.publicKey)
+    ctm_matA = array(cc, matrix, slots, public_key=keys.publicKey)
 
     print(f"slots = {slots}, dim = {cc.GetRingDimension()}, ncols = {ctm_matA.ncols}")
 
     print("\n********** HOMOMORPHIC ACCUMULATION BY ROWS **********")
     #  Generate rotation keys for column operations
     start_keygen = time.time()
-    onp.gen_accumulate_rows_key(keys.secretKey, ctm_matA.ncols)
+    gen_accumulate_rows_key(keys.secretKey, ctm_matA.ncols)
     end_keygen = time.time()
 
     # Perform homomorphic column accumulation
     start_acc = time.time()
-    ctm_result = onp.cumsum(ctm_matA, 0, True)
+    ctm_result = cumsum(ctm_matA, 0, True)
     end_acc = time.time()
 
     # Perform decryption
@@ -99,19 +103,19 @@ def demo():
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = onp.check_equality_matrix(result, expected)
+    is_match, error = check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
     print("\n********** HOMOMORPHIC ACCUMULATION BY COLUMNS **********")
 
     #  Generate rotation keys for column operations
     start_keygen = time.time()
-    onp.gen_accumulate_cols_key(keys.secretKey, ctm_matA.ncols)
-    end_keygen = time.time()
+    gen_accumulate_cols_key(keys.secretKey, ctm_matA.ncols)
+    end_keygen = time.time()    
 
     # Perform homomorphic column accumulation
     start_acc = time.time()
-    ctm_result = onp.cumsum(ctm_matA, 1, True)
+    ctm_result = cumsum(ctm_matA, 1, True)
     end_acc = time.time()
 
     # Perform decryption
@@ -128,7 +132,7 @@ def demo():
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = onp.check_equality_matrix(result, expected)
+    is_match, error = check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
 

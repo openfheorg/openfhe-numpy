@@ -317,7 +317,7 @@ def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 
 
 @tensor_function_api("sum", binary=False)
-def sum(a: ArrayLike, axis: Optional[int] = 0, keepdims: bool = False) -> ArrayLike:
+def sum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
     """
     Sum of tensor elements over a given axis.
 

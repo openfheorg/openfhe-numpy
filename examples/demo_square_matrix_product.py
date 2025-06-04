@@ -13,8 +13,10 @@ from openfhe import (
     UNIFORM_TERNARY,
     HEStd_NotSet,
 )
+
+from tensor.constructors import array
+from utils.matlib import check_equality_matrix
 import openfhe_numpy as onp
-from openfhe_numpy.utils import utils
 
 
 def gen_crypto_context(mult_depth, ring_dim=0):
@@ -103,7 +105,7 @@ def demo():
 
     # Encrypt matrix
     start_enc_matrix = time.time()
-    ctm_matA = onp.array(cc, A, total_slots, public_key=keys.publicKey)
+    ctm_matA = array(cc, A, total_slots, public_key=keys.publicKey)
 
     enc_time = time.time()
     print(f"Matrix [2] encryption time: {(enc_time - start_enc_matrix) * 1000:.2f} ms")
@@ -137,7 +139,7 @@ def demo():
     print(f"\nExpected:\n{A @ B}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = utils.check_equality_matrix(result, expected)
+    is_match, error = check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
 

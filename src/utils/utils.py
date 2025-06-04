@@ -1,7 +1,7 @@
 import numpy as np
-from openfhe_numpy.utils.matlib import *
-from openfhe_numpy.utils.constants import *
-from openfhe_numpy.utils.log import ONP_ERROR, ONP_DEBUG, ONP_WARNING
+from utils.matlib import *
+from utils.constants import *
+from utils.log import ONP_ERROR
 from typing import Union
 
 

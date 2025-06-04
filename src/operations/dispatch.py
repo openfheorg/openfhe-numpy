@@ -35,9 +35,9 @@ def register_tensor_function(name, type_signatures):
         else:
             signatures = type_signatures
 
-            for signature in signatures:
-                TENSOR_FUNCTIONS[(name, signature)] = func
-            return func
+        for signature in signatures:
+            TENSOR_FUNCTIONS[(name, signature)] = func
+        return func
 
     return decorator
 
@@ -94,6 +94,7 @@ def dispatch_tensor_function(
             f"Registered for {func_name}: {[k[1] for k in TENSOR_FUNCTIONS if k[0] == func_name]}"
         )
 
+    # import pdb;pdb.set_trace()
     raise NotImplementedError(
         f"{str(func_name)} not implemented for types {sig}.\n"
         f"Registered signatures for '{func_name}':\n  "
