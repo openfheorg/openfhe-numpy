@@ -102,7 +102,16 @@ else()
     set(Python_Install_Location "${CMAKE_INSTALL_PREFIX}")
 endif()
 message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake with -DCMAKE_INSTALL_PREFIX=/your/path")
+
+# install the .so with the python bindings 
 install(TARGETS openfhe_numpy LIBRARY DESTINATION ${Python_Install_Location})
+# install the required directories: operations, tensor and utils (with *.py files only)
+file(GLOB OPERATIONS_DIR_FILES "${CMAKE_SOURCE_DIR}/onp/operations/*.py")
+install(FILES ${OPERATIONS_DIR_FILES} DESTINATION ${Python_Install_Location}/operations/)
+file(GLOB TENSOR_DIR_FILES "${CMAKE_SOURCE_DIR}/onp/tensor/*.py")
+install(FILES ${TENSOR_DIR_FILES} DESTINATION ${Python_Install_Location}/tensor/)
+file(GLOB UTILS_DIR_FILES "${CMAKE_SOURCE_DIR}/onp/utils/*.py")
+install(FILES ${UTILS_DIR_FILES} DESTINATION ${Python_Install_Location}/utils/)
 
 if(BUILD_EXAMPLES)
     file(GLOB EXAMPLE_SOURCES "onp/cpp/examples/*.cpp")
