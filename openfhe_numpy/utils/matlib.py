@@ -1,6 +1,6 @@
 import math
 import numpy as np
-from utils.constants import EPSILON, EPSILON_HIGH
+from openfhe_numpy.utils.constants import EPSILON, EPSILON_HIGH
 
 
 

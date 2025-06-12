@@ -22,11 +22,10 @@ import logging
 # Third-Party Imports
 # -----------------------------------------------------------
 import numpy as np
-import openfhe
-from openfhe import *
+from openfhe_numpy.openfhe import *
 
-from utils.log import ONP_ERROR
-from utils.utils import is_power_of_two, next_power_of_two, MatrixOrder
+from openfhe_numpy.utils.log import ONP_ERROR
+from openfhe_numpy.utils.utils import is_power_of_two, next_power_of_two, MatrixOrder
 
 # -----------------------------------------------------------
 # Ultilities Imports
@@ -289,7 +288,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
 
     def __tensor_function__(self, func_name, args, kwargs=None):
         """Dispatch tensor operations via the registry."""
-        from operations.dispatch import dispatch_tensor_function
+        from openfhe_numpy.operations.dispatch import dispatch_tensor_function
 
         return dispatch_tensor_function(func_name, args, kwargs or {})
 

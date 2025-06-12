@@ -1,10 +1,10 @@
-import openfhe
+import openfhe_numpy.openfhe as openfhe
 import io
 import numpy as np
-import openfhe_numpy
-from tensor.tensor import FHETensor
-from utils.log import ONP_ERROR
-from utils.utils import format_array
+import openfhe_numpy as onp
+from openfhe_numpy.tensor.tensor import FHETensor
+from openfhe_numpy.utils.log import ONP_ERROR
+from openfhe_numpy.utils.utils import format_array
 
 
 class CTArray(FHETensor[openfhe.Ciphertext]):
@@ -276,27 +276,27 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     #         A new tensor with cumulative sums along the specified axis.
     #     """
     #     if axis == 0:
-    #         ciphertext = openfhe_numpy.EvalSumCumRows(
+    #         ciphertext = onp.EvalSumCumRows(
     #             self.data, self.ncols, self.original_shape[1]
     #         )
     #     else:
-    #         ciphertext = openfhe_numpy.EvalSumCumCols(self.data, self.ncols)
+    #         ciphertext = onp.EvalSumCumCols(self.data, self.ncols)
     #     return self.clone(ciphertext)
 
     # def _reduce(self, axis=0) -> "CTArray":
     #     if axis == 0:
-    #         ciphertext = openfhe_numpy.EvalReduceCumRows(
+    #         ciphertext = onp.EvalReduceCumRows(
     #             self.data, self.ncols, self.original_shape[1]
     #         )
     #     else:
-    #         ciphertext = openfhe_numpy.EvalReduceCumCols(self.data, self.ncols)
+    #         ciphertext = onp.EvalReduceCumCols(self.data, self.ncols)
     #     return self.clone(ciphertext)
 
     def _transpose(self) -> "CTArray":
         """Transpose the encrypted matrix."""
-        from utils.matlib import next_power_of_two
+        from openfhe_numpy.utils.matlib import next_power_of_two
 
-        ciphertext = openfhe_numpy.EvalTranspose(self.data, self.ncols)
+        ciphertext = onp.EvalTranspose(self.data, self.ncols)
         shape = (self.original_shape[1], self.original_shape[0])
         ncols = next_power_of_two(shape[1])
         return CTArray(ciphertext, shape, self.batch_size, ncols, self.order)

@@ -1,13 +1,13 @@
 import numpy as np
-import openfhe
+import openfhe_numpy.openfhe as openfhe
 import copy
 
-from tensor.tensor import FHETensor
-from tensor.ptarray import PTArray
-from tensor.ctarray import CTArray
-from utils import utils
-from utils.constants import MatrixOrder, DataType
-from utils.log import ONP_ERROR
+from openfhe_numpy.tensor.tensor import FHETensor
+from openfhe_numpy.tensor.ptarray import PTArray
+from openfhe_numpy.tensor.ctarray import CTArray
+from openfhe_numpy.utils import utils
+from openfhe_numpy.utils.constants import MatrixOrder, DataType
+from openfhe_numpy.utils.log import ONP_ERROR
 
 
 # TODO: constructor for block matrix

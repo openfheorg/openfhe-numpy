@@ -250,7 +250,7 @@ void bind_matrix_funcs(py::module& m) {
 }
 
 void bind_ciphertext(py::module& m) {
-    py::object existingModule = py::module_::import("openfhe");
+    py::object existingModule = py::module_::import("openfhe_numpy.openfhe.openfhe");
     py::object pyClsObj       = existingModule.attr("Ciphertext");
     pyClsObj.attr("GetEncodingType") =
         py::cpp_function([](const Ciphertext<DCRTPoly>& ct) { return ct->GetEncodingType(); });
@@ -259,7 +259,7 @@ void bind_ciphertext(py::module& m) {
 }
 
 void bind_privatekey(py::module& m) {
-    py::object existingModule = py::module_::import("openfhe");
+    py::object existingModule = py::module_::import("openfhe_numpy.openfhe.openfhe");
     py::object pyClsObj       = existingModule.attr("PrivateKey");
     pyClsObj.attr("GetCryptoContext") =
         py::cpp_function([](const PrivateKey<DCRTPoly>& sk) { return sk->GetCryptoContext(); });

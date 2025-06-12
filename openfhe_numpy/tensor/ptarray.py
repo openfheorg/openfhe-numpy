@@ -1,11 +1,11 @@
 from .tensor import FHETensor  # Use relative import
-import openfhe
+from openfhe_numpy.openfhe import Plaintext
 
 
 # -----------------------------------------------------------
 # PTArray - Plaintext Tensor
 # -----------------------------------------------------------
-class PTArray(FHETensor[openfhe.Plaintext]):
+class PTArray(FHETensor[Plaintext]):
     """Concrete tensor class for OpenFHE plaintexts."""
 
     def clone(self, data=None):

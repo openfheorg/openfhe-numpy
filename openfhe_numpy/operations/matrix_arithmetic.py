@@ -7,11 +7,11 @@ matrix multiplication, and other mathematical operations.
 """
 
 import openfhe_numpy as onp
-from operations.dispatch import register_tensor_function
-from tensor.ctarray import CTArray
-from tensor.ptarray import PTArray
-from utils.log import ONP_ERROR
-from utils.utils import MatrixOrder, next_power_of_two
+from openfhe_numpy.operations.dispatch import register_tensor_function
+from openfhe_numpy.tensor.ctarray import CTArray
+from openfhe_numpy.tensor.ptarray import PTArray
+from openfhe_numpy.utils.log import ONP_ERROR
+from openfhe_numpy.utils.utils import MatrixOrder, next_power_of_two
 from typing import Optional
 from numpy.typing import ArrayLike
 
