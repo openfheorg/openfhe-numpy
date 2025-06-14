@@ -38,9 +38,7 @@ using namespace lbcrypto;
 namespace py = pybind11;
 void bind_enums_and_constants(py::module& m);
 void bind_matrix_funcs(py::module& m);
-void bind_ciphertext(py::module& m);
 // void bind_metadata(py::module& m);
-void bind_privatekey(py::module& m);
 
 PYBIND11_MODULE(openfhe_numpy, m) {
     m.doc() = "OpenFHE-Numpy C++ extension";
@@ -64,8 +62,6 @@ PYBIND11_MODULE(openfhe_numpy, m) {
 
     bind_enums_and_constants(m);
     bind_matrix_funcs(m);
-    bind_ciphertext(m);
-    bind_privatekey(m);
 }
 
 void bind_enums_and_constants(py::module& m) {
@@ -247,22 +243,6 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("ciphertext"),
         py::arg("numCols"),
         py::arg("subringDim") = 0);
-}
-
-void bind_ciphertext(py::module& m) {
-    py::object existingModule = py::module_::import("openfhe_numpy.openfhe.openfhe");
-    py::object pyClsObj       = existingModule.attr("Ciphertext");
-    pyClsObj.attr("GetEncodingType") =
-        py::cpp_function([](const Ciphertext<DCRTPoly>& ct) { return ct->GetEncodingType(); });
-    pyClsObj.attr("GetCryptoContext") =
-        py::cpp_function([](const Ciphertext<DCRTPoly>& ct) { return ct->GetCryptoContext(); });
-}
-
-void bind_privatekey(py::module& m) {
-    py::object existingModule = py::module_::import("openfhe_numpy.openfhe.openfhe");
-    py::object pyClsObj       = existingModule.attr("PrivateKey");
-    pyClsObj.attr("GetCryptoContext") =
-        py::cpp_function([](const PrivateKey<DCRTPoly>& sk) { return sk->GetCryptoContext(); });
 }
 
 // FOR LATER
