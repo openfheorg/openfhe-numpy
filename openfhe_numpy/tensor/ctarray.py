@@ -1,4 +1,4 @@
-import openfhe_numpy.openfhe as openfhe
+import openfhe as openfhe
 import io
 import numpy as np
 import openfhe_numpy as onp

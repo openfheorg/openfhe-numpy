@@ -1,5 +1,5 @@
 from .tensor import FHETensor  # Use relative import
-from openfhe_numpy.openfhe import Plaintext
+from openfhe import Plaintext
 
 
 # -----------------------------------------------------------

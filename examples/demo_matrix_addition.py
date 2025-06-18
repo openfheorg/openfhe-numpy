@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from openfhe_numpy.openfhe import *
+from   openfhe import *
 
 from openfhe_numpy.tensor.constructors import array
 from openfhe_numpy.utils.matlib import check_equality_matrix

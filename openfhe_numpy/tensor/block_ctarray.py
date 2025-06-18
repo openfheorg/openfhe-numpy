@@ -1,4 +1,4 @@
-from openfhe_numpy.openfhe import Ciphertext
+from openfhe import Ciphertext
 from openfhe_numpy.tensor.block_tensor import BlockFHETensor
 
 

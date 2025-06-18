@@ -1,5 +1,5 @@
 import numpy as np
-import openfhe_numpy.openfhe as openfhe
+import openfhe as openfhe
 import copy
 
 from openfhe_numpy.tensor.tensor import FHETensor

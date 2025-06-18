@@ -22,7 +22,7 @@ import logging
 # Third-Party Imports
 # -----------------------------------------------------------
 import numpy as np
-from openfhe_numpy.openfhe import *
+from openfhe import *
 
 from openfhe_numpy.utils.log import ONP_ERROR
 from openfhe_numpy.utils.utils import is_power_of_two, next_power_of_two, MatrixOrder
