@@ -8,10 +8,7 @@ from openfhe import (
     HYBRID,
     UNIFORM_TERNARY,
 )
-
-from openfhe_numpy import gen_accumulate_rows_key, gen_accumulate_cols_key, cumsum
-from tensor.constructors import array
-from utils.matlib import check_equality_matrix
+from openfhe_numpy import gen_accumulate_rows_key, gen_accumulate_cols_key, cumsum, array, check_equality_matrix
 
 
 def gen_crypto_context(mult_depth):

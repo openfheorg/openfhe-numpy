@@ -5,7 +5,7 @@ This module provides functions for generating rotation, accumulation, and other 
 keys needed for various homomorphic operations in OpenFHE-NumPy.
 """
 
-import openfhe as openfhe
+import openfhe_numpy
 
 
 def accumulation_depth(nrows, ncols, accumulate_by_rows):
@@ -26,7 +26,7 @@ def accumulation_depth(nrows, ncols, accumulate_by_rows):
     int
         Required multiplicative depth
     """
-    return openfhe.MulDepthAccumulation(nrows, ncols, accumulate_by_rows)
+    return openfhe_numpy.MulDepthAccumulation(nrows, ncols, accumulate_by_rows)
 
 
 def sum_row_keys(context, secret_key, ncols=0):
@@ -86,7 +86,7 @@ def gen_accumulate_rows_key(secret_key, ncols):
     ncols : int
         Number of columns in the matrix
     """
-    openfhe.EvalSumCumRowsKeyGen(secret_key, ncols)
+    openfhe_numpy.EvalSumCumRowsKeyGen(secret_key, ncols)
 
 
 def gen_accumulate_cols_key(secret_key, ncols):
@@ -100,7 +100,7 @@ def gen_accumulate_cols_key(secret_key, ncols):
     ncols : int
         Number of columns in the matrix
     """
-    openfhe.EvalSumCumColsKeyGen(secret_key, ncols)
+    openfhe_numpy.EvalSumCumColsKeyGen(secret_key, ncols)
 
 
 def gen_rotation_keys(context, secret_key, rotation_indices):
@@ -134,7 +134,7 @@ def gen_lintrans_keys(secret_key, block_size, linear_transform_type, repetitions
     repetitions : int, optional
         Number of repetitions, by default 0
     """
-    openfhe.EvalLinTransKeyGen(secret_key, block_size, linear_transform_type, repetitions)
+    openfhe_numpy.EvalLinTransKeyGen(secret_key, block_size, linear_transform_type, repetitions)
 
 
 def gen_square_matmult_key(secret_key, block_size):
@@ -148,7 +148,7 @@ def gen_square_matmult_key(secret_key, block_size):
     block_size : int
         Block size for the matrix
     """
-    openfhe.EvalSquareMatMultRotateKeyGen(secret_key, block_size)
+    openfhe_numpy.EvalSquareMatMultRotateKeyGen(secret_key, block_size)
 
 
 def gen_transpose_keys(secret_key, ctm_matrix):
@@ -162,6 +162,6 @@ def gen_transpose_keys(secret_key, ctm_matrix):
     ctm_matrix : CTArray
         The ciphertext matrix to transpose
     """
-    openfhe.EvalLinTransKeyGen(
-        secret_key, ctm_matrix.ncols, openfhe.LinTransType.TRANSPOSE
+    openfhe_numpy.EvalLinTransKeyGen(
+        secret_key, ctm_matrix.ncols, openfhe_numpy.LinTransType.TRANSPOSE
     )
