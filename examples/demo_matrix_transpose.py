@@ -2,10 +2,7 @@
 import numpy as np
 from openfhe import *
 
-from utils.matlib import check_equality_matrix
-from tensor.constructors import array
-from operations.crypto_context import gen_transpose_keys
-from operations.matrix_api import transpose
+from openfhe_numpy import check_equality_matrix, array, gen_transpose_keys, transpose
 
 
 def gen_crypto_context(mult_depth):

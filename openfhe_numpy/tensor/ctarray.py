@@ -1,8 +1,10 @@
 import openfhe as openfhe
 import io
 import numpy as np
+
+from .tensor import FHETensor
+
 import openfhe_numpy as onp
-from openfhe_numpy.tensor.tensor import FHETensor
 from openfhe_numpy.utils.log import ONP_ERROR
 from openfhe_numpy.utils.utils import format_array
 

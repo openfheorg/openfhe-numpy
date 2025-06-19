@@ -2,10 +2,7 @@
 import numpy as np
 from openfhe import *
 
-from tensor.constructors import array
-from operations.crypto_context import sum_col_keys
-from utils.utils import pack_vec_row_wise
-from utils.matlib import check_equality_vector
+from openfhe_numpy import array, sum_col_keys, pack_vec_row_wise, check_equality_vector
 
 
 def gen_crypto_context(mult_depth):

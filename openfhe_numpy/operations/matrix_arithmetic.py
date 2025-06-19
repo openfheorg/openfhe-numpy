@@ -6,12 +6,14 @@ using the OpenFHE library. Operations include addition, subtraction, multiplicat
 matrix multiplication, and other mathematical operations.
 """
 
+from .dispatch import register_tensor_function
+
 import openfhe_numpy as onp
-from openfhe_numpy.operations.dispatch import register_tensor_function
 from openfhe_numpy.tensor.ctarray import CTArray
 from openfhe_numpy.tensor.ptarray import PTArray
 from openfhe_numpy.utils.log import ONP_ERROR
 from openfhe_numpy.utils.utils import MatrixOrder, next_power_of_two
+
 from typing import Optional
 from numpy.typing import ArrayLike
 

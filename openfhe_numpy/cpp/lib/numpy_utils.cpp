@@ -39,7 +39,7 @@ void RoundVector(std::vector<double>& vector) {
 }
 
 uint32_t NextPow2(uint32_t x) {
-    return pow(2, std::ceil(log(double(x)) / log(2.0)));
+    return std::pow(2, std::ceil(std::log(x) / std::log(2.0)));
 };
 
 

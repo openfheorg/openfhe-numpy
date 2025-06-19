@@ -2,9 +2,11 @@ import numpy as np
 import openfhe as openfhe
 import copy
 
-from openfhe_numpy.tensor.tensor import FHETensor
-from openfhe_numpy.tensor.ptarray import PTArray
-from openfhe_numpy.tensor.ctarray import CTArray
+from .tensor import FHETensor
+from .ptarray import PTArray
+from .ctarray import CTArray
+
+import openfhe_numpy as onp
 from openfhe_numpy.utils import utils
 from openfhe_numpy.utils.constants import MatrixOrder, DataType
 from openfhe_numpy.utils.log import ONP_ERROR

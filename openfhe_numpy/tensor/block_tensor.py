@@ -1,6 +1,6 @@
 from typing import Generic
 from openfhe_numpy.utils.utils import MatrixOrder
-from openfhe_numpy.tensor.tensor import FHETensor, T
+from .tensor import FHETensor, T
 
 
 class BlockFHETensor(FHETensor[T], Generic[T]):

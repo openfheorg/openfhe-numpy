@@ -9,10 +9,7 @@ from openfhe import (
     UNIFORM_TERNARY,
 )
 
-from tensor.constructors import array
-from operations.crypto_context import (gen_accumulate_rows_key, sum_row_keys, sum_col_keys)
-from operations.matrix_api import sum
-from utils.matlib import check_equality_matrix
+from openfhe_numpy import array, gen_accumulate_rows_key, sum_row_keys, sum_col_keys, sum, check_equality_matrix
 
 
 def gen_crypto_context(mult_depth):

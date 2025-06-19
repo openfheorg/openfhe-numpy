@@ -14,8 +14,7 @@ from openfhe import (
     HEStd_NotSet,
 )
 
-from tensor.constructors import array
-from utils.matlib import check_equality_matrix
+from openfhe_numpy import array, check_equality_matrix
 import openfhe_numpy as onp
 
 

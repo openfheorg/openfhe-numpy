@@ -1,5 +1,5 @@
 from openfhe import Ciphertext
-from openfhe_numpy.tensor.block_tensor import BlockFHETensor
+from .block_tensor import BlockFHETensor
 
 
 class BlockCTArray(BlockFHETensor[Ciphertext]):
