@@ -1,22 +1,37 @@
 """Tensor implementations for homomorphic encryption operations."""
 
 # Import tensor classes
-from .tensor import BaseTensor, FHETensor
-from .ptarray import PTArray
-from .ctarray import CTArray
-from .block_tensor import BlockFHETensor
 from .block_ctarray import BlockCTArray
-from .constructors import array
-
-# Define public API
+from .block_tensor import BlockFHETensor
+from .constructors import (
+    array,
+    pack,
+    ravel_matrix,
+    ravel_vector,
+)
+from .ctarray import CTArray
+from .ptarray import PTArray
+from .tensor import BaseTensor, FHETensor, copy_tensor, T
+#######################################################################################################################
 __all__ = [
+    # block_ctarray
+    "BlockCTArray",
+    # block_tensor
+    "BlockFHETensor",
+    # constructors
+    "array",
+    "pack",
+    "ravel_matrix",
+    "ravel_vector",
+    # ctarray
+    "CTArray",
+    # ptarray
+    "PTArray",
+    # tensor
     "BaseTensor",
     "FHETensor",
-    "PTArray",
-    "CTArray",
-    "BlockFHETensor",
-    "BlockCTArray",
-    "array",
+    "copy_tensor",
+    "T",
 ]
 
 def _register_all_operations():

@@ -9,8 +9,7 @@ from openfhe import (
     UNIFORM_TERNARY,
 )
 
-from operations.crypto_context import gen_accumulate_rows_key, gen_accumulate_cols_key
-from operations.matrix_api import cumsum
+from openfhe_numpy import gen_accumulate_rows_key, gen_accumulate_cols_key, cumsum
 from tensor.constructors import array
 from utils.matlib import check_equality_matrix
 

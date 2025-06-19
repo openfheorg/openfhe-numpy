@@ -1,3 +1,7 @@
+import time
+import numpy as np
+from .tensor.ctarray import CTArray
+
 class FHEDebugger:
     """Tools for debugging FHE operations."""
 
