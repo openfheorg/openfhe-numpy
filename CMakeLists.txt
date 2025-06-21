@@ -39,15 +39,31 @@ find_package(OpenFHE 1.3.0 REQUIRED)
 find_package(pybind11 REQUIRED)
 
 # include_directories(${OPENMP_INCLUDES})
-include_directories(${OpenFHE_INCLUDE})
-include_directories(${OpenFHE_INCLUDE}/third-party/include)
-include_directories(${OpenFHE_INCLUDE}/core)
-include_directories(${OpenFHE_INCLUDE}/pke)
-include_directories(${OpenFHE_INCLUDE}/binfhe)
+# Optional: fallback if targets are not defined
+if(NOT TARGET OpenFHE::pke)
+    message(WARNING "OpenFHE::pke not found, falling back to manual include/link paths")
 
-# always link with shared libs
-set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
-link_libraries(${OpenFHE_SHARED_LIBRARIES})
+    include_directories(${OpenFHE_INCLUDE})
+    include_directories(${OpenFHE_INCLUDE}/third-party/include)
+    include_directories(${OpenFHE_INCLUDE}/core)
+    include_directories(${OpenFHE_INCLUDE}/pke)
+    include_directories(${OpenFHE_INCLUDE}/binfhe)
+
+    set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
+    link_libraries(${OpenFHE_SHARED_LIBRARIES})
+else()
+    message(STATUS "Found OpenFHE targets: using OpenFHE::pke, OpenFHE::core, etc.")
+endif()
+
+# include_directories(${OpenFHE_INCLUDE})
+# include_directories(${OpenFHE_INCLUDE}/third-party/include)
+# include_directories(${OpenFHE_INCLUDE}/core)
+# include_directories(${OpenFHE_INCLUDE}/pke)
+# include_directories(${OpenFHE_INCLUDE}/binfhe)
+
+# # always link with shared libs
+# set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
+# link_libraries(${OpenFHE_SHARED_LIBRARIES})
 
 set(OpenFHE_Numpy_INCLUDES "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/include")
 include_directories( ${OpenFHE_Numpy_INCLUDES} )
@@ -75,7 +91,13 @@ add_library(openfhe_numpy_cpp STATIC
 #                     )
 pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
 
-target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
+# If OpenFHE targets are available, use them
+if(TARGET OpenFHE::pke)
+    target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp OpenFHE::pke OpenFHE::core OpenFHE::binfhe)
+else()
+    target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
+endif()
+# target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 
 # Find Python and its development components
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
@@ -121,6 +143,11 @@ if(BUILD_EXAMPLES)
         get_filename_component(example_name ${example_file} NAME_WE)
         add_executable(${example_name} ${example_file})
         target_include_directories(${example_name} PRIVATE ${OpenFHE_Numpy_INCLUDES})
-        target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
+        if(TARGET OpenFHE::pke)
+            target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp OpenFHE::pke OpenFHE::core OpenFHE::binfhe)
+        else()
+            target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
+        endif()
+        # target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
     endforeach()
 endif()
