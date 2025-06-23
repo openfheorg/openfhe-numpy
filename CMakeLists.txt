@@ -55,16 +55,6 @@ else()
     message(STATUS "Found OpenFHE targets: using OpenFHE::pke, OpenFHE::core, etc.")
 endif()
 
-# include_directories(${OpenFHE_INCLUDE})
-# include_directories(${OpenFHE_INCLUDE}/third-party/include)
-# include_directories(${OpenFHE_INCLUDE}/core)
-# include_directories(${OpenFHE_INCLUDE}/pke)
-# include_directories(${OpenFHE_INCLUDE}/binfhe)
-
-# # always link with shared libs
-# set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
-# link_libraries(${OpenFHE_SHARED_LIBRARIES})
-
 set(OpenFHE_Numpy_INCLUDES "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/include")
 include_directories( ${OpenFHE_Numpy_INCLUDES} )
 
@@ -80,15 +70,6 @@ add_library(openfhe_numpy_cpp STATIC
     ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
     ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
 )
-
-### Pybind Modules
-# pybind11_add_module(openfhe_numpy 
-#                     ${OpenFHE_Numpy_SOURCE}/numpy_array_metadata.cpp
-#                     ${OpenFHE_Numpy_SOURCE}/numpy_enc_matrix.cpp
-#                     ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
-#                     ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
-#                     ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp
-#                     )
 pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
 
 # If OpenFHE targets are available, use them
@@ -97,7 +78,6 @@ if(TARGET OpenFHE::pke)
 else()
     target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 endif()
-# target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 
 # Find Python and its development components
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
