@@ -1,20 +1,19 @@
-# Minimum required CMake version - needs at least 3.16 for modern features
 cmake_minimum_required(VERSION 3.16)
 
-# Project declaration with name, version, and languages
 project(OpenFHE-Numpy)
 
-# Version variables
 set(OPENFHE_NUMPY_VERSION_MAJOR 0)
 set(OPENFHE_NUMPY_VERSION_MINOR 0)
 set(OPENFHE_NUMPY_VERSION_PATCH 1)
 set(OPENFHE_NUMPY_VERSION ${OPENFHE_NUMPY_VERSION_MAJOR}.${OPENFHE_NUMPY_VERSION_MINOR}.${OPENFHE_NUMPY_VERSION_PATCH})
 
-set(OPENFHE_PYTHON_VERSION_MAJOR 1)
-set(OPENFHE_PYTHON_VERSION_MINOR 3)
-set(OPENFHE_PYTHON_VERSION_PATCH 0)
-set(OPENFHE_PYTHON_VERSION_TWEAK 0)
-set(OPENFHE_PYTHON_VERSION ${OPENFHE_PYTHON_VERSION_MAJOR}.${OPENFHE_PYTHON_VERSION_MINOR}.${OPENFHE_PYTHON_VERSION_PATCH}.${OPENFHE_PYTHON_VERSION_TWEAK})
+# OpenFHE version can be specified externally (-DOPENFHE_REQUIRED_VERSION=1.3.0)
+if(NOT DEFINED OPENFHE_REQUIRED_VERSION)
+    set(OPENFHE_REQUIRED_VERSION "1.3.0" CACHE STRING "Required OpenFHE version")
+else()
+    # User provided OPENFHE_REQUIRED_VERSION via -D
+    message(STATUS "Using user-specified OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
+endif()
 
 # Build Options
 set(CMAKE_CXX_STANDARD 17)
@@ -22,41 +21,33 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 
-option(BUILD_EXAMPLES "Set to ON to build C++ examples for the library" ON)
-# option(BUILD_TESTING "Enable building of tests" OFF)
-# message(STATUS "BUILD_EXAMPLES:     ${BUILD_EXAMPLES}")
-
 if(APPLE)
     set(CMAKE_CXX_VISIBILITY_PRESET default)
 endif()
 
-if(POLICY CMP0148)
-  cmake_policy(SET CMP0148 NEW)
-endif()
+option(BUILD_EXAMPLES "Set to ON to build C++ examples for the library" ON)
+# option(BUILD_TESTING "Enable building of tests" OFF)
+# message(STATUS "BUILD_EXAMPLES:     ${BUILD_EXAMPLES}")
 
-# Dependencies
-find_package(OpenFHE 1.3.0 REQUIRED)
+find_package(OpenFHE ${OPENFHE_REQUIRED_VERSION} REQUIRED)
+message(STATUS "Building with OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
+
+set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 
-# include_directories(${OPENMP_INCLUDES})
-# Optional: fallback if targets are not defined
-if(NOT TARGET OpenFHE::pke)
-    message(WARNING "OpenFHE::pke not found, falling back to manual include/link paths")
-
-    include_directories(${OpenFHE_INCLUDE})
-    include_directories(${OpenFHE_INCLUDE}/third-party/include)
-    include_directories(${OpenFHE_INCLUDE}/core)
-    include_directories(${OpenFHE_INCLUDE}/pke)
-    include_directories(${OpenFHE_INCLUDE}/binfhe)
-
-    set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
-    link_libraries(${OpenFHE_SHARED_LIBRARIES})
-else()
-    message(STATUS "Found OpenFHE targets: using OpenFHE::pke, OpenFHE::core, etc.")
-endif()
-
+# if(POLICY CMP0148)
+#   cmake_policy(SET CMP0148 NEW)
+# endif()
 set(OpenFHE_Numpy_INCLUDES "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/include")
 include_directories( ${OpenFHE_Numpy_INCLUDES} )
+include_directories(${OpenFHE_INCLUDE})
+include_directories(${OpenFHE_INCLUDE}/third-party/include)
+include_directories(${OpenFHE_INCLUDE}/core)
+include_directories(${OpenFHE_INCLUDE}/pke)
+include_directories(${OpenFHE_INCLUDE}/binfhe)
+
+set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
+link_libraries(${OpenFHE_SHARED_LIBRARIES})
 
 set(OpenFHE_Numpy_SOURCE "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/lib")
 add_library(openfhe_numpy_cpp STATIC
@@ -72,18 +63,17 @@ add_library(openfhe_numpy_cpp STATIC
 )
 pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
 
-# If OpenFHE targets are available, use them
-if(TARGET OpenFHE::pke)
-    target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp OpenFHE::pke OpenFHE::core OpenFHE::binfhe)
-else()
-    target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
-endif()
+target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 
-# Find Python and its development components
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+# Allow the user to specify the path to Python executable (if not provided, find it)
+option(PYTHON_EXECUTABLE_PATH "Path to Python executable" "")
+if(PYTHON_EXECUTABLE_PATH)
+    set(Python_EXECUTABLE "${PYTHON_EXECUTABLE_PATH}")
+endif()
+find_package(Python REQUIRED COMPONENTS Interpreter Development)
 
 # Check Python version
-if(${Python3_VERSION_MAJOR} EQUAL 3 AND ${Python3_VERSION_MINOR} GREATER_EQUAL 10)
+if(Python3_VERSION_MAJOR EQUAL 3 AND Python3_VERSION_MINOR GREATER_EQUAL 10)
     execute_process(
         COMMAND "${Python_EXECUTABLE}" -c "from sys import exec_prefix; print(exec_prefix)"
         OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
@@ -108,6 +98,7 @@ message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake wi
 # install the .so with the python bindings 
 install(TARGETS openfhe_numpy LIBRARY DESTINATION ${Python_Install_Location})
 install(FILES ${CMAKE_SOURCE_DIR}/openfhe_numpy/__init__.py DESTINATION ${Python_Install_Location})
+
 # install the required directories: operations, tensor and utils (with *.py files only)
 file(GLOB OPERATIONS_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/operations/*.py")
 install(FILES ${OPERATIONS_DIR_FILES} DESTINATION ${Python_Install_Location}/operations/)
@@ -128,6 +119,5 @@ if(BUILD_EXAMPLES)
         else()
             target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
         endif()
-        # target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
     endforeach()
 endif()
