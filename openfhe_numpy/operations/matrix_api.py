@@ -24,17 +24,6 @@ def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
     Add two tensors or a tensor and a scalar.
 
-    Parameters
-    ----------
-    a : ArrayLike
-        First operand.
-    b : ArrayLike
-        Second operand.
-
-    Returns
-    -------
-    out : ArrayLike
-        Element-wise sum of `a` and `b`.
 
     See Also
     --------
@@ -45,6 +34,10 @@ def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     >>> add([1, 2], [3, 4])
     array([4, 6])
     """
+    return _add_dispatch(a, b)
+@tensor_function_api("add", binary=True)
+def _add_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
+    """Dispatch for `add` operation."""
     pass
 
 
@@ -53,17 +46,7 @@ def subtract(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
     Subtract two tensors or a tensor and a scalar.
 
-    Parameters
-    ----------
-    a : ArrayLike
-        First operand.
-    b : ArrayLike
-        Second operand.
 
-    Returns
-    -------
-    out : ArrayLike
-        Element-wise difference of `a` and `b`.
 
     See Also
     --------
@@ -74,6 +57,12 @@ def subtract(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     >>> subtract([5, 7], [2, 4])
     array([3, 3])
     """
+    return _subtract_dispatch(a, b)
+
+
+@tensor_function_api("subtract", binary=True)
+def _subtract_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
+    """Dispatch for `subtract` operation."""
     pass
 
 
@@ -148,9 +137,9 @@ def power(a: ArrayLike, exponent: int) -> ArrayLike:
 @tensor_function_api("dot", binary=True)
 def dot(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Compute the dot (inner) product of two tensors.
-    1-D vectors: inner product
-    2-D matrices: matrix multiplication
+    Dot product or matrix multiplication:
+      - 1-D vectors: inner product
+      - 2-D matrices: standard matmul
 
     Parameters
     ----------

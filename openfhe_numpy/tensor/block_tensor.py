@@ -1,13 +1,19 @@
-from typing import Generic
-from openfhe_numpy.utils.utils import MatrixOrder
-from .tensor import FHETensor, T
+from typing import TypeVar, Generic, Tuple, List
+from openfhe_numpy._onp_cpp import ArrayEncodingType
+from openfhe_numpy.tensor.tensor import FHETensor, T
 
 
 class BlockFHETensor(FHETensor[T], Generic[T]):
     """Base class for block tensor implementations"""
 
     def __init__(
-        self, blocks, block_shape, original_shape, batch_size, ncols=1, order=MatrixOrder.ROW_MAJOR
+        self,
+        blocks,
+        block_shape,
+        original_shape,
+        batch_size,
+        ncols=1,
+        order=ArrayEncodingType.ROW_MAJOR,
     ):
         self._blocks = blocks
         self._block_shape = block_shape

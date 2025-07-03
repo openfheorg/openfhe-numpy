@@ -1,7 +1,6 @@
 import math
 import numpy as np
-from .constants import EPSILON, EPSILON_HIGH
-
+from .constants import EPSILON
 
 
 def next_power_of_two(x):
@@ -104,13 +103,11 @@ def check_equality_matrix(a, b, eps=EPSILON):
     tuple
         (is_equal: bool, total_error: float)
     """
-    a = np.array(a)
-    b = np.array(b)
+    a = np.asarray(a)
+    b = np.asarray(b)
 
     error, is_equal = 0, True
 
-    # if a.shape != b.shape:
-    #    rows = min(a)
     if a.ndim == 1:
         for i in range(len(a)):
             f, e = check_single_equality(a[i], b[i], eps)
@@ -128,3 +125,23 @@ def check_equality_matrix(a, b, eps=EPSILON):
             if not f:
                 is_equal = False
     return is_equal, error
+
+
+def _rotate_vector(vec, k):
+    """Rotate a vector by k positions.
+
+    Parameters
+    ----------
+    vec : list or ndarray
+        The input vector to rotate.
+    k : int
+        Number of positions to rotate the vector.
+
+    Returns
+    -------
+    list
+        Rotated vector.
+    """
+    n = len(vec)
+    new_vec = vec[:]
+    return [new_vec[(i + k) % n] for i in range(n)]

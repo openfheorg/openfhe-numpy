@@ -1,42 +1,9 @@
+import time
+
 # Import OpenFHE and matrix utilities
 import numpy as np
 from openfhe import *
-
-from openfhe_numpy import check_equality_matrix, array, gen_transpose_keys, transpose
-
-
-def gen_crypto_context(mult_depth):
-    """
-    Generate a CryptoContext and key pair for CKKS encryption.
-
-    Parameters
-    ----------
-    mult_depth : int
-        Maximum multiplicative depth for the ciphertext.
-
-    Returns
-    -------
-    tuple
-        (CryptoContext, KeyPair)
-    """
-    params = CCParamsCKKSRNS()
-    params.SetMultiplicativeDepth(mult_depth)
-    params.SetScalingModSize(59)
-    params.SetFirstModSize(60)
-    params.SetScalingTechnique(FIXEDAUTO)
-    params.SetKeySwitchTechnique(HYBRID)
-    params.SetSecretKeyDist(UNIFORM_TERNARY)
-
-    cc = GenCryptoContext(params)
-    cc.Enable(PKESchemeFeature.PKE)
-    cc.Enable(PKESchemeFeature.LEVELEDSHE)
-    cc.Enable(PKESchemeFeature.ADVANCEDSHE)
-
-    keys = cc.KeyGen()
-    cc.EvalMultKeyGen(keys.secretKey)
-    cc.EvalSumKeyGen(keys.secretKey)
-
-    return cc, params, keys
+import openfhe_numpy as onp
 
 
 def demo():
@@ -44,8 +11,13 @@ def demo():
     Run a demonstration of homomorphic matrix multiplication using OpenFHE-NumPy.
     """
 
-    mult_depth = 4
-    cc, params, keys = gen_crypto_context(mult_depth)
+    params = CCParamsCKKSRNS()
+    cc = GenCryptoContext(params)
+    cc.Enable(PKESchemeFeature.PKE)
+    cc.Enable(PKESchemeFeature.LEVELEDSHE)
+    cc.Enable(PKESchemeFeature.ADVANCEDSHE)
+
+    keys = cc.KeyGen()
 
     # Sample input matrix (8x8)
     matrix = np.array(
@@ -66,22 +38,22 @@ def demo():
     print(params.GetBatchSize(), params.GetRingDim())
 
     # Encrypt matrix A
-    ctm_matA = array(cc, matrix, slots, public_key=keys.publicKey)
+    ctm_matA = onp.array(cc, matrix, slots, public_key=keys.publicKey)
 
     print("\n********** HOMOMORPHIC MATRIX TRANSPOSE **********")
 
     # Perform matrix tranpose on ciphertexts
-    gen_transpose_keys(keys.secretKey, ctm_matA)
-    ctm_result = transpose(ctm_matA)
+    onp.gen_transpose_keys(keys.secretKey, ctm_matA)
+    ctm_result = onp.transpose(ctm_matA)  # ctm_matA.T
 
     # Decrypt the result
-    result = ctm_result.decrypt(keys.secretKey, format_type="reshape")
+    result = ctm_result.decrypt(keys.secretKey)
     # Compare with plain result
     expected = matrix.T
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = check_equality_matrix(result, expected)
+    is_match, error = onp.check_equality_matrix(result, expected)
     print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
 
 

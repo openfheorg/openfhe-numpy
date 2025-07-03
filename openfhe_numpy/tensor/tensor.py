@@ -1,41 +1,25 @@
-# -----------------------------------------------------------
 # Standard Library Imports
-# -----------------------------------------------------------
 from abc import ABC, abstractmethod
 from typing import (
     Any,
     Dict,
     Generic,
-    List,
-    Literal,
     Optional,
-    Sequence,
     Tuple,
     TypeVar,
 )
-import io
-import sys
-import logging
 
 
-# -----------------------------------------------------------
-# Third-Party Imports
-# -----------------------------------------------------------
-import numpy as np
-from openfhe import *
-
-from openfhe_numpy.utils.log import ONP_ERROR
-from openfhe_numpy.utils.utils import is_power_of_two, next_power_of_two, MatrixOrder
+# Internal C++ module Imports
+from openfhe_numpy.utils.errors import ONP_ERROR
+from openfhe_numpy.utils.constants import *
 
 # -----------------------------------------------------------
 # Ultilities Imports
-# -----------------------------------------------------------
 T = TypeVar("T")
 
 
-# -----------------------------------------------------------
 # BaseTensor - Abstract Interface
-# -----------------------------------------------------------
 class BaseTensor(ABC, Generic[T]):
     @property
     @abstractmethod
@@ -67,7 +51,7 @@ class BaseTensor(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def meta(self) -> dict: ...
+    def metadata(self) -> dict: ...
 
     @abstractmethod
     def clone(self, data: T = None) -> "BaseTensor[T]": ...
@@ -91,32 +75,39 @@ class FHETensor(BaseTensor[T], Generic[T]):
         Shape before any padding.
     batch_size : int
         Total number of packed slots.
-    ncols : int
-        Number of logical columns after padding.
+    new_shape : Tuple[int, int]
+        Since the shape may change after some operations, we need to store the new information.
     order : int
-        Packing order, e.g., row- or column-major.
+        Packing order: only support row-major or column-major.
     """
 
-    __slots__ = ("_data", "_original_shape", "_batch_size", "_ncols", "_ndim", "_order")
+    __slots__ = (
+        "_data",
+        "_original_shape",
+        "_shape",
+        "_batch_size",
+        "_ndim",
+        "_order",
+        "_dtype",
+        "extra",
+    )
 
     def __init__(
         self,
         data: T,
         original_shape: Tuple[int, int],
         batch_size: int,
-        ncols: int = 1,
-        order: int = MatrixOrder.ROW_MAJOR,
+        new_shape: Tuple[int, int],
+        order: int = 0,
     ):
         self._data = data
         self._original_shape = original_shape
+        self._shape = new_shape
         self._batch_size = batch_size
-        self._ncols = ncols if is_power_of_two(ncols) else next_power_of_two(ncols)
-        if len(original_shape) == 2:
-            self._ndim = 2 if original_shape[1] else 1
-        elif len(original_shape) == 1:
-            self._ndim = 1
-        else:
-            ONP_ERROR("Don't support high dimension")
+
+        self._ndim = len(original_shape)
+        if self._ndim > 2 or self._ndim < 0:
+            ONP_ERROR("Dimension is invalid!!!")
         self._order = order
         self._dtype = self.__class__.__name__  # e.g., "CTArray", "BlockCTArray"
         self.extra = {}
@@ -124,6 +115,13 @@ class FHETensor(BaseTensor[T], Generic[T]):
     ###
     ### Properties
     ###
+    @property
+    def size(self):
+        if self.ndim == 1:
+            return self.shape[0]
+        elif self.ndim == 2:
+            return self.shape[0] * self.shape[1]
+        return 0
 
     @property
     def dtype(self):
@@ -135,15 +133,14 @@ class FHETensor(BaseTensor[T], Generic[T]):
         return self._data
 
     @property
-    def shape(self) -> Tuple[int, int]:
-        """Logical 2-D shape after packing."""
-        rows = self._batch_size // self._ncols
-        return (rows, self._ncols)
 
-    @property
     def original_shape(self) -> Tuple[int, int]:
-        """Shape before any padding was applied."""
+        """Original shape before any padding was applied."""
         return self._original_shape
+    @property
+    def shape(self) -> Tuple[int, int]:
+        """Shape after padding."""
+        return self._shape
 
     @property
     def ndim(self) -> int:
@@ -157,8 +154,8 @@ class FHETensor(BaseTensor[T], Generic[T]):
 
     @property
     def ncols(self) -> int:
-        """Number of columns in the packed representation."""
-        return self._ncols
+        """Number of columns after padding"""
+        return self._shape[1]
 
     @property
     def order(self) -> int:
@@ -166,20 +163,19 @@ class FHETensor(BaseTensor[T], Generic[T]):
         return self._order
 
     @property
-    def meta(self) -> Dict[str, Any]:
+    def metadata(self) -> Dict[str, Any]:
         """Metadata dict for serialization or inspection."""
         return {
             "type": self.dtype,
             "shape": self.shape,
             "original_shape": self.original_shape,
-            "ncols": self.ncols,
             "batch_size": self.batch_size,
             "order": self.order,
             "extra": self.extra,
         }
 
     @property
-    def info(self) -> Tuple:
+    def info(self) -> Dict[str, Any]:
         """
         Tuple of shape and encoding metadata.
 
@@ -188,7 +184,14 @@ class FHETensor(BaseTensor[T], Generic[T]):
         Tuple
             Contains [None, original_shape, batch_size, ncols, order]
         """
-        return [None, self.original_shape, self.batch_size, self.ncols, self.order]
+        return {
+            "ndim": self.ndim,
+            "shape": self.shape,
+            "original_shape": self.original_shape,
+            "batch_size": self.batch_size,
+            "order": self.order,
+            "extra": self.extra,
+        }
 
     @property
     def is_encrypted(self) -> bool:
@@ -206,20 +209,22 @@ class FHETensor(BaseTensor[T], Generic[T]):
             raise ValueError(f"Batch size must be positive, got {value}")
         self._batch_size = value
 
-    def set_ncols(self, value: int):
-        """
-        Set the number of columns in the packed representation.
+    # def set_ncols(self, value: int):
+    #     """
+    #     Set the number of columns in the packed representation.
 
-        Parameters
-        ----------
-        value : int
-            New number of columns value. Should be a power of two.
-        """
-        if not isinstance(value, int):
-            raise TypeError(f"Batch size must be integer, got {type(value)}")
-        if value <= 0:
-            raise ValueError(f"Batch size must be positive, got {value}")
-        self._ncols = value
+    #     Parameters
+    #     ----------
+    #     value : int
+    #         New number of columns value. Should be a power of two.
+    #     """
+    #     if not isinstance(value, int):
+    #         raise TypeError(f"Value must be integer, got {type(value)}")
+    #     if value <= 0:
+    #         raise ValueError(f"Value must be positive, got {value}")
+    #     self._ncols = value
+    def set_shape(self, value: Tuple[int, int]):
+        self._shape = value
 
     def clone(self, data: Optional[T] = None) -> "BaseTensor[T]":
         """
@@ -229,7 +234,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
             data or self.data,
             self.original_shape,
             self.batch_size,
-            self.ncols,
+            self.shape,
             self.order,
         )
 
@@ -286,8 +291,10 @@ class FHETensor(BaseTensor[T], Generic[T]):
     def transpose(self):
         return self.__tensor_function__("transpose", (self,))
 
-    def __tensor_function__(self, func_name, args, kwargs=None):
+    def __tensor_function__(self, func_name, args, kwargs=None, verbose: bool = False):
         """Dispatch tensor operations via the registry."""
+        if verbose:
+            print(f"DEBUG: tensor.__tensor_function__ called for '{func_name}' with {len(args)} args")
         from openfhe_numpy.operations.dispatch import dispatch_tensor_function
 
         return dispatch_tensor_function(func_name, args, kwargs or {})
@@ -369,6 +376,6 @@ def copy_tensor(tensor: "FHETensor") -> "FHETensor":
         data=copy.deepcopy(tensor.data),
         original_shape=tensor.original_shape,
         batch_size=tensor.batch_size,
-        ncols=tensor.ncols,
+        shape=tensor.shape,
         order=tensor.order,
     )

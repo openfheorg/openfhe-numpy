@@ -1,111 +1,53 @@
-from .crypto_context import (
-    accumulation_depth,
-    sum_row_keys,
-    sum_col_keys,
-    gen_accumulate_rows_key,
-    gen_accumulate_cols_key,
-    gen_rotation_keys,
-    gen_lintrans_keys,
-    gen_square_matmult_key,
-    gen_transpose_keys,
-)
-#######################################################################################################################
-from .dispatch import (
-    mark_commutative,
-    register_tensor_function,
-    dispatch_tensor_function,
-    tensor_function_api,
-)
-#######################################################################################################################
+"""Operations for homomorphic encryption tensors."""
+
+from . import matrix_arithmetic
+
+# Import arithmetic operations
 from .matrix_api import (
     add,
     subtract,
     multiply,
-    power,
     dot,
     matmul,
     transpose,
+    power,
     cumsum,
     cumreduce,
     sum,
-    mean,
 )
-#######################################################################################################################
-from .matrix_arithmetic import (
-    add_ct,
-    add_ct_scalar,
-    add_block_ct,
-    add_block_ct_scalar,
-    subtract_ct,
-    subtract_ct_scalar,
-    multiply_ct,
-    multiply_ct_scalar,
-    multiply_block_ct,
-    multiply_block_ct_scalar,
-    matmul_ct,
-    dot_ct,
-    transpose_ct,
-    pow_ct,
-    pow_block_ct,
-    cumsum_ct,
-    cumsum_block_ct,
-    cumreduce_ct,
-    cumreduce_block_ct,
-    sum_ct,
-    mean_ct,
+
+# Import crypto context utilities
+from .crypto_context import (
+    sum_row_keys,
+    sum_col_keys,
+    gen_rotation_keys,
+    gen_lintrans_keys,
+    gen_transpose_keys,
+    gen_square_matmult_key,
+    gen_accumulate_rows_key,
+    gen_accumulate_cols_key,
 )
-#######################################################################################################################
-#######################################################################################################################
+
+# Define public API
 __all__ = [
-    # crypto_context
-    "accumulation_depth",
-    "sum_row_keys",
-    "sum_col_keys",
-    "gen_accumulate_rows_key",
-    "gen_accumulate_cols_key",
-    "gen_rotation_keys",
-    "gen_lintrans_keys",
-    "gen_square_matmult_key",
-    "gen_transpose_keys",
-    # dispatch
-    "mark_commutative",
-    "register_tensor_function",
-    "dispatch_tensor_function",
-    "tensor_function_api",
-    # matrix_api
+    # Arithmetic and matrix operations
     "add",
     "subtract",
     "multiply",
-    "power",
     "dot",
     "matmul",
     "transpose",
+    "power",
     "cumsum",
     "cumreduce",
     "sum",
-    "mean",
-    # matrix_arithmetic
-    "add_ct",
-    "add_ct_scalar",
-    "add_block_ct",
-    "add_block_ct_scalar",
-    "subtract_ct",
-    "subtract_ct_scalar",
-    "multiply_ct",
-    "multiply_ct_scalar",
-    "multiply_block_ct",
-    "multiply_block_ct_scalar",
-    "matmul_ct",
-    "dot_ct",
-    "transpose_ct",
-    "pow_ct",
-    "pow_block_ct",
-    "cumsum_ct",
-    "cumsum_block_ct",
-    "cumreduce_ct",
-    "cumreduce_block_ct",
-    "sum_ct",
-    "mean_ct",
+    # Key generation utilities
+    "sum_row_keys",
+    "sum_col_keys",
+    "gen_rotation_keys",
+    "gen_lintrans_keys",
+    "gen_transpose_keys",
+    "gen_square_matmult_key",
+    "gen_accumulate_rows_key",
+    "gen_accumulate_cols_key",
 ]
-
-

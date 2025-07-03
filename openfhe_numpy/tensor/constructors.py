@@ -1,190 +1,237 @@
+# Third‐party imports
+from typing import Literal, Optional
+
 import numpy as np
-import openfhe as openfhe
-import copy
+import openfhe
 
-from .tensor import FHETensor
-from .ptarray import PTArray
+# Package-level imports
+from openfhe_numpy._onp_cpp import ArrayEncodingType
+from openfhe_numpy.utils.errors import ONP_ERROR
+from openfhe_numpy.utils.matlib import is_power_of_two
+from openfhe_numpy.utils.packing import (
+    _pack_matrix_col_wise,
+    _pack_matrix_row_wise,
+    _pack_vector_col_wise,
+    _pack_vector_row_wise,
+)
+from openfhe_numpy.utils.typecheck import (
+    Number,
+    is_numeric_arraylike,
+    is_numeric_scalar,
+)
+
+# Tensor imports
 from .ctarray import CTArray
-
-import openfhe_numpy as onp
-from openfhe_numpy.utils import utils
-from openfhe_numpy.utils.constants import MatrixOrder, DataType
-from openfhe_numpy.utils.log import ONP_ERROR
+from .ptarray import PTArray
+from .tensor import FHETensor
 
 
-# TODO: constructor for block matrix
 def _get_block_dimensions(data, slots) -> tuple[int, int]:
+    """
+    TODO: Compute the block‐matrix dimensions (rows, cols)
+    given raw `data` and number of slots.
+    """
     pass
-    # org_rows, org_cols, ndim = utils.get_shape(data)
-    # nrows = next_power_of_two(org_rows)
-    # ncols = next_power_of_two(org_cols)
-
-    # if ndim == 1:
-    #     if ncols > slots:
-    #         nblocks = ncols // (slots // 2)
-
-    #     cell_rows = 1
-    #     cell_cols = slots // 2
-    # else:
-    #     if nrows > slots:
-    #         nblocks = nrows // (slots // 2)
-
-    #     cell_rows = slots // 2
-    #     cell_cols = ncols
 
 
-def pack(
-    data: list | tuple | np.ndarray | int,
-    slots: int,
-    ncols: int = 0,
-    order: int = MatrixOrder.ROW_MAJOR,
-):
-    org_rows, org_cols, ndim = utils.get_shape(data)
-    if slots < 0:
-        ONP_ERROR("The number of slots is negative")
+def block_array(
+    cc: openfhe.CryptoContext,
+    data: np.ndarray | Number | list,
+    batch_size: Optional[int] = None,
+    order: int = ArrayEncodingType.ROW_MAJOR,
+    type_: Literal["C", "P"] = "C",
+    mode: str = "repeat",
+    package: Optional[dict] = None,
+    public_key: openfhe.PublicKey = None,
+    **kwargs,
+) -> FHETensor:
+    """
+    Construct a block‐plaintext or block‐ciphertext array from raw input.
 
-    if isinstance(data, int):
-        packed_data = [data] * slots
-    else:
-        if ndim == 2:
-            if ncols == 0:
-                ncols = utils.next_power_of_two(org_cols)
-            packed_data = ravel_matrix(data, slots, ncols, order)
+    Parameters
+    ----------
+    cc         : CryptoContext
+    data       : np.ndarray | Number | list
+    batch_size : Optional[int]
+    order      : ArrayEncodingType
+    type_      : "C" for ciphertext, "P" for plaintext
+    mode       : padding mode ("repeat" or "zero")
+    package    : Optional prepacked dict from `_pack_array`
+    public_key : PublicKey (required for encryption)
+
+    Returns
+    -------
+    FHETensor
+    """
+    pass
+
+
+def _pack_array(
+    data: np.ndarray | Number | list,
+    batch_size: int,
+    order: int = ArrayEncodingType.ROW_MAJOR,
+    mode: str = "repeat",
+    **kwargs,
+) -> dict:
+    """
+    Flatten a scalar, vector, or matrix into a 1D array, padding
+    or repeating elements to fill all slots.
+
+    Parameters
+    ----------
+    data       : np.ndarray | Number | list
+    batch_size : int
+        Number of available plaintext slots (must be a power of two).
+    order      : ArrayEncodingType
+    mode       : str
+        "repeat" to duplicate values, "zero" to pad with zeros.
+    **kwargs   : extra args for matrix/vector packing
+
+    Returns
+    -------
+    dict with keys:
+      - data           : packed 1D numpy array
+      - original_shape : tuple
+      - ndim           : int
+      - batch_size     : int
+      - shape          : tuple (rows, cols)
+      - order          : int
+    """
+    if batch_size < 0:
+        ONP_ERROR("The batch size cannot be negative.")
+    if not is_power_of_two(batch_size):
+        ONP_ERROR(f"Batch size [{batch_size}] must be a power of two.")
+
+    data = np.array(data)
+
+    if is_numeric_scalar(data):
+        if mode == "zero":
+            packed = np.zeros(batch_size, dtype=data.dtype)
+            packed[0] = data
+        elif mode == "repeat":
+            packed = np.full(batch_size, data)
         else:
-            if ncols == 0:
-                ncols = 1
-            packed_data = ravel_vector(data, slots, ncols, order)
+            ONP_ERROR(f"Invalid padding mode: '{mode}'. Use 'zero' or 'repeat'.")
+        shape = (batch_size, 1)
+
+    elif is_numeric_arraylike(data):
+        if data.ndim == 2:
+            packed, shape = _ravel_matrix(data, batch_size, order, True, mode, **kwargs)
+        elif data.ndim == 1:
+            packed, shape = _ravel_vector(data, batch_size, order, True, mode, **kwargs)
+        else:
+            ONP_ERROR(f"Unsupported data dimension [{data.ndim}].")
+        packed = packed
+    else:
+        ONP_ERROR("Input is not numeric.")
 
     return {
-        "data": packed_data,
-        "original_shape": (org_rows, org_cols),
-        "ndim": ndim,
-        "batch_size": slots,
-        "ncols": ncols,
+        "data": packed,
+        "original_shape": data.shape,
+        "ndim": data.ndim,
+        "batch_size": batch_size,
+        "shape": shape,
         "order": order,
     }
 
 
 def array(
     cc: openfhe.CryptoContext,
-    data: list | tuple | np.ndarray | int,
-    slots: int = -1,
-    ncols: int = 0,
-    order: int = MatrixOrder.ROW_MAJOR,
-    type: str = DataType.CIPHERTEXT,
-    package=None,
-    public_key=None,
+    data: np.ndarray | Number | list,
+    batch_size: Optional[int] = None,
+    order: int = ArrayEncodingType.ROW_MAJOR,
+    type_: Literal["C", "P"] = "C",
+    mode: str = "repeat",
+    package: dict = {},
+    public_key: openfhe.PublicKey = None,
+    **kwargs,
 ) -> FHETensor:
     """
-    Construct either a ciphertext (FHETensor) or plaintext (PTArray) from raw input data.
+    Construct a ciphertext or plaintext FHETensor from raw input.
 
     Parameters
     ----------
-    cc : CryptoContext
-        The OpenFHE CryptoContext.
-    data : list
-        Input list or matrix data.
-    slots : int
-        Number of total CKKS slots.
-    ncols : int
-        Size of a row.
-    order : int
-        MatrixOrder.ROW_MAJOR or COL_MAJOR.
-    type : str
-        DataType.CIPHERTEXT or PLAINTEXT.
-    public_key : optional
-        Public key needed for encryption.
+    cc         : CryptoContext
+    data       : matrix | vector | scalar
+    batch_size : Optional[int]
+    order      : ArrayEncodingType
+    type_      : "C" or "P"
+    package    : dict from `_pack_array` (optional)
+    public_key : required if type_ == "C"
 
     Returns
     -------
-    FHETensor Object
+    FHETensor
     """
+    if cc is None:
+        ONP_ERROR("CryptoContext cannot be None.")
+    if batch_size is not None and not isinstance(batch_size, int):
+        ONP_ERROR(f"batch_size must be int or None, got {type(batch_size).__name__}.")
 
-    if package is None:
-        package = pack(data, slots, ncols, order)
+    if not package:
+        package = _pack_array(data, batch_size, order, mode, **kwargs)
 
     packed_data = package["data"]
-    org_rows = package["original_shape"][0]
-    org_cols = package["original_shape"][1]
     ndim = package["ndim"]
-    slots = package["batch_size"]
-    ncols = package["ncols"]
+    batch_size = package["batch_size"]
+    shape = package["shape"]
     order = package["order"]
 
     plaintext = cc.MakeCKKSPackedPlaintext(packed_data)
 
-    if type == DataType.PLAINTEXT:
-        result = PTArray(plaintext, (org_rows, org_cols), ndim, slots, ncols, order)
+    if type_ == "P":
+        result = PTArray(plaintext, package["original_shape"], batch_size, shape, order)
     else:
         if public_key is None:
-            raise ValueError("Public key must be provided for ciphertext encoding.")
-
+            ONP_ERROR("Public key must be provided for ciphertext encoding.")
         ciphertext = cc.Encrypt(public_key, plaintext)
-        result = CTArray(ciphertext, (org_rows, org_cols), slots, ncols, order)
+        result = CTArray(ciphertext, package["original_shape"], batch_size, shape, order)
 
-    result.set_ncols(ncols)
-    result.set_batch_size(slots)
+    result.set_shape(shape)
+    result.set_batch_size(batch_size)
     return result
 
 
-def ravel_matrix(data, slots, ncols=1, order=MatrixOrder.ROW_MAJOR, repetitions=1):
+def _ravel_matrix(
+    data: np.ndarray,
+    batch_size: int,
+    order: int = ArrayEncodingType.ROW_MAJOR,
+    pad_to_pow2: bool = True,
+    mode: str = "repeat",
+    **kwargs,
+) -> tuple[np.ndarray, tuple[int, int]]:
     """
-    Encode a 2D matrix into a CKKS plaintext.
-
-    Parameters
-    ----------
-    data : list of list
-    ncols : int
-        Block size per row.
-    order : MatrixOrder
-    repetitions : int
-        Number of repetitions
-
-    Returns
-    -------
-    Plaintext
+    Encode a 2D matrix into a packed array.
     """
-
-    if order == MatrixOrder.ROW_MAJOR:
-        packed_data = utils.pack_mat_row_wise(data, ncols, slots, repetitions)
-    elif order == MatrixOrder.COL_MAJOR:
-        packed_data = utils.pack_mat_col_wise(data, ncols, slots, repetitions)
+    if order == ArrayEncodingType.ROW_MAJOR:
+        return _pack_matrix_row_wise(data, batch_size, pad_to_pow2, mode)
+    elif order == ArrayEncodingType.COL_MAJOR:
+        return _pack_matrix_col_wise(data, batch_size, pad_to_pow2, mode)
     else:
         raise ValueError("Unsupported encoding order")
 
-    return packed_data
 
-
-def ravel_vector(data, slots, ncols=1, order=MatrixOrder.ROW_MAJOR):
+def _ravel_vector(
+    data: list | np.ndarray,
+    batch_size: int,
+    order: int = ArrayEncodingType.ROW_MAJOR,
+    pad_to_pow2: bool = True,
+    tile: str = "repeats",
+    **kwargs,
+) -> tuple[np.ndarray, tuple[int, int]]:
     """
-    Encode a 1D vector into a CKKS plaintext.
-
-    Parameters
-    ----------
-    data : list
-    ncols : int
-        Number of repetitions.
-    order : MatrixOrder
-
-    Returns
-    -------
-    Plaintext
+    Encode a 1D vector into a packed array.
     """
+    target_cols = kwargs.get("target_cols")
+    if target_cols is not None and not (isinstance(target_cols, int) and target_cols > 0):
+        ONP_ERROR(f"target_cols must be positive int or None, got {target_cols!r}.")
 
-    if ncols < 1:
-        raise ValueError("Number of repetitions must be > 0")
+    pad_value = kwargs.get("pad_value", "repeat")
+    expand = kwargs.get("expand", "repeat")
 
-    # if ncols == 1 and order == MatrixOrder.ROW_MAJOR:
-    #     raise ValueError("Can't encode row-wise with ncols = 1")
-
-    if not utils.is_power_of_two(ncols):
-        raise ValueError("Repetition count must be a power of two")
-
-    if order == MatrixOrder.ROW_MAJOR:
-        packed_data = utils.pack_vec_row_wise(data, ncols, slots)
-    elif order == MatrixOrder.COL_MAJOR:
-        packed_data = utils.pack_vec_col_wise(data, ncols, slots)
+    if order == ArrayEncodingType.ROW_MAJOR:
+        return _pack_vector_row_wise(data, batch_size, target_cols, expand, tile, pad_to_pow2, pad_value)
+    elif order == ArrayEncodingType.COL_MAJOR:
+        return _pack_vector_col_wise(data, batch_size, target_cols, expand, tile, pad_to_pow2, pad_value)
     else:
-        raise ValueError("Unsupported encoding order")
-
-    return packed_data
+        ONP_ERROR("Unsupported encoding order")

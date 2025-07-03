@@ -1,7 +1,3 @@
-import time
-import numpy as np
-from openfhe_numpy.tensor.ctarray import CTArray
-
 class FHEDebugger:
     """Tools for debugging FHE operations."""
 
@@ -24,7 +20,7 @@ class FHEDebugger:
         info = {
             "name": name,
             "shape": ct_array.original_shape,
-            "meta": ct_array.meta,
+            "meta": ct_array.metadata,
             "time": time.time(),
         }
 

@@ -10,6 +10,7 @@ TENSOR_FUNCTIONS = {}
 
 # Registry for explicitly commutative operations
 COMMUTATIVE_OPS = set()
+DEBUG = False
 
 
 def mark_commutative(*names):
@@ -43,7 +44,7 @@ def register_tensor_function(name, type_signatures):
 
 
 def dispatch_tensor_function(
-    func_name: str, args: Tuple[Any, ...], kwargs=None, return_hint=False
+    func_name: str, args: Tuple[Any, ...], kwargs=None, return_hint=False, verbose=DEBUG
 ) -> Any:
     """Dispatch implementation for the given function name and argument types.
 
@@ -54,12 +55,22 @@ def dispatch_tensor_function(
     # Step 1: Extract type names
     sig = tuple(getattr(arg, "dtype", type(arg).__name__) for arg in args)
 
-    if os.getenv("DISPATCH_DEBUG", "0") == "1":
-        print(f"[DISPATCH] Trying {func_name}{sig}")
+    if verbose:
+        print(f"DEBUG: dispatch_tensor_function called with func_name='{func_name}', sig={sig}")
+        print(
+            f"DEBUG: Available registrations for '{func_name}': {[k[1] for k in TENSOR_FUNCTIONS if k[0] == func_name]}"
+        )
+    if verbose:
+        if os.getenv("DISPATCH_DEBUG", "0") == "1":
+            print(f"[DISPATCH] Trying {func_name}{sig}")
 
     # Step 2: Try exact match
     key = (func_name, sig)
+    if verbose:
+        print(f"DEBUG: Trying exact match with key: {key}")
     if key in TENSOR_FUNCTIONS:
+        if verbose:
+            print(f"DEBUG: Found exact match! Calling {TENSOR_FUNCTIONS[key]}")
         return TENSOR_FUNCTIONS[key](*args, **kwargs)
 
     # Step 3: Normalize scalars to 'scalar'
@@ -102,10 +113,14 @@ def dispatch_tensor_function(
     )
 
 
-def tensor_function_api(op_name: str, binary: bool = True) -> Callable:
+def tensor_function_api(op_name: str, binary: bool = True, verbose: bool = DEBUG) -> Callable:
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            if verbose:
+                print(
+                    f"DEBUG: tensor_function_api called for operation '{op_name}' with args: {[type(arg).__name__ for arg in args]}"
+                )
             if binary:
                 if len(args) < 2:
                     raise TypeError(f"{op_name} requires 2 arguments")
@@ -114,6 +129,8 @@ def tensor_function_api(op_name: str, binary: bool = True) -> Callable:
                 # Check if both have __tensor_function__
                 a_tf = hasattr(a, "__tensor_function__")
                 b_tf = hasattr(b, "__tensor_function__")
+                if verbose:
+                    print(f"DEBUG: a has __tensor_function__: {a_tf}, b has __tensor_function__: {b_tf}")
 
                 if a_tf and b_tf:
                     # Use tensor_priority to decide which implementation to use
@@ -149,4 +166,4 @@ def tensor_function_api(op_name: str, binary: bool = True) -> Callable:
 
 
 # === Mark commutative operations ===
-mark_commutative("add")
+mark_commutative("add", "multiply")

@@ -1,39 +1,28 @@
 """Tensor implementations for homomorphic encryption operations."""
 
 # Import tensor classes
-from .block_ctarray import BlockCTArray
-from .block_tensor import BlockFHETensor
-from .constructors import (
-    array,
-    pack,
-    ravel_matrix,
-    ravel_vector,
-)
-from .ctarray import CTArray
+from .tensor import BaseTensor, FHETensor
 from .ptarray import PTArray
-from .tensor import BaseTensor, FHETensor, copy_tensor, T
-#######################################################################################################################
+from .ctarray import CTArray
+from .block_tensor import BlockFHETensor
+from .block_ctarray import BlockCTArray
+
+
+# Import tensor constructors
+from .constructors import array
+
+# Define public API
 __all__ = [
-    # block_ctarray
-    "BlockCTArray",
-    # block_tensor
-    "BlockFHETensor",
-    # constructors
-    "array",
-    "pack",
-    "ravel_matrix",
-    "ravel_vector",
-    # ctarray
-    "CTArray",
-    # ptarray
-    "PTArray",
-    # tensor
     "BaseTensor",
     "FHETensor",
-    "copy_tensor",
-    "T",
+    "PTArray",
+    "CTArray",
+    "BlockFHETensor",
+    "BlockCTArray",
+    "array",
 ]
 
+# [TANGO] I don't understand this????
 def _register_all_operations():
     import openfhe_numpy.operations.matrix_arithmetic
     # import operations.matrix_api
