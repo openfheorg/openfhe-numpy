@@ -5,10 +5,10 @@ import numpy as np
 import openfhe
 
 
-import openfhe_numpy import EvalTranspose
-from openfhe_numpy.utils.constants import *
-from openfhe_numpy.utils.errors import ONP_ERROR
-from openfhe_numpy.utils.packing import process_packed_data
+from ..openfhe_numpy import EvalTranspose
+from ..utils.constants import *
+from ..utils.errors import ONP_ERROR
+from ..utils.packing import process_packed_data
 
 from .tensor import FHETensor
 
@@ -129,4 +129,3 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         shape = (self.original_shape[1], self.original_shape[0])
         ncols = next_power_of_two(shape[1])
         return CTArray(ciphertext, shape, self.batch_size, ncols, self.order)
-

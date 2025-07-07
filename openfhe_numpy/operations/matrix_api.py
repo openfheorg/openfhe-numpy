@@ -19,20 +19,13 @@ from .dispatch import tensor_function_api
 # ===========================
 
 
-@tensor_function_api("add", binary=True)
 def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Add two tensors or a tensor and a scalar.
-
+    Element-wise add: tensor + tensor or tensor + scalar.
 
     See Also
     --------
-    numpy.add : Corresponding NumPy function.
-
-    Examples
-    --------
-    >>> add([1, 2], [3, 4])
-    array([4, 6])
+    numpy.add
     """
     return _add_dispatch(a, b)
 @tensor_function_api("add", binary=True)
@@ -41,21 +34,13 @@ def _add_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     pass
 
 
-@tensor_function_api("subtract", binary=True)
 def subtract(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Subtract two tensors or a tensor and a scalar.
-
-
+    Element-wise subtract: tensor - tensor or tensor - scalar.
 
     See Also
     --------
-    numpy.subtract : Corresponding NumPy function.
-
-    Examples
-    --------
-    >>> subtract([5, 7], [2, 4])
-    array([3, 3])
+    numpy.subtract
     """
     return _subtract_dispatch(a, b)
 
@@ -256,7 +241,7 @@ def cumsum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
     Returns
     -------
     out : ArrayLike
-        Cumulative sum of `a`.
+        Cumulative sum along an axis.
 
     See Also
     --------
@@ -275,7 +260,7 @@ def cumsum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 @tensor_function_api("cumreduce", binary=False)
 def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
     """
-    Compute the cumulative reduction (e.g., product) of tensor elements.
+    Compute the cumulative reduction (e.g., product) along an axis.
 
     Parameters
     ----------
@@ -308,7 +293,7 @@ def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 @tensor_function_api("sum", binary=False)
 def sum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
     """
-    Sum of tensor elements over a given axis.
+    Sum of elements over an axis or all.
 
     Parameters
     ----------
@@ -347,7 +332,7 @@ def sum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 @tensor_function_api("mean", binary=False)
 def mean(a: ArrayLike, axis: Optional[int] = 0, keepdims: bool = False) -> ArrayLike:
     """
-    Compute the arithmetic mean along the specified axis.
+    Compute the arithmetic mean along an axis or all elements.
 
     Returns the average of the array elements. The average is taken over
     the flattened array by default, otherwise over the specified axis.

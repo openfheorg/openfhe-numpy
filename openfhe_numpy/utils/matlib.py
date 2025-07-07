@@ -59,7 +59,8 @@ def check_single_equality(a, b, eps=EPSILON):
 
 def check_equality_vector(a, b, vector_size=None, eps=EPSILON):
     """
-    Compare two vectors element-wise with tolerance.
+    Compare two vectors element-wise, ensuring the maximum absolute error does not exceed eps.
+    The total error is computed using l2 norm sqrt(sum_ (a_i-b_i)^2)
 
     Parameters
     ----------
@@ -81,13 +82,13 @@ def check_equality_vector(a, b, vector_size=None, eps=EPSILON):
     is_equal = True
     for i in range(vector_size):
         f, e = check_single_equality(a[i], b[i], eps)
-        error += e
+        error += e**2
         if not f:
             is_equal = False
-    return is_equal, error
+    return is_equal, math.sqrt(error)
 
 
-def check_equality_matrix(a, b, eps=EPSILON):
+def check_equality(a, b, eps=EPSILON):
     """
     Compare two matrices element-wise with tolerance.
 
@@ -108,10 +109,14 @@ def check_equality_matrix(a, b, eps=EPSILON):
 
     error, is_equal = 0, True
 
+    if np.isscalar(a) or (hasattr(a, "shape") and a.shape == ()):
+        error = abs(a - b)
+        return error <= eps, error
+
     if a.ndim == 1:
         for i in range(len(a)):
             f, e = check_single_equality(a[i], b[i], eps)
-            error += 2
+            error += e**2
             if not f:
                 is_equal = False
         return is_equal, error
@@ -121,7 +126,7 @@ def check_equality_matrix(a, b, eps=EPSILON):
     for i in range(rows):
         for j in range(cols):
             f, e = check_single_equality(a[i][j], b[i][j], eps)
-            error += e
+            error += e**2
             if not f:
                 is_equal = False
     return is_equal, error

@@ -6,12 +6,12 @@ import openfhe_numpy as onp
 def validate_and_print_results(computed, expected, operation_name):
     """Helper function to validate and print results."""
     print("\n" + "*" * 60)
-    print(f"* {operation_name} *")
+    print(f"* {operation_name}")
     print("*" * 60)
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{computed}")
-    is_match, error = onp.check_equality_matrix(computed, expected)
-    print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
+    is_match, error = onp.check_equality(computed, expected)
+    print(f"\nMatch: {is_match}, Total Error: {error}")
     return is_match, error
 
 
@@ -22,8 +22,12 @@ def run_matmul_example(cc, keys, A, B, description):
     print("Input B:\n", B)
 
     # Encrypt A and B
-    ctm_A = onp.array(cc, A, cc.GetRingDimension() // 2, public_key=keys.publicKey)
-    ctm_B = onp.array(cc, B, cc.GetRingDimension() // 2, public_key=keys.publicKey)
+    ctm_A = onp.array(
+        cc, A, cc.GetRingDimension() // 2, public_key=keys.publicKey
+    )
+    ctm_B = onp.array(
+        cc, B, cc.GetRingDimension() // 2, public_key=keys.publicKey
+    )
 
     # Generate rotation keys for matrix multiplication
     onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, ctm_A.ncols)
@@ -96,7 +100,9 @@ def main():
     # Case 2: non–power-of-two (3x3)
     A3 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
     B3 = np.array([[9, 8, 7], [6, 5, 4], [3, 2, 1]])
-    run_matmul_example(cc, keys, A3, B3, "3x3 Matrix Product (non-power-of-two)")
+    run_matmul_example(
+        cc, keys, A3, B3, "3x3 Matrix Product (non-power-of-two)"
+    )
 
 
 if __name__ == "__main__":

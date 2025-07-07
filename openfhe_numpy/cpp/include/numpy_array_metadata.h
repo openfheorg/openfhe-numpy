@@ -57,7 +57,7 @@ public:
                                  int32_t batchSize,
                                  ArrayEncodingType enc = ArrayEncodingType::ROW_MAJOR)
         : m_initialShape(initialShape), m_ndim(ndim), m_ncols(rowsize), m_batchSize(batchSize), m_encodeType(enc) {}
-        
+
     ~ArrayMetadata() override = default;
 
     std::array<int, 2>& initialShape() noexcept {

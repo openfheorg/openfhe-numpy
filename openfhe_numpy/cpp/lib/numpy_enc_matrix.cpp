@@ -43,17 +43,17 @@ namespace openfhe_numpy {
 *
 * @param numCols   The row size (number of columns) of the matrix.
 * @param type The linear transformation type (SIGMA, TAU, PHI, PSI, TRANSPOSE).
-* @param numRepeats   Optional offset used by PHI and PSI types.
+* @param numtiles   Optional offset used by PHI and PSI types.
 * @return std::vector<int32_t> List of rotation indices to be used for EvalRotateKeyGen.
 **/
-static std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int32_t numRepeats = 0) {
+static std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType type, int32_t numtiles = 0) {
     if (numCols < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
 
     if (numCols > std::numeric_limits<int32_t>::max() / 2 ||  // conservative upper bound
-        numRepeats < 0 || numRepeats > std::numeric_limits<int32_t>::max() / 2) {
-        OPENFHE_THROW("numCols or numRepeats too large");
+        numtiles < 0 || numtiles > std::numeric_limits<int32_t>::max() / 2) {
+        OPENFHE_THROW("numCols or numtiles too large");
     }
 
     std::vector<int32_t> rotationIndices;
@@ -75,16 +75,16 @@ static std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType typ
             break;
 
         case LinTransType::PHI:
-            // Generate indices: numRepeats, numRepeats - numCols
+            // Generate indices: numtiles, numtiles - numCols
             rotationIndices.reserve(2);
             for (int32_t k = 0; k < 2; ++k) {
-                rotationIndices.push_back(numRepeats - k * numCols);
+                rotationIndices.push_back(numtiles - k * numCols);
             }
             break;
 
         case LinTransType::PSI:
             // Generate a single index based on offset
-            rotationIndices.push_back(numCols * numRepeats);
+            rotationIndices.push_back(numCols * numtiles);
             break;
 
         case LinTransType::TRANSPOSE:
@@ -113,11 +113,11 @@ static std::vector<int32_t> GenLinTransIndices(int32_t numCols, LinTransType typ
 * @param secretKey   The KeyPair<DCRTPoly> containing the secret key used to generate rotation keys.
 * @param numCols   The row size of the matrix being transformed.
 * @param type The type of linear transformation.
-* @param numRepeats  Optional numRepeats used by PHI and PSI transformations.
+* @param numtiles  Optional numtiles used by PHI and PSI transformations.
 **/
 
-void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols, LinTransType type, int32_t numRepeats) {
-    auto rotationIndices = GenLinTransIndices(numCols, type, numRepeats);
+void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols, LinTransType type, int32_t numtiles) {
+    auto rotationIndices = GenLinTransIndices(numCols, type, numtiles);
     auto cryptoContext   = secretKey->GetCryptoContext();
     cryptoContext->EvalRotateKeyGen(secretKey, rotationIndices);
 }
@@ -135,9 +135,9 @@ void EvalSquareMatMultRotateKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numC
     cryptoContext->EvalRotateKeyGen(secretKey, indicesSigma);
     cryptoContext->EvalRotateKeyGen(secretKey, indicesTau);
 
-    for (int32_t numRepeats = 1; numRepeats < numCols; ++numRepeats) {
-        auto indicesPhi = GenLinTransIndices(numCols, LinTransType::PHI, numRepeats);
-        auto indicesPsi = GenLinTransIndices(numCols, LinTransType::PSI, numRepeats);
+    for (int32_t numtiles = 1; numtiles < numCols; ++numtiles) {
+        auto indicesPhi = GenLinTransIndices(numCols, LinTransType::PHI, numtiles);
+        auto indicesPsi = GenLinTransIndices(numCols, LinTransType::PSI, numtiles);
 
         cryptoContext->EvalRotateKeyGen(secretKey, indicesPhi);
         cryptoContext->EvalRotateKeyGen(secretKey, indicesPsi);
@@ -315,8 +315,8 @@ Ciphertext<DCRTPoly> EvalLinTransTau(PrivateKey<DCRTPoly>& secretKey,
 *
 * @param numCols   The number of padded cols in the encoded matrix
 */
-Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats) {
-    if (numCols < 0 or numRepeats < 0) {
+Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numtiles) {
+    if (numCols < 0 or numtiles < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
     auto cryptoContext = ctVector->GetCryptoContext();
@@ -324,8 +324,8 @@ Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector, int32
     Ciphertext<DCRTPoly> ctResult;
 
     for (auto i = 0; i < 2; ++i) {
-        auto rotateIdx  = numRepeats - i * numCols;
-        auto diag       = GenPhiDiag(numCols, numRepeats, i);
+        auto rotateIdx  = numtiles - i * numCols;
+        auto diag       = GenPhiDiag(numCols, numtiles, i);
         auto ptDiagonal = cryptoContext->MakeCKKSPackedPlaintext(diag);
         auto ctRotated  = cryptoContext->EvalRotate(ctVector, rotateIdx);
         auto ctProduct  = cryptoContext->EvalMult(ctRotated, ptDiagonal);
@@ -342,9 +342,9 @@ Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector, int32
 Ciphertext<DCRTPoly> EvalLinTransPhi(PrivateKey<DCRTPoly>& secretKey,
                                     const Ciphertext<DCRTPoly>& ctVector,
                                     int32_t numCols,
-                                    int32_t numRepeats) {
-    EvalLinTransKeyGen(secretKey, numCols, LinTransType::PHI, numRepeats);
-    return EvalLinTransPhi(ctVector, numCols, numRepeats);
+                                    int32_t numtiles) {
+    EvalLinTransKeyGen(secretKey, numCols, LinTransType::PHI, numtiles);
+    return EvalLinTransPhi(ctVector, numCols, numtiles);
 }
 
 /**
@@ -361,16 +361,16 @@ Ciphertext<DCRTPoly> EvalLinTransPhi(PrivateKey<DCRTPoly>& secretKey,
 Ciphertext<DCRTPoly> EvalLinTransPsi(PrivateKey<DCRTPoly>& secretKey,
                                     const Ciphertext<DCRTPoly>& ctVector,
                                     int32_t numCols,
-                                    int32_t numRepeats) {
-    EvalLinTransKeyGen(secretKey, numCols, LinTransType::PSI, numRepeats);
-    return EvalLinTransPsi(ctVector, numCols, numRepeats);
+                                    int32_t numtiles) {
+    EvalLinTransKeyGen(secretKey, numCols, LinTransType::PSI, numtiles);
+    return EvalLinTransPsi(ctVector, numCols, numtiles);
 }
-Ciphertext<DCRTPoly> EvalLinTransPsi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats) {
-    if (numCols < 0 or numRepeats < 0) {
+Ciphertext<DCRTPoly> EvalLinTransPsi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numtiles) {
+    if (numCols < 0 or numtiles < 0) {
         OPENFHE_THROW("numCols must be positive");
     }
     auto cryptoContext = ctVector->GetCryptoContext();
-    return cryptoContext->EvalRotate(ctVector, numCols * numRepeats);
+    return cryptoContext->EvalRotate(ctVector, numCols * numtiles);
 }
 
 /**

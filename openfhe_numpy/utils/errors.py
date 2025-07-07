@@ -4,9 +4,17 @@ This module provides:
 1. A configured logger with consistent log formatting
 2. Custom exceptions with stack trace information
 3. Convenience functions for logging at different levels
+4. Configuration management via environment variables
+
+Environment Variables:
+    OPENFHE_DEBUG: Enable debug logging ("ON", "1", "TRUE")
+    OPENFHE_LOG_FORMAT: Custom log format string
+    OPENFHE_LOG_FILE: Path to log file (optional)
+    OPENFHE_LOG_MAX_SIZE: Maximum log file size in bytes
+    OPENFHE_LOG_BACKUP_COUNT: Number of backup log files
 
 Usage:
-    from ..utils.log import ONP_DEBUG, ONP_ERROR, ONP_WARNING
+    from openfhe_numpy.utils.errors import ONP_DEBUG, ONP_ERROR, ONP_WARNING
 
     ONP_DEBUG("Processing data...")
     ONP_WARNING("Unusual input detected")
@@ -37,11 +45,22 @@ DEFAULT_CONFIG = {
 def get_config() -> Dict[str, Any]:
     """Get logging configuration from environment variables with defaults."""
     return {
-        "enable_debug": os.getenv("OPENFHE_DEBUG", "OFF").upper() in ("ON", "1", "TRUE"),
-        "log_format": os.getenv("OPENFHE_LOG_FORMAT", DEFAULT_CONFIG["log_format"]),
+        "enable_debug": os.getenv("OPENFHE_DEBUG", "OFF").upper()
+        in ("ON", "1", "TRUE"),
+        "log_format": os.getenv(
+            "OPENFHE_LOG_FORMAT", DEFAULT_CONFIG["log_format"]
+        ),
         "log_file": os.getenv("OPENFHE_LOG_FILE", DEFAULT_CONFIG["log_file"]),
-        "max_file_size": int(os.getenv("OPENFHE_LOG_MAX_SIZE", str(DEFAULT_CONFIG["max_file_size"]))),
-        "backup_count": int(os.getenv("OPENFHE_LOG_BACKUP_COUNT", str(DEFAULT_CONFIG["backup_count"]))),
+        "max_file_size": int(
+            os.getenv(
+                "OPENFHE_LOG_MAX_SIZE", str(DEFAULT_CONFIG["max_file_size"])
+            )
+        ),
+        "backup_count": int(
+            os.getenv(
+                "OPENFHE_LOG_BACKUP_COUNT", str(DEFAULT_CONFIG["backup_count"])
+            )
+        ),
     }
 
 
@@ -81,12 +100,18 @@ def get_logger() -> logging.Logger:
                             file_handler.setFormatter(formatter)
                             _logger.addHandler(file_handler)
                         except Exception as e:
-                            print(f"Warning: Could not set up file logging: {e}")
+                            print(
+                                f"Warning: Could not set up file logging: {e}"
+                            )
 
                     # Console handler
                     stream_handler = logging.StreamHandler()
                     stream_handler.setFormatter(formatter)
-                    stream_handler.setLevel(logging.DEBUG if _config["enable_debug"] else logging.INFO)
+                    stream_handler.setLevel(
+                        logging.DEBUG
+                        if _config["enable_debug"]
+                        else logging.INFO
+                    )
                     _logger.addHandler(stream_handler)
 
                     _logger.setLevel(logging.DEBUG)
@@ -109,26 +134,26 @@ class ONPError(Exception):
         super().__init__(full_message)
 
 
-class ONPTypeError(ONPError):
+class ONPTypeError(ONPError, TypeError):
     """Raised when incorrect types are provided."""
 
     pass
 
 
-class ONPDimensionError(ONPError):
+class ONPDimensionError(ONPError, ValueError):
     """Raised when an invalid axis is provided."""
 
     pass
 
 
-class ONPValueError(ONPError):
+class ONPValueError(ONPError, ValueError):
     """Raised when an invalid value is encountered."""
 
     def __init__(self, message: str = "Invalid value encountered."):
         super().__init__(message)
 
 
-class ONPImcompatibleShape(ONPValueError):
+class ONPIncompatibleShape(ONPValueError, ValueError):
     """Raised when tensor shapes are incompatible."""
 
     def __init__(self, shape_a, shape_b, message: str = None):
@@ -137,10 +162,17 @@ class ONPImcompatibleShape(ONPValueError):
         super().__init__(message)
 
 
-class ONPNotImplementedError(ONPError):
+class ONPNotImplementedError(ONPError, NotImplementedError):
     """Raised when a feature is not implemented."""
 
     def __init__(self, message: str = "This feature is not implemented."):
+        super().__init__(f"{message}")
+
+
+class ONPNotSupportedError(ONPError, NotImplementedError):
+    """Raised when a feature is not supported."""
+
+    def __init__(self, message: str = "This feature is not supported."):
         super().__init__(f"{message}")
 
 
@@ -164,6 +196,8 @@ def _log(level: str, message: str, stack_level: int = 2) -> None:
         logger.debug(formatted_message)
     elif level == "ONP_WARNING":
         logger.warning(formatted_message)
+    elif level == "ONP_INFO":
+        logger.info(formatted_message)
     else:
         return
 

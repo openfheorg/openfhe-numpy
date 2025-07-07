@@ -1,6 +1,6 @@
 from .tensor import FHETensor  # Use relative import
 from .ctarray import CTArray
-from openfhe import Plaintext
+from openfhe import Plaintext, CryptoContext, PublicKey
 
 
 # -----------------------------------------------------------
@@ -20,7 +20,13 @@ class PTArray(FHETensor[Plaintext]):
 
     def encrypt(self, crypto_context: CryptoContext, public_key: PublicKey):
         ciphertext = crypto_context.Encrypt(public_key, self.data)
-        return CTArray(ciphertext, self.original_shape, self.batch_size, self.shape, self.order)
+        return CTArray(
+            ciphertext,
+            self.original_shape,
+            self.batch_size,
+            self.shape,
+            self.order,
+        )
 
     def decrypt(self, *args, **kwargs):
         raise NotImplementedError("Decrypt not implemented for plaintext")

@@ -38,7 +38,10 @@ using namespace lbcrypto;
 namespace py = pybind11;
 void bind_enums_and_constants(py::module& m);
 void bind_matrix_funcs(py::module& m);
-// void bind_metadata(py::module& m);
+
+//  [tango] Since the current versions of openfhe_python and OpenFHE don’t support this binding, I’ve included it here for testing purposes.
+void bind_ciphertext(py::module& m);
+void bind_privatekey(py::module& m);
 
 PYBIND11_MODULE(openfhe_numpy, m) {
     m.doc() = "OpenFHE-Numpy C++ extension";
@@ -62,6 +65,8 @@ PYBIND11_MODULE(openfhe_numpy, m) {
 
     bind_enums_and_constants(m);
     bind_matrix_funcs(m);
+    bind_ciphertext(m);
+    bind_privatekey(m);
 }
 
 void bind_enums_and_constants(py::module& m) {
@@ -129,7 +134,7 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("secretKey"),
         py::arg("ciphertext"),
         py::arg("numCols"));
-    
+
     m.def("EvalLinTransSigma",
         static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransSigma),
         py::arg("ciphertext"),
@@ -139,40 +144,40 @@ void bind_matrix_funcs(py::module& m) {
         static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransTau),
         py::arg("ctVector"),
         py::arg("numCols"));
-      
+
     m.def("EvalLinTransTau",
         static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransTau),
         py::arg("secretKey"),
         py::arg("ciphertext"),
         py::arg("numCols"));
-      
+
 
     m.def("EvalLinTransPhi",
         static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPhi),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
-      
+
     m.def("EvalLinTransPhi",
         static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPhi),
         py::arg("secretKey"),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
-      
+
     m.def("EvalLinTransPsi",
         static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPsi),
         py::arg("secretKey"),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
-      
+
     m.def("EvalLinTransPsi",
         static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPsi),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
-      
+
     m.def("EvalMatMulSquare",
         [](const Ciphertext<DCRTPoly>& matrixA, const Ciphertext<DCRTPoly>& matrixB, int32_t numCols) {
             return EvalMatMulSquare(matrixA, matrixB, numCols);
@@ -244,6 +249,23 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("numCols"),
         py::arg("subringDim") = 0);
 }
+
+//  [tango] Since the current versions of openfhe_python and OpenFHE don’t support this binding, I’ve included it here for testing purposes.
+void bind_ciphertext(py::module& m) {
+    py::object existingModule = py::module_::import("openfhe");
+    py::object pyClsObj       = existingModule.attr("Ciphertext");
+    auto cls                  = py::reinterpret_borrow<py::class_<Ciphertext<DCRTPoly>>>(pyClsObj);
+    cls.def("GetEncodingType", [](const Ciphertext<DCRTPoly>& ct) { return ct->GetEncodingType(); });
+    cls.def("GetCryptoContext", [](const Ciphertext<DCRTPoly>& ct) { return ct->GetCryptoContext(); });
+}
+
+void bind_privatekey(py::module& m) {
+    py::object existingModule = py::module_::import("openfhe");
+    py::object pyClsObj       = existingModule.attr("PrivateKey");
+    auto cls                  = py::reinterpret_borrow<py::class_<PrivateKey<DCRTPoly>>>(pyClsObj);
+    cls.def("GetCryptoContext", [](const PrivateKey<DCRTPoly>& ct) { return ct->GetCryptoContext(); });
+}
+
 
 // FOR LATER
 // void bind_metadata(py::module& m) {

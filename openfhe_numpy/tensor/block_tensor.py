@@ -1,5 +1,5 @@
 from typing import TypeVar, Generic, Tuple, List
-from openfhe_numpy._onp_cpp import ArrayEncodingType
+from openfhe_numpy.openfhe_numpy import ArrayEncodingType
 from openfhe_numpy.tensor.tensor import FHETensor, T
 
 

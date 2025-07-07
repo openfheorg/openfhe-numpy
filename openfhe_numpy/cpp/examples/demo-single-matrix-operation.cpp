@@ -13,7 +13,7 @@ using namespace lbcrypto;
 
 /**
  * @brief Creates a CryptoContext for CKKS operations
- * 
+ *
  * @param multDepth Multiplicative depth
  * @param batchSize Batch size (default: 0)
  * @return Configured CryptoContext

@@ -13,7 +13,7 @@ using namespace lbcrypto;
 
 /**
  * @brief Generate a CKKS crypto context with specified parameters
- * 
+ *
  * @param multDepth Multiplicative depth
  * @param batchSize Optional batch size (default: 0)
  * @return CryptoContext<DCRTPoly> Configured crypto context
@@ -74,7 +74,7 @@ void MatrixVectorProduct_CRC() {
 
     std::vector<double> inputVector = {7, 0, 1, 3, 5, 0, 1, 8};
 
-    // Result: 98.00 120.00 129.00 117.00 163.00 126.00 137.00 103.00 
+    // Result: 98.00 120.00 129.00 117.00 163.00 126.00 137.00 103.00
 
 
     uint multDepth = 10 ;
@@ -107,7 +107,7 @@ void MatrixVectorProduct_CRC() {
     std::size_t nRows          = inputMatrix.size();
     std::size_t nCols          = !inputMatrix.empty() ? inputMatrix[0].size() : 0;
     std::size_t paddedRowCount = NextPow2(nCols);
-    
+
     std::size_t batchSize         = cc->GetRingDimension() / 2;
 
     std::vector<double> flatMat = EncodeMatrix(inputMatrix, batchSize);
@@ -156,7 +156,7 @@ void MatrixVectorProduct_CRC() {
 
 /**
  * @brief Demonstrate homomorphic matrix-matrix multiplication
- * 
+ *
  * @param verbose Whether to print detailed output (default: true)
  */
 void DemoMatrixProduct(bool verbose = true) {

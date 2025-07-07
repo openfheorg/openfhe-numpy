@@ -34,8 +34,11 @@ def demo():
     )
 
     print("Matrix:\n", matrix)
-    slots = params.GetBatchSize() if params.GetBatchSize() else cc.GetRingDimension() // 4
-    print(params.GetBatchSize(), params.GetRingDim())
+    slots = (
+        params.GetBatchSize()
+        if params.GetBatchSize()
+        else cc.GetRingDimension() // 4
+    )
 
     # Encrypt matrix A
     ctm_matA = onp.array(cc, matrix, slots, public_key=keys.publicKey)
@@ -53,8 +56,8 @@ def demo():
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{result}")
 
-    is_match, error = onp.check_equality_matrix(result, expected)
-    print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
+    is_match, error = onp.check_equality(result, expected)
+    print(f"\nMatch: {is_match}, Total Error: {error}")
 
 
 if __name__ == "__main__":

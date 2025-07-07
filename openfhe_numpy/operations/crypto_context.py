@@ -6,10 +6,10 @@ keys needed for various homomorphic operations in OpenFHE-NumPy.
 """
 
 import openfhe
-import openfhe_numpy as onp
+import openfhe_numpy as backend  # Import from cpp source
 
 
-def accumulation_depth(nrows, ncols, accumulate_by_rows):
+def accumulation_depth(nrows: int, ncols: int, accumulate_by_rows: bool):
     """
     Compute the CKKS multiplicative depth needed to sum over a matrix.
 
@@ -27,7 +27,7 @@ def accumulation_depth(nrows, ncols, accumulate_by_rows):
     int
         Required multiplicative depth
     """
-    return onp.MulDepthAccumulation(nrows, ncols, accumulate_by_rows)
+    return backend.MulDepthAccumulation(nrows, ncols, accumulate_by_rows)
 
 
 def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
@@ -63,14 +63,6 @@ def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
     ncols : int, optional
         Number of columns in the matrix, by default 0
     """
-    # import numpy as np
-
-    # base = np.arange(ncols) * ncols
-    # indices = np.empty(2 * ncols, dtype=base.dtype)
-    # indices[0::2] = base
-    # indices[1::2] = -base
-
-    # indices = [x for i in range(ncols) for x in (i * ncols, -i * ncols)]
     context = secret_key.GetCryptoContext()
     return context.EvalSumColsKeyGen(secret_key)
 
@@ -86,7 +78,7 @@ def gen_accumulate_rows_key(secret_key: openfhe.PrivateKey, ncols: int):
     ncols : int
         Number of columns in the matrix
     """
-    onp.EvalSumCumRowsKeyGen(secret_key, ncols)
+    backend.EvalSumCumRowsKeyGen(secret_key, ncols)
 
 
 def gen_accumulate_cols_key(secret_key: openfhe.PrivateKey, ncols: int):
@@ -100,7 +92,7 @@ def gen_accumulate_cols_key(secret_key: openfhe.PrivateKey, ncols: int):
     ncols : int
         Number of columns in the matrix
     """
-    onp.EvalSumCumColsKeyGen(secret_key, ncols)
+    backend.EvalSumCumColsKeyGen(secret_key, ncols)
 
 
 def gen_rotation_keys(secret_key: openfhe.PrivateKey, rotation_indices: int):
@@ -135,7 +127,7 @@ def gen_lintrans_keys(secret_key: openfhe.PrivateKey, block_size: int, linear_tr
     repetitions : int, optional
         Number of repetitions, by default 0
     """
-    onp.EvalLinTransKeyGen(secret_key, block_size, linear_transform_type, repetitions)
+    backend.EvalLinTransKeyGen(secret_key, block_size, linear_transform_type, repetitions)
 
 
 def gen_square_matmult_key(secret_key: openfhe.PrivateKey, block_size: int):
@@ -149,7 +141,7 @@ def gen_square_matmult_key(secret_key: openfhe.PrivateKey, block_size: int):
     block_size : int
         Block size for the matrix
     """
-    onp.EvalSquareMatMultRotateKeyGen(secret_key, block_size)
+    backend.EvalSquareMatMultRotateKeyGen(secret_key, block_size)
 
 
 def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
@@ -163,6 +155,4 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
     ctm_matrix : CTArray
         The ciphertext matrix to transpose
     """
-    onp.EvalLinTransKeyGen(
-        secret_key, ctm_matrix.ncols, onp.LinTransType.TRANSPOSE
-    )
+    backend.EvalLinTransKeyGen(secret_key, ctm_matrix.ncols, backend.LinTransType.TRANSPOSE)

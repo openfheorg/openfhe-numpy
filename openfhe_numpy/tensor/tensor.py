@@ -70,7 +70,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
     Parameters
     ----------
     data : T
-        Underlying encrypted or encoded data.
+        Underlying encrypted or encoded of a packed encoding array.
     original_shape : Tuple[int, int]
         Shape before any padding.
     batch_size : int
@@ -116,6 +116,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
     ### Properties
     ###
     @property
+    # Total size of a packed encoded array
     def size(self):
         if self.ndim == 1:
             return self.shape[0]
@@ -124,6 +125,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
         return 0
 
     @property
+    # Determine if the tensor is Ciphertext or Plaintext
     def dtype(self):
         return self._dtype
 
@@ -133,10 +135,10 @@ class FHETensor(BaseTensor[T], Generic[T]):
         return self._data
 
     @property
-
     def original_shape(self) -> Tuple[int, int]:
         """Original shape before any padding was applied."""
         return self._original_shape
+
     @property
     def shape(self) -> Tuple[int, int]:
         """Shape after padding."""
@@ -159,7 +161,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
 
     @property
     def order(self) -> int:
-        """Packing order constant (row- or column-major)."""
+        """Packing order constant (row-major or column-major)."""
         return self._order
 
     @property
@@ -282,7 +284,9 @@ class FHETensor(BaseTensor[T], Generic[T]):
     # Replace these methods too
     def sum(self, axis=0):
         if axis < 0 or axis >= self.ndim:
-            raise ValueError(f"Invalid axis {axis} for tensor with {self.ndim} dimensions.")
+            raise ValueError(
+                f"Invalid axis {axis} for tensor with {self.ndim} dimensions."
+            )
         return self.__tensor_function__("sum", (self,), {"axis": axis})
 
     def reduce(self, axis=0):
@@ -291,10 +295,14 @@ class FHETensor(BaseTensor[T], Generic[T]):
     def transpose(self):
         return self.__tensor_function__("transpose", (self,))
 
-    def __tensor_function__(self, func_name, args, kwargs=None, verbose: bool = False):
+    def __tensor_function__(
+        self, func_name, args, kwargs=None, verbose: bool = False
+    ):
         """Dispatch tensor operations via the registry."""
         if verbose:
-            print(f"DEBUG: tensor.__tensor_function__ called for '{func_name}' with {len(args)} args")
+            print(
+                f"DEBUG: tensor.__tensor_function__ called for '{func_name}' with {len(args)} args"
+            )
         from openfhe_numpy.operations.dispatch import dispatch_tensor_function
 
         return dispatch_tensor_function(func_name, args, kwargs or {})

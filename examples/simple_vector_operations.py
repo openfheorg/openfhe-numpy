@@ -10,13 +10,9 @@ def validate_and_print_results(computed, expected, operation_name):
     print("*" * 60)
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{computed}")
-    if expected.ndim == 0:
-        is_match, error = onp.check_single_equality(computed, expected)
-    elif expected.ndim == 1:
-        is_match, error = onp.check_equality_vector(computed, expected)
-    else:
-        is_match, error = onp.check_equality_matrix(computed, expected)
-    print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
+
+    is_match, error = onp.check_equality(computed, expected)
+    print(f"\nMatch: {is_match}, Total Error: {error}")
     return is_match, error
 
 
@@ -63,45 +59,67 @@ def main():
     # 1) Addition
     ctv_add = ctv_a + ctv_b
     res_add = ctv_add.decrypt(keys.secretKey, unpack_type="original")
-    validate_and_print_results(res_add, np.add(vector_a, vector_b), f"Vector Addition  \n{vector_a} \n{vector_b}")
+    validate_and_print_results(
+        res_add,
+        np.add(vector_a, vector_b),
+        f"Vector Addition  \n{vector_a} \n{vector_b}",
+    )
 
     # 2) Subtraction
     ctv_sub = ctv_a - ctv_b
     res_sub = ctv_sub.decrypt(keys.secretKey, unpack_type="original")
     validate_and_print_results(
-        res_sub, np.subtract(vector_a, vector_b), f"Vector Subtraction  \n{vector_a} and \n{vector_b}"
+        res_sub,
+        np.subtract(vector_a, vector_b),
+        f"Vector Subtraction  \n{vector_a} and \n{vector_b}",
     )
 
     # 3) Transpose
     onp.gen_transpose_keys(keys.secretKey, ctv_a)
     ctv_a_T = onp.transpose(ctv_a)
     res_T = ctv_a_T.decrypt(keys.secretKey, unpack_type="original")
-    validate_and_print_results(res_T, np.transpose(vector_a), f"Tranpose \n{vector_a}")
+    validate_and_print_results(
+        res_T, np.transpose(vector_a), f"Tranpose \n{vector_a}"
+    )
 
     # 4) Elementwise multiplication
     ctv_mul = ctv_a * ctv_b
     res_mul = ctv_mul.decrypt(keys.secretKey, unpack_type="original")
     validate_and_print_results(
-        res_mul, np.multiply(vector_a, vector_b), f"Elementwise multiplication \n{vector_a} \n{vector_b} "
+        res_mul,
+        np.multiply(vector_a, vector_b),
+        f"Elementwise multiplication \n{vector_a} \n{vector_b} ",
     )
 
     # 5) Elementwise multiplication
     ctv_mul_scalar = ctv_a * 7
-    res_mul_scalar = ctv_mul_scalar.decrypt(keys.secretKey, unpack_type="original")
-    validate_and_print_results(res_mul_scalar, np.multiply(vector_a, 7), f"Scalar Multiplcation \n{vector_a} and 7")
+    res_mul_scalar = ctv_mul_scalar.decrypt(
+        keys.secretKey, unpack_type="original"
+    )
+    validate_and_print_results(
+        res_mul_scalar,
+        np.multiply(vector_a, 7),
+        f"Scalar Multiplcation \n{vector_a} and 7",
+    )
 
     # 6) Inner product
     # We can use onp.dot(ctv_a, ctv_b) as well
     ctv_inner = ctv_a @ ctv_b
-    res_inner_decrypted = ctv_inner.decrypt(keys.secretKey, unpack_type="original")
+    res_inner_decrypted = ctv_inner.decrypt(
+        keys.secretKey, unpack_type="original"
+    )
     validate_and_print_results(
-        res_inner_decrypted, np.dot(vector_a, vector_b), f"Inner product of \n{vector_a} \n{vector_b}"
+        res_inner_decrypted,
+        np.dot(vector_a, vector_b),
+        f"Inner product of \n{vector_a} \n{vector_b}",
     )
 
     # 7) Sum
     ctv_sum = onp.sum(ctv_a)
     res_sum_decrypted = ctv_sum.decrypt(keys.secretKey, unpack_type="original")
-    validate_and_print_results(res_sum_decrypted, np.sum(vector_a), "Sum of vector\n" + str(vector_a))
+    validate_and_print_results(
+        res_sum_decrypted, np.sum(vector_a), "Sum of vector\n" + str(vector_a)
+    )
 
 
 if __name__ == "__main__":
