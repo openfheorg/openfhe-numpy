@@ -21,12 +21,11 @@ from openfhe_numpy.utils.errors import (
     ONPNotImplementedError,
     ONPNotSupportedError,
     ONPDimensionError,
+    ONPValueError,
 )
 from openfhe_numpy.utils.typecheck import is_numeric_scalar
 from openfhe_numpy import (
     ArrayEncodingType,
-    MatVecEncoding,
-    EvalMultMatVec,
     EvalMatMulSquare,
     EvalTranspose,
     EvalSumCumRows,
@@ -205,40 +204,32 @@ def _eval_matvec_ct(lhs, rhs):
             lhs.order == ArrayEncodingType.ROW_MAJOR
             and rhs.order == ArrayEncodingType.COL_MAJOR
         ):
-            sumkey = lhs.extra["colkey"]
-            ciphertext = EvalMultMatVec(
-                sumkey,
-                MatVecEncoding.MM_CRC,
-                lhs.ncols,
-                rhs.data,
-                lhs.data,
-            )
+            cc = lhs.data.GetCryptoContext()
+            ct_mult = cc.EvalMult(lhs.data, rhs.data)
+            ct_prod = cc.EvalSumCols(ct_mult, lhs.ncols, lhs.extra["colkey"])
             return CTArray(
-                ciphertext,
+                ct_prod,
                 (lhs.original_shape[0],),
                 lhs.batch_size,
-                (lhs.shape[0],),
+                (lhs.shape[0], lhs.shape[1]),
                 ArrayEncodingType.ROW_MAJOR,
             )
 
         elif (
             lhs.order == ArrayEncodingType.COL_MAJOR
-            and rhs.order == ArrayEncodingType.COL_MAJOR
+            and rhs.order == ArrayEncodingType.ROW_MAJOR
         ):
-            sumkey = lhs.extra["rowkey"]
-            ciphertext = EvalMultMatVec(
-                sumkey,
-                MatVecEncoding.MM_RCR,
-                lhs.ncols,
-                rhs.data,
-                lhs.data,
+            cc = lhs.data.GetCryptoContext()
+            ct_mult = cc.EvalMult(lhs.data, rhs.data)
+            ct_prod = cc.EvalSumRows(
+                ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size
             )
             return CTArray(
-                ciphertext,
+                ct_prod,
                 (lhs.original_shape[0],),
                 lhs.batch_size,
-                (lhs.shape[0],),
-                ArrayEncodingType.ROW_MAJOR,
+                (lhs.shape[0], lhs.shape[1]),
+                ArrayEncodingType.COL_MAJOR,
             )
         else:
             ONP_ERROR(
@@ -255,11 +246,10 @@ def _eval_matvec_ct(lhs, rhs):
 def _matmul_ct(lhs, rhs):
     """Internal function to evaluate matrix multiplication."""
     if lhs.is_encrypted and rhs.is_encrypted:
-        if lhs.shape == rhs.shape:
-            if rhs.ndim == 1:
-                return _eval_matvec_ct(lhs, rhs)
+        if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
             return lhs.clone(EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
-
+        elif rhs.ndim == 1:
+            return _eval_matvec_ct(lhs, rhs)
         else:
             ONPIncompatibleShape(
                 f"Matrix dimension mismatch for multiplication: {lhs.shape} and {rhs.shape}"
@@ -471,45 +461,93 @@ def cumreduce_block_ct(a, axis=0, keepdims=False):
 # ------------------------------------------------------------------------------
 
 
+# NOTE: Sum Operations
+# Here is a running example illustrating the behavior of onp.sum when summing over axes 0 and 1
+# Orginal matrix: [11 // 21 // 31 // 26]
+# Expected result:
+#                   - axis = 0: 8 9
+#                   - axis = 1: 2 // 3 // 4 // 8
+# Packed matrix behavior
+# A. Row-Major: 11 21 31 26
+# 1. Sum over rows: axis = 0.
+#    using EvalSumRows(rows = 4, cols = 2)
+#     11 21 31 22
+#     21 31 22 11
+#     32 52 53 33
+#     53 33 32 52
+#     89 89 89 89
+# 2. Sum over columns: axis = 1.
+#    using EvalSumCols(rows = 4, cols = 2)
+#     1121 3126
+#     1213 1261
+#     2334 4387
+#     2233 4488
+# B. Column-Major: 1232 1116
+# 1. Sum over rows: axis = 0.
+#    using EvalSumCol(rows = 2, cols = 4)
+#     1232 1116
+#     8888 9999
+# 2. Sum over columns: axis = 1.
+#    using EvalSumRows(rows = 2, cols = 4)
+#     12 32 11 16
+#     11 16 12 32
+#     23 48 23 48
+
+
 def _ct_sum_matrix(tensor: ArrayLike, axis: Optional[int] = None):
     """
     This function computes a sum of a padded matrix. It is similar to np.sum
     """
-    crypto_context = tensor.data.GetCryptoContext()
+
+    cc = tensor.data.GetCryptoContext()
     rows, cols = tensor.original_shape
     nrows, ncols = tensor.shape
     order = tensor.order
+    fhe_data = tensor.data
 
     if axis is None:
-        # Sums all elements in a packed_encoded matrix ciphertext
-        rotated = tensor.data
-        ct_sum = tensor.data
+        # Sum all elements in a packed-encoded matrix ciphertext: fhe_data
+        rotated = fhe_data
+        ct_sum = fhe_data
         for i in range(nrows * ncols - 1):
-            rotated = crypto_context.EvalRotate(rotated, 1)
-            ct_sum = crypto_context.EvalAdd(ct_sum, rotated)
+            rotated = cc.EvalRotate(rotated, 1)
+            ct_sum = cc.EvalAdd(ct_sum, rotated)
 
         shape = ()
         padded_shape = ()
 
-    elif (axis == 0 and ArrayEncodingType.ROW_MAJOR) or (
-        axis == 1 and ArrayEncodingType.COL_MAJOR
-    ):
-        ct_sum = crypto_context.EvalSumRows(
-            tensor.data, tensor.shape[0], tensor.extra["rowkey"]
-        )
-        shape = (cols, 1)
-        padded_shape = (nrows, ncols)
+    elif axis == 0:
+        # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
+        if order == ArrayEncodingType.ROW_MAJOR:
+            ct_sum = cc.EvalSumRows(
+                fhe_data, ncols, tensor.extra["rowkey"], tensor.batch_size
+            )
+            shape = (cols,)
+            padded_shape = (nrows, ncols)
+            order = ArrayEncodingType.COL_MAJOR
+        elif order == ArrayEncodingType.COL_MAJOR:
+            ct_sum = cc.EvalSumCols(fhe_data, ncols, tensor.extra["colkey"])
+            shape = (cols,)
+            padded_shape = (nrows, ncols)
+        else:
+            ONPNotSupportedError(f"Not support the current encoding [{order}] ")
 
     elif axis == 1:
-        # Sums all elements across each column a packed_encoded matrix ciphertext
-        ct_sum = crypto_context.EvalSumCols(
-            tensor.data, ncols, tensor.extra["colkey"]
-        )
-        shape = (rows,)
-        padded_shape = (nrows, ncols)
+        # Sum across each column of a packed_encoded matrix ciphertext: fhe_data
+        if order == ArrayEncodingType.ROW_MAJOR:
+            ct_sum = cc.EvalSumCols(fhe_data, ncols, tensor.extra["colkey"])
+            shape = (rows,)
+            padded_shape = (nrows, ncols)
+        elif order == ArrayEncodingType.COL_MAJOR:
+            ct_sum = cc.EvalSumRows(fhe_data, nrows, tensor.extra["rowkey"])
+            shape = (rows,)
+            padded_shape = (nrows, ncols)
+        else:
+            ONPNotSupportedError(f"Not support the current encoding [{order}]")
 
     else:
-        ONPDimensionError(f"The dimension is invalid axis = {axis}")
+        ONPValueError(f"Invalid axis [{axis}]")
+
     return CTArray(ct_sum, shape, tensor.batch_size, padded_shape, order)
 
 

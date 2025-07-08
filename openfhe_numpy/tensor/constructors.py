@@ -6,10 +6,11 @@ including support for block-based tensor operations.
 """
 
 # Third‐party imports
-from typing import Literal, Optional
+from dataclasses import dataclass
+from typing import Literal, Optional, Union, overload
 
 import numpy as np
-import openfhe
+from openfhe import CryptoContext, PublicKey
 
 # Package-level imports
 from openfhe_numpy.openfhe_numpy import ArrayEncodingType
@@ -27,10 +28,16 @@ from openfhe_numpy.utils.typecheck import (
     is_numeric_scalar,
 )
 
+from openfhe_numpy.operations.dispatch import (
+    tensor_function_api,
+    register_tensor_function,
+)
+
+
 # Tensor imports
 from .ctarray import CTArray
 from .ptarray import PTArray
-from .tensor import FHETensor
+from .tensor import FHETensor, PackedArrayInformation
 
 
 def _get_block_dimensions(data, slots) -> tuple[int, int]:
@@ -42,14 +49,14 @@ def _get_block_dimensions(data, slots) -> tuple[int, int]:
 
 
 def block_array(
-    cc: openfhe.CryptoContext,
+    cc: CryptoContext,
     data: np.ndarray | Number | list,
     batch_size: Optional[int] = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
     type: Literal["C", "P"] = "C",
     mode: str = "tile",
     package: Optional[dict] = None,
-    public_key: openfhe.PublicKey = None,
+    public_key: PublicKey = None,
     **kwargs,
 ) -> FHETensor:
     """
@@ -79,7 +86,7 @@ def _pack_array(
     order: int = ArrayEncodingType.ROW_MAJOR,
     mode: str = "tile",
     **kwargs,
-) -> dict:
+) -> PackedArrayInformation:
     """
     Flatten a scalar, vector, or matrix into a 1D array, padding
     or tileing elements to fill all slots.
@@ -96,7 +103,7 @@ def _pack_array(
 
     Returns
     -------
-    dict with keys:
+    a metadata (PackedArrayInformation) with keys:
       - data           : packed 1D numpy array
       - original_shape : tuple
       - ndim           : int
@@ -132,29 +139,29 @@ def _pack_array(
             )
         else:
             ONP_ERROR(f"Unsupported data dimension [{data.ndim}].")
-        packed = packed
+
     else:
         ONP_ERROR("Input is not numeric.")
 
-    return {
-        "data": packed,
-        "original_shape": data.shape,
-        "ndim": data.ndim,
-        "batch_size": batch_size,
-        "shape": shape,
-        "order": order,
-    }
+    return PackedArrayInformation(
+        data=packed,
+        original_shape=data.shape,
+        ndim=data.ndim,
+        batch_size=batch_size,
+        shape=shape,
+        order=order,
+    )
 
 
 def array(
-    cc: openfhe.CryptoContext,
-    data: np.ndarray | Number | list,
+    cc: CryptoContext,
+    data: Union[np.ndarray | Number | list],
     batch_size: Optional[int] = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
-    type: Literal["C", "P"] = "C",
+    fhe_type: Literal["C", "P"] = "P",
     mode: str = "tile",
-    package: dict = {},
-    public_key: openfhe.PublicKey = None,
+    package: Optional[PackedArrayInformation] = None,
+    public_key: PublicKey = None,
     **kwargs,
 ) -> FHETensor:
     """
@@ -175,50 +182,47 @@ def array(
     FHETensor
     """
     if cc is None:
-        ONP_ERROR("CryptoContext cannot be None.")
+        ONP_ERROR("CryptoContext does not exist")
 
-    if batch_size is not None and not isinstance(batch_size, int):
+    if batch_size is None:
+        batch_size = cc.GetBatchSize()
+    if not isinstance(batch_size, int) or batch_size < 0:
         ONP_ERROR(
-            f"batch_size must be int or None, got {type(batch_size).__name__}."
+            f"batch_size must be a non-negative int or None, got {batch_size}."
         )
-
-    if type not in ["C", "P"]:
-        ONP_ERROR(f"type must be 'C' or 'P', got '{type}'.")
 
     if not package:
         package = _pack_array(data, batch_size, order, mode, **kwargs)
 
-    if mode not in ["tile", "zero"]:
-        ONP_ERROR(f"mode must be 'tile' or 'zero', got '{mode}'.")
-
-    packed_data = package["data"]
-    batch_size = package["batch_size"]
-    shape = package["shape"]
-    order = package["order"]
-
     try:
-        plaintext = cc.MakeCKKSPackedPlaintext(packed_data)
+        plaintext = cc.MakeCKKSPackedPlaintext(package.data)
     except Exception as e:
-        ONP_ERROR(f"Failed to create plaintext: {e}")
+        ONP_ERROR("Error: " + str(e))
 
-    if type == "P":
-        result = PTArray(
-            plaintext, package["original_shape"], batch_size, shape, order
+    if fhe_type == "P":
+        return PTArray(
+            plaintext,  # data
+            package.original_shape,  # original_shape
+            package.batch_size,  # batch_size
+            package.shape,  # new_shape
+            package.order,  # order
         )
-    else:
+    elif fhe_type == "C":
         if public_key is None:
             ONP_ERROR("Public key must be provided for ciphertext encoding.")
         try:
             ciphertext = cc.Encrypt(public_key, plaintext)
-            result = CTArray(
-                ciphertext, package["original_shape"], batch_size, shape, order
+            return CTArray(
+                ciphertext,  # data
+                package.original_shape,  # original_shape
+                package.batch_size,  # batch_size
+                package.shape,  # new_shape
+                package.order,  # order
             )
         except Exception as e:
             ONP_ERROR(f"Failed to encrypt: {e}")
-
-    result.set_shape(shape)
-    result.set_batch_size(batch_size)
-    return result
+    else:
+        ONP_ERROR(f"type must be 'C' or 'P', got '{fhe_type}'.")
 
 
 def _ravel_matrix(

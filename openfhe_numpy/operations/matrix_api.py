@@ -9,7 +9,7 @@ All functions use the tensor_function_api decorator to handle different tensor t
 and dispatch to the appropriate backend implementation.
 """
 
-from typing import Any, Optional, Union
+from typing import Optional
 from numpy.typing import ArrayLike
 from .dispatch import tensor_function_api
 
@@ -28,6 +28,8 @@ def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     numpy.add
     """
     return _add_dispatch(a, b)
+
+
 @tensor_function_api("add", binary=True)
 def _add_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """Dispatch for `add` operation."""
@@ -330,7 +332,9 @@ def sum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 
 
 @tensor_function_api("mean", binary=False)
-def mean(a: ArrayLike, axis: Optional[int] = 0, keepdims: bool = False) -> ArrayLike:
+def mean(
+    a: ArrayLike, axis: Optional[int] = 0, keepdims: bool = False
+) -> ArrayLike:
     """
     Compute the arithmetic mean along an axis or all elements.
 

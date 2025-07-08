@@ -22,11 +22,25 @@ def run_matmul_example(cc, keys, A, B, description):
     print("Input B:\n", B)
 
     # Encrypt A and B
+    batch_size = cc.GetRingDimension() // 2
     ctm_A = onp.array(
-        cc, A, cc.GetRingDimension() // 2, public_key=keys.publicKey
+        cc=cc,
+        data=A,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        fhe_type="C",
+        mode="tile",
+        public_key=keys.publicKey,
     )
+
     ctm_B = onp.array(
-        cc, B, cc.GetRingDimension() // 2, public_key=keys.publicKey
+        cc=cc,
+        data=B,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        fhe_type="C",
+        mode="tile",
+        public_key=keys.publicKey,
     )
 
     # Generate rotation keys for matrix multiplication

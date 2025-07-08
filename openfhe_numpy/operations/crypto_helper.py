@@ -30,7 +30,9 @@ def accumulation_depth(nrows: int, ncols: int, accumulate_by_rows: bool):
     return backend.MulDepthAccumulation(nrows, ncols, accumulate_by_rows)
 
 
-def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
+def sum_row_keys(
+    secret_key: openfhe.PrivateKey, ncols: int = 0, slots: int = 0
+):
     """
     Generate keys for summing rows in a matrix.
 
@@ -49,7 +51,7 @@ def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
         Generated sum keys
     """
     context = secret_key.GetCryptoContext()
-    return context.EvalSumRowsKeyGen(secret_key, None, ncols)
+    return context.EvalSumRowsKeyGen(secret_key, None, ncols, slots)
 
 
 def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
@@ -112,7 +114,12 @@ def gen_rotation_keys(secret_key: openfhe.PrivateKey, rotation_indices: int):
     context.EvalRotateKeyGen(secret_key, rotation_indices)
 
 
-def gen_lintrans_keys(secret_key: openfhe.PrivateKey, block_size: int, linear_transform_type, repetitions: int = 0):
+def gen_lintrans_keys(
+    secret_key: openfhe.PrivateKey,
+    block_size: int,
+    linear_transform_type,
+    repetitions: int = 0,
+):
     """
     Generate keys for linear transformations.
 
@@ -127,7 +134,9 @@ def gen_lintrans_keys(secret_key: openfhe.PrivateKey, block_size: int, linear_tr
     repetitions : int, optional
         Number of repetitions, by default 0
     """
-    backend.EvalLinTransKeyGen(secret_key, block_size, linear_transform_type, repetitions)
+    backend.EvalLinTransKeyGen(
+        secret_key, block_size, linear_transform_type, repetitions
+    )
 
 
 def gen_square_matmult_key(secret_key: openfhe.PrivateKey, block_size: int):
@@ -155,4 +164,11 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
     ctm_matrix : CTArray
         The ciphertext matrix to transpose
     """
-    backend.EvalLinTransKeyGen(secret_key, ctm_matrix.ncols, backend.LinTransType.TRANSPOSE)
+    if ctm_matrix.ndim == 1:
+        ncols = 1
+    else:
+        ncols = ctm_matrix.ncols
+
+    backend.EvalLinTransKeyGen(
+        secret_key, ncols, backend.LinTransType.TRANSPOSE
+    )

@@ -40,9 +40,9 @@ def main():
     cc.EvalSumKeyGen(keys.secretKey)
 
     ring_dim = cc.GetRingDimension()
-    total_slots = ring_dim // 2
+    batch_size = ring_dim // 2
     print(f"\nCKKS ring dimension: {ring_dim}")
-    print(f"Available slots:    {total_slots}")
+    print(f"Available slots:    {batch_size}")
 
     # Sample input vectors
     vector_a = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -53,8 +53,26 @@ def main():
     print("vector_b:", vector_b)
 
     # Encrypt vector_a directly to ciphertext
-    ctv_a = onp.array(cc, vector_a, total_slots, public_key=keys.publicKey)
-    ctv_b = onp.array(cc, vector_b, total_slots, public_key=keys.publicKey)
+    # ctv_a = onp.array(cc, vector_a, batch_size, public_key=keys.publicKey)
+    ctv_a = onp.array(
+        cc=cc,
+        data=vector_a,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        mode="zero",
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
+    # ctv_b = onp.array(cc, vector_b, batch_size, public_key=keys.publicKey)
+    ctv_b = onp.array(
+        cc=cc,
+        data=vector_b,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        mode="zero",
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
 
     # 1) Addition
     ctv_add = ctv_a + ctv_b

@@ -1,14 +1,9 @@
 # Standard Library Imports
+from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import (
-    Any,
-    Dict,
-    Generic,
-    Optional,
-    Tuple,
-    TypeVar,
-)
+from typing import overload, Any, Dict, Generic, Optional, Tuple, TypeVar, Union
 
+import numpy as np
 
 # Internal C++ module Imports
 from openfhe_numpy.utils.errors import ONP_ERROR
@@ -51,7 +46,7 @@ class BaseTensor(ABC, Generic[T]):
 
     @property
     @abstractmethod
-    def metadata(self) -> dict: ...
+    def info(self) -> dict: ...
 
     @abstractmethod
     def clone(self, data: T = None) -> "BaseTensor[T]": ...
@@ -63,6 +58,16 @@ class BaseTensor(ABC, Generic[T]):
 # -----------------------------------------------------------
 # FHETensor - Generic Tensor with Metadata
 # -----------------------------------------------------------
+@dataclass
+class PackedArrayInformation:
+    data: list | np.ndarray | T
+    original_shape: tuple[int, int]
+    ndim: int
+    batch_size: int
+    shape: tuple[int, int]
+    order: int
+
+
 class FHETensor(BaseTensor[T], Generic[T]):
     """
     Concrete base class for tensors in FHE computation.
@@ -92,6 +97,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
         "extra",
     )
 
+    @overload
     def __init__(
         self,
         data: T,
@@ -99,18 +105,45 @@ class FHETensor(BaseTensor[T], Generic[T]):
         batch_size: int,
         new_shape: Tuple[int, int],
         order: int = 0,
-    ):
-        self._data = data
-        self._original_shape = original_shape
-        self._shape = new_shape
-        self._batch_size = batch_size
+    ) -> None: ...
 
-        self._ndim = len(original_shape)
-        if self._ndim > 2 or self._ndim < 0:
-            ONP_ERROR("Dimension is invalid!!!")
-        self._order = order
-        self._dtype = self.__class__.__name__  # e.g., "CTArray", "BlockCTArray"
-        self.extra = {}
+    @overload
+    def __init__(self, info: PackedArrayInformation) -> None: ...
+
+    def __init__(
+        self,
+        data: Union[list, np.ndarray, PackedArrayInformation],
+        original_shape: Tuple[int, int],
+        batch_size: int,
+        new_shape: Tuple[int, int],
+        order: int = 0,
+    ) -> None:
+        if isinstance(data, PackedArrayInformation):
+            self._data = data.data
+            self._original_shape = data.original_shape
+            self._shape = data.shape
+            self._batch_size = data.batch_size
+            self._ndim = data.ndim
+            self._order = data.order
+            self._dtype = self.__class__.__name__
+            self.extra = {}
+        else:
+            if None in (original_shape, batch_size, new_shape):
+                ONP_ERROR(
+                    "Raw form requires (data, original_shape, ndim, batch_size, shape[, order])"
+                )
+            self._data = data
+            self._original_shape = original_shape
+            self._shape = new_shape
+            self._batch_size = batch_size
+
+            self._ndim = len(original_shape)
+            if self._ndim > 2 or self._ndim < 0:
+                ONP_ERROR("Dimension is invalid!!!")
+            self._order = order
+            # dtyle in ["CTArray", "BlockCTArray"]
+            self._dtype = self.__class__.__name__
+            self.extra = {}
 
     ###
     ### Properties
@@ -157,7 +190,14 @@ class FHETensor(BaseTensor[T], Generic[T]):
     @property
     def ncols(self) -> int:
         """Number of columns after padding"""
-        return self._shape[1]
+        if self.ndim == 2:
+            return self._shape[1]
+        return None
+
+    @property
+    def nrows(self) -> int:
+        """Number of rows after padding"""
+        return self._shape[0]
 
     @property
     def order(self) -> int:
@@ -165,7 +205,11 @@ class FHETensor(BaseTensor[T], Generic[T]):
         return self._order
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def is_encrypted(self) -> int:
+        return "CT" in self.dtype
+
+    @property
+    def info(self) -> Dict[str, Any]:
         """Metadata dict for serialization or inspection."""
         return {
             "type": self.dtype,
@@ -174,33 +218,11 @@ class FHETensor(BaseTensor[T], Generic[T]):
             "batch_size": self.batch_size,
             "order": self.order,
             "extra": self.extra,
-        }
-
-    @property
-    def info(self) -> Dict[str, Any]:
-        """
-        Tuple of shape and encoding metadata.
-
-        Returns
-        -------
-        Tuple
-            Contains [None, original_shape, batch_size, ncols, order]
-        """
-        return {
             "ndim": self.ndim,
-            "shape": self.shape,
-            "original_shape": self.original_shape,
-            "batch_size": self.batch_size,
-            "order": self.order,
-            "extra": self.extra,
         }
-
-    @property
-    def is_encrypted(self) -> bool:
-        return "CT" in self.dtype
 
     ###
-    ### Setter
+    ### Update properties in some specific cases
     ###
 
     def set_batch_size(self, value: int):
@@ -211,20 +233,6 @@ class FHETensor(BaseTensor[T], Generic[T]):
             raise ValueError(f"Batch size must be positive, got {value}")
         self._batch_size = value
 
-    # def set_ncols(self, value: int):
-    #     """
-    #     Set the number of columns in the packed representation.
-
-    #     Parameters
-    #     ----------
-    #     value : int
-    #         New number of columns value. Should be a power of two.
-    #     """
-    #     if not isinstance(value, int):
-    #         raise TypeError(f"Value must be integer, got {type(value)}")
-    #     if value <= 0:
-    #         raise ValueError(f"Value must be positive, got {value}")
-    #     self._ncols = value
     def set_shape(self, value: Tuple[int, int]):
         self._shape = value
 

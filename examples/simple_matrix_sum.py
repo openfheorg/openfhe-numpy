@@ -21,46 +21,48 @@ def validate_and_print_results(computed, expected, operation_name):
     return is_match, error
 
 
-def run_total_sum_example(cc, keys, ctm_x, matrix):
+def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
     """Run homomorphic total sum example."""
     # Generate rotation keys for total sum operations
     onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
 
     # Perform homomorphic total sum
-    result_ctm_x = onp.sum(ctm_x)
+    ctm_result = onp.sum(ctm_x)
 
     # Perform decryption
-    result = result_ctm_x.decrypt(keys.secretKey, unpack_type="original")
+    result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
     validate_and_print_results(result, np.sum(matrix), "Total Sum")
 
 
-def run_row_sum_example(cc, keys, ctm_x, matrix):
+def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
     """Run homomorphic row sum example."""
     # Generate rotation keys for row sum operations
-    ctm_x.extra["rowkey"] = onp.sum_row_keys(keys.secretKey, ctm_x.shape[0])
+    ctm_x.extra["rowkey"] = onp.sum_row_keys(
+        keys.secretKey, ctm_x.ncols, ctm_x.batch_size
+    )
 
     # Perform homomorphic row sum
-    result_ctm_x = onp.sum(ctm_x, axis=0)
+    ctm_result = onp.sum(ctm_x, axis=0)
 
     # Perform decryption
-    result = result_ctm_x.decrypt(keys.secretKey, unpack_type="original")
+    result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
     validate_and_print_results(result, np.sum(matrix, axis=0), "Row Sum")
 
 
-def run_column_sum_example(cc, keys, ctm_x, matrix):
+def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
     """Run homomorphic column sum example."""
     # Generate rotation keys for column sum operations
     ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
 
     # Perform homomorphic column sum
-    result_ctm_x = onp.sum(ctm_x, axis=1)
+    ctm_result = onp.sum(ctm_x, axis=1)
 
     # Perform decryption
-    result = result_ctm_x.decrypt(keys.secretKey, unpack_type="original")
+    result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
     validate_and_print_results(result, np.sum(matrix, axis=1), "Column Sum")
@@ -75,36 +77,45 @@ def main():
     params = CCParamsCKKSRNS()
 
     # Generate crypto context
-    cc = GenCryptoContext(params)
-    cc.Enable(PKESchemeFeature.PKE)
-    cc.Enable(PKESchemeFeature.LEVELEDSHE)
-    cc.Enable(PKESchemeFeature.ADVANCEDSHE)
+    crypto_context = GenCryptoContext(params)
+    crypto_context.Enable(PKESchemeFeature.PKE)
+    crypto_context.Enable(PKESchemeFeature.LEVELEDSHE)
+    crypto_context.Enable(PKESchemeFeature.ADVANCEDSHE)
 
     # Generate keys
-    keys = cc.KeyGen()
-    cc.EvalMultKeyGen(keys.secretKey)
-    cc.EvalSumKeyGen(keys.secretKey)
+    keys = crypto_context.KeyGen()
+    crypto_context.EvalMultKeyGen(keys.secretKey)
+    crypto_context.EvalSumKeyGen(keys.secretKey)
 
     # Get system parameters
-    ring_dim = cc.GetRingDimension()
+    ring_dim = crypto_context.GetRingDimension()
     batch_size = (
         params.GetBatchSize() if params.GetBatchSize() else ring_dim // 2
     )
 
     print("\nCrypto Info:")
     print(f"  - Used slots: {batch_size}")
-    print(f"  - Ring dimension: {cc.GetRingDimension()}")
+    print(f"  - Ring dimension: {crypto_context.GetRingDimension()}")
 
     # Sample input matrix - using a simple 3x2 matrix for demonstration
+    # matrix = np.array(
+    #     [
+    #         [1.80521609, 0.46970757, 1.0],
+    #         [7.82405472, 8.52768494, 2.0],
+    #         [2.0, 1.0, 3.0],
+    #     ]
+    # )
+
     matrix = np.array(
         [
-            [1.80521609, 0.46970757, 1.0],
-            [7.82405472, 8.52768494, 2.0],
-            [2.0, 1.0, 3.0],
+            [1, 1],
+            [2, 1],
+            [3, 1],
+            [2, 6],
         ]
     )
 
-    print(f"\nInput Matrix (3x2):\n{matrix}")
+    print(f"\nInput Matrix:\n{matrix}")
 
     # We can use the 'array' function to encode or encrypt a matrix:
     # 1. Before processing, the matrix is flattened to a list using:
@@ -114,13 +125,19 @@ def main():
     #        - type="P" - encode the array to plaintext
 
     ctm_x = onp.array(
-        cc, matrix, batch_size, onp.ROW_MAJOR, "C", public_key=keys.publicKey
+        cc=crypto_context,
+        data=matrix,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        fhe_type="C",
+        mode="zero",
+        public_key=keys.publicKey,
     )
 
     # Run sum examples
-    run_total_sum_example(cc, keys, ctm_x, matrix)
-    run_row_sum_example(cc, keys, ctm_x, matrix)
-    run_column_sum_example(cc, keys, ctm_x, matrix)
+    run_total_sum_example(crypto_context, keys, ctm_x, matrix)
+    run_row_sum_example(crypto_context, keys, ctm_x, matrix)
+    run_column_sum_example(crypto_context, keys, ctm_x, matrix)
 
 
 if __name__ == "__main__":

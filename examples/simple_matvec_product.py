@@ -36,46 +36,114 @@ def demo():
     print(f"Total Slots: {batch_size}")
     print("*******************************")
 
-    # Sample input matrices (8x8)
-    matrix = np.array(
-        [
-            [0, 7, 8, 10, 1, 2, 7, 6],
-            [0, 1, 1, 9, 7, 5, 1, 7],
-            [8, 8, 4, 5, 8, 2, 6, 1],
-            [1, 0, 0, 1, 10, 3, 1, 7],
-            [7, 8, 2, 5, 3, 2, 10, 9],
-            [0, 3, 4, 10, 10, 5, 2, 5],
-            [2, 5, 0, 2, 8, 8, 5, 9],
-            [5, 1, 10, 6, 2, 8, 6, 3],
-        ]
-    )
+    # Sample input
+    # matrix = np.array(
+    #     [
+    #         [0, 7, 8, 10, 1, 2, 7],
+    #         [0, 1, 1, 9, 7, 5, 1],
+    #         [8, 8, 4, 5, 8, 2, 6],
+    #         [1, 0, 0, 1, 10, 3, 1],
+    #         [7, 8, 2, 5, 3, 2, 10],
+    #         [0, 3, 4, 10, 10, 5, 2],
+    #         [2, 5, 0, 2, 8, 8, 5],
+    #         [5, 1, 10, 6, 2, 8, 6],
+    #     ]
+    # )
+
+    # vector = np.array(
+    #     [7, 0, 1, 3, 5, 0, 1],
+    # )
+
+    matrix = np.array([[1, 2, 3], [4, 5, 6]])
 
     vector = np.array(
-        [7, 0, 1, 3, 5, 0, 1, 8],
+        [1, 1, 1],
     )
 
     print("\nInput")
-    print("Matrix:\n", matrix)
-    print("Vector:\n", vector)
+    print("\nMatrix:\n", matrix)
+    print("\nVector:\n", vector)
 
-    # Encryption
-    ctm_matrix = onp.array(cc, matrix, batch_size, onp.ROW_MAJOR, public_key=keys.publicKey)
-    ncols = ctm_matrix.ncols
-    sumkey = onp.sum_col_keys(keys.secretKey)
-    ctm_matrix.extra["colkey"] = sumkey
-    ctv_vector = onp.array(cc, vector, batch_size, onp.COL_MAJOR, public_key=keys.publicKey, target_cols=ncols)
+    print("\n" + "*" * 60)
+    print(f"* Homomorphic Matrix Vector Product")
+    print("*" * 60)
 
-    print("\n********** Homomorphic Matrix Vector Product **********")
-    ctv_result = ctm_matrix @ ctv_vector
-
-    result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
     expected = matrix @ vector
+    print(f"\nExpected:\n{expected}")
 
-    print(f"\nExpected:\n{matrix @ vector}")
-    print(f"\nDecrypted Result:\n{result}")
+    # Case 1:
+    #   - Matrix Packing Style: row-major
+    #   - Vector Packing Style: col-major
+    #   - Product Packing Style: row-major
 
-    is_match, error = onp.check_equality_vector(result, expected)
-    print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
+    ctm_m_rm = onp.array(
+        cc=cc,
+        data=matrix,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
+    ctm_m_rm.extra["colkey"] = onp.sum_col_keys(keys.secretKey)
+    ctv_v_cm = onp.array(
+        cc=cc,
+        data=vector,
+        batch_size=batch_size,
+        order=onp.COL_MAJOR,
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
+
+    ctv_result_rm = ctm_m_rm @ ctv_v_cm
+    result_rm = ctv_result_rm.decrypt(keys.secretKey, unpack_type="original")
+    is_match_rm, error_rm = onp.check_equality(result_rm, expected)
+
+    print("Case 1:")
+    print("  - Matrix Packing Style: row-major")
+    print("  - Vector Packing Style: col-major")
+    print("  - Product Packing Style: row-major")
+    print(f"\nDecrypted Result:\n{result_rm}")
+    print(f"\nMatch: {is_match_rm}, Total Error: {error_rm}")
+
+    # Case 2:
+    #   - Matrix Packing Style: col-major
+    #   - Vector Packing Style: row-major
+    #   - Product Packing Style: col-major
+    ctm_m_cm = onp.array(
+        cc=cc,
+        data=matrix,
+        batch_size=batch_size,
+        order=onp.COL_MAJOR,
+        mode="zero",
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
+
+    ctv_v_rm = onp.array(
+        cc=cc,
+        data=vector,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        mode="zero",
+        fhe_type="C",
+        target_cols=ctm_m_cm.nrows,
+        public_key=keys.publicKey,
+    )
+
+    ctm_m_cm.extra["rowkey"] = onp.sum_row_keys(
+        keys.secretKey, ctm_m_cm.nrows, ctm_m_cm.batch_size
+    )
+
+    ctv_result_cm = ctm_m_cm @ ctv_v_rm
+    result_cm = ctv_result_cm.decrypt(keys.secretKey, unpack_type="original")
+    is_match_cm, error_cm = onp.check_equality(result_cm, expected)
+
+    print("Case 2:")
+    print("  - Matrix Packing Style: col-major")
+    print("  - Vector Packing Style: row-major")
+    print("  - Product Packing Style: col-major")
+    print(f"\nDecrypted Result:\n{result_cm}")
+    print(f"\nMatch: {is_match_cm}, Total Error: {error_cm}")
 
 
 if __name__ == "__main__":

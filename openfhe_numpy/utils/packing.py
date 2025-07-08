@@ -13,9 +13,10 @@ The module is organized into sections:
 """
 
 # from pydantic import validate_call, PositiveInt
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from openfhe_numpy.openfhe_numpy import *
 
@@ -31,8 +32,8 @@ def _pack_vector_row_wise(
     vector: ArrayNumeric,
     batch_size: int,
     target_cols: int,
-    expand: str = "tile",
-    tile: str = "tile",
+    expand: str = Literal["tile", "zero"],
+    tile: str = Literal["tile", "zero"],
     pad_to_power_of_2: bool = True,
     pad_value: str = "tile",
 ):
@@ -117,9 +118,9 @@ def _pack_vector_row_wise(
                 f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'."
             )
     elif expand == "zero":
-        flattened = np.zeros(expanded_size, dtype=np.asarray(vector).dtype)
-        for i in range(n):
-            flattened[i * target_cols] = vector[i]
+        flattened[np.arange(n) * target_cols] = vector
+        # for i in range(n):
+        #     flattened[i * target_cols] = vector[i]
     else:
         ONP_ERROR(
             f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'."
@@ -257,7 +258,7 @@ def _pack_matrix_row_wise(
     pad_to_power_of_2: bool = True,
     mode: str = "tile",
     **kwargs,
-) -> Tuple[np.ndarray, Tuple[int, int]]:
+) -> tuple[np.ndarray, tuple[int, int]]:
     """
     Pack a 2D array into a flat 1D buffer, row by row, with optional zero-padding.
 
@@ -269,7 +270,7 @@ def _pack_matrix_row_wise(
     matrix : array_like, shape (m, n)
         The input 2D array to pack.
     batch_size : int
-        Total number of slots in the output buffer.  Must be a power of two.
+        Total number of slots in the output array.  Must be a power of two.
     pad_to_power_of_2 : bool, default=True
         If True, pad rows and columns up to the nearest power of two before packing.
     mode : {'zero', 'tile', ...}, default='tile'
@@ -278,12 +279,12 @@ def _pack_matrix_row_wise(
         - ''tile'': tile the original matrix within the padded shape.
         (Additional modes may be accepted via '**kwargs'.)
     **kwargs
-        Mode-specific options (e.g. tile, offset) forwarded to the packing routine.
+        Mode-specific options (e.g. tiles) forwarded to the packing routine.
 
     Returns
     -------
     flat_array : ndarray, shape (batch_size,)
-        Row-wise packed, padded (and possibly tileed/ tiled) 1D array.
+        Row-wise packed, padded (and possibly zero/ tiled) 1D array.
     packed_shape : tuple of int (nrows, ncols)
         The logical 2D shape after any padding (both dimensions).
 
@@ -346,8 +347,12 @@ def _pack_matrix_row_wise(
 
 # @validate_call
 def _pack_matrix_col_wise(
-    matrix, batch_size, pad_to_power_of_2=True, mode="tile", **kwargs
-):
+    matrix: ArrayLike,
+    batch_size: int,
+    pad_to_power_of_2: bool = True,
+    mode: str = "tile",
+    **kwargs,
+) -> tuple[np.ndarray, tuple[int, int]]:
     """Pack a matrix into a flat array column-wise with zero padding.
 
     This function packs a matrix column by column, padding each column to a power of two length
@@ -557,9 +562,11 @@ def _extract_vector(data, info):
 
         ncols = info["shape"][1]
         nrows = info["batch_size"] // ncols
+
         reshaped = np.reshape(data, (nrows, ncols))
 
         if info["order"] == ROW_MAJOR:
+            # get [original_row] elements from the first columns
             return reshaped[:original_row, 0]
         elif info["order"] == COL_MAJOR:
             return reshaped[0, :original_row]

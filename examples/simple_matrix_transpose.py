@@ -34,20 +34,30 @@ def demo():
     )
 
     print("Matrix:\n", matrix)
-    slots = (
+
+    batch_size = (
         params.GetBatchSize()
         if params.GetBatchSize()
-        else cc.GetRingDimension() // 4
+        else cc.GetRingDimension() // 2
     )
 
     # Encrypt matrix A
-    ctm_matA = onp.array(cc, matrix, slots, public_key=keys.publicKey)
-
-    print("\n********** HOMOMORPHIC MATRIX TRANSPOSE **********")
+    ctm_x = onp.array(
+        cc=cc,
+        data=matrix,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        fhe_type="C",
+        mode="zero",
+        public_key=keys.publicKey,
+    )
+    print("\n" + "*" * 60)
+    print(f"* HOMOMORPHIC MATRIX TRANSPOSE ")
+    print("*" * 60)
 
     # Perform matrix tranpose on ciphertexts
-    onp.gen_transpose_keys(keys.secretKey, ctm_matA)
-    ctm_result = onp.transpose(ctm_matA)  # ctm_matA.T
+    onp.gen_transpose_keys(keys.secretKey, ctm_x)
+    ctm_result = onp.transpose(ctm_x)  # ctm_x.T
 
     # Decrypt the result
     result = ctm_result.decrypt(keys.secretKey)

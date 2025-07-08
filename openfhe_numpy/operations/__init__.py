@@ -17,7 +17,7 @@ from .matrix_api import (
 )
 
 # Import crypto context utilities
-from .crypto_context import (
+from .crypto_helper import (
     sum_row_keys,
     sum_col_keys,
     gen_rotation_keys,
