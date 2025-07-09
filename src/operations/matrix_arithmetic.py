@@ -222,7 +222,7 @@ def _eval_matvec_ct(lhs, rhs):
             cc = lhs.data.GetCryptoContext()
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
             ct_prod = cc.EvalSumRows(
-                ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size
+                ct_mult, lhs.ncols, lhs.extra["rowkey"], lhs.batch_size
             )
             return CTArray(
                 ct_prod,

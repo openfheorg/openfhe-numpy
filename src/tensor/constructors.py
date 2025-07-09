@@ -194,6 +194,7 @@ def array(
     if not package:
         package = _pack_array(data, batch_size, order, mode, **kwargs)
 
+    # print("DEBUG ::: PACKED DATA = ", package.data[:128])
     try:
         plaintext = cc.MakeCKKSPackedPlaintext(package.data)
     except Exception as e:

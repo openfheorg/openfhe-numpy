@@ -109,22 +109,12 @@ def main():
     print(f"  - Used slots: {batch_size}")
     print(f"  - Ring dimension: {crypto_context.GetRingDimension()}")
 
-    # Sample input matrix - using a simple 3x2 matrix for demonstration
-    # matrix = np.array(
-    #     [
-    #         [1.80521609, 0.46970757, 1.0],
-    #         [7.82405472, 8.52768494, 2.0],
-    #         [2.0, 1.0, 3.0],
-    #     ]
-    # )
-
+    # Sample input matrix - using a simple 2x2 matrix for demonstration
     matrix = np.array(
         [
-            [1, 1],
-            [2, 1],
-            [3, 1],
-            [2, 6],
-            [3, 3],
+            [2.0, -3.0],
+            [0.5, 0.25],
+            [-1.125, 1.875],
         ]
     )
 

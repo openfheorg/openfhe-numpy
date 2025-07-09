@@ -22,9 +22,11 @@ __all__ = [
     "array",
 ]
 
-# [TANGO] I don't understand this????
-def _register_all_operations():
-    import openfhe_numpy.operations.matrix_arithmetic
-    # import operations.matrix_api
 
-_register_all_operations()
+# # [TANGO] I don't understand this????
+# def _register_all_operations():
+#     import openfhe_numpy.operations.matrix_arithmetic
+#     # import operations.matrix_api
+
+
+# _register_all_operations()

@@ -26,6 +26,7 @@ from .crypto_helper import (
     gen_square_matmult_key,
     gen_accumulate_rows_key,
     gen_accumulate_cols_key,
+    decrypt_ciphertext,
 )
 
 # Define public API
@@ -50,4 +51,5 @@ __all__ = [
     "gen_square_matmult_key",
     "gen_accumulate_rows_key",
     "gen_accumulate_cols_key",
+    "decrypt_ciphertext",
 ]

@@ -23,7 +23,7 @@ def run_row_accumulation_example(cc, keys, ctm_x, matrix):
     if ctm_x.order == onp.ROW_MAJOR:
         onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
     elif ctm_x.order == onp.COL_MAJOR:
-        onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.ncols)
+        onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.nrows)
     else:
         raise ValueError("Invalid order.")
 
@@ -45,7 +45,7 @@ def run_column_accumulation_example(cc, keys, ctm_x, matrix):
     if ctm_x.order == onp.ROW_MAJOR:
         onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.ncols)
     elif ctm_x.order == onp.COL_MAJOR:
-        onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+        onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.nrows)
     else:
         raise ValueError("Invalid order.")
 
@@ -96,10 +96,18 @@ def main():
     print(f"  - Ring dimension: {cc.GetRingDimension()}")
 
     # Sample input matrix (3x8)
+    # matrix = [
+    #     [0.0, 7.2, 8.5, 10.0, 1.5, 2.3333, 7.125, 6.0],
+    #     [0.0, 1.0, 1.414, 9.1, 7.07, 5.5, 1.25, 7.9],
+    #     [8.08, 8.0, 4.55, 5.625, 8.125, 2.0, 6.618, 0.33231],
+    # ]
+
     matrix = [
-        [0, 7, 8, 10, 1, 2, 7, 6],
-        [0, 1, 1, 9, 7, 5, 1, 7],
-        [8, 8, 4, 5, 8, 2, 6, 1],
+        [1, 3, 1, 1],
+        [2, 2, 2, 2],
+        [3, 3, 3, 3],
+        [3, 3, 3, 3],
+        [3, 3, 3, 3],
     ]
 
     print(f"\nInput Matrix\n{np.array(matrix)}")
@@ -126,6 +134,27 @@ def main():
     # Run accumulation examples
     run_row_accumulation_example(cc, keys, ctm_x, matrix)
     run_column_accumulation_example(cc, keys, ctm_x, matrix)
+
+
+# Expected:
+# [[1 3 1 1]
+#  [3 5 3 3]
+#  [6 8 6 6]]
+
+# Decrypted Result:
+# [[1. 3. 1. 1.]
+#  [3. 5. 3. 3.]
+#  [6. 8. 6. 6.]]
+
+# Expected:
+# [[ 1  4  5  6]
+#  [ 2  4  6  8]
+#  [ 3  6  9 12]]
+
+# Decrypted Result:
+# [[ 1.  4.  5.  6.]
+#  [ 2.  4.  6.  8.]
+#  [ 3.  6.  9. 12.]]
 
 
 if __name__ == "__main__":

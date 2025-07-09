@@ -54,7 +54,7 @@ def demo():
     #     [7, 0, 1, 3, 5, 0, 1],
     # )
 
-    matrix = np.array([[1, 2, 3], [4, 5, 6]])
+    matrix = np.array([[1, 2, 3], [4, 5, 6], [4, 5, 6], [4, 5, 6], [4, 5, 6]])
 
     vector = np.array(
         [1, 1, 1],
@@ -131,7 +131,7 @@ def demo():
     )
 
     ctm_m_cm.extra["rowkey"] = onp.sum_row_keys(
-        keys.secretKey, ctm_m_cm.nrows, ctm_m_cm.batch_size
+        keys.secretKey, ctm_m_cm.ncols, ctm_m_cm.batch_size
     )
 
     ctv_result_cm = ctm_m_cm @ ctv_v_rm

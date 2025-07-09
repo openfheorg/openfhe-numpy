@@ -58,7 +58,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         plaintext.SetLength(self.batch_size)
         result = plaintext.GetRealPackedValue()
 
-        print("DEBUG ::: result = ", result[:32])
+        # print("DEBUG ::: result = ", result[:32])
 
         if isinstance(unpack_type, str):
             unpack_type = UnpackType(unpack_type.lower())
@@ -175,6 +175,9 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
 
         if axis not in (0, 1):
             ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
+        order = self.order
+        shape = self.shape
+        original_shape = self.original_shape
         # Cumsum over rows
         if axis == 0:
             if self.order == ArrayEncodingType.ROW_MAJOR:
@@ -185,6 +188,8 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             elif self.order == ArrayEncodingType.COL_MAJOR:
                 ciphertext = EvalSumCumCols(self.data, self.nrows)
 
+                # shape = self.shape[1], self.shape[0]
+                # original_shape = self.original_shape[1], self.original_shape[0]
             else:
                 raise ValueError(f"Invalid axis [{self.order}].")
 
@@ -197,8 +202,13 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
                 ciphertext = EvalSumCumRows(
                     self.data, self.nrows, self.original_shape[0]
                 )
+
+                # shape = self.shape[1], self.shape[0]
+                # original_shape = self.original_shape[1], self.original_shape[0]
             else:
                 raise ValueError(f"Invalid axis [{self.order}].")
         else:
             raise ValueError(f"Invalid axis [{axis}].")
-        return self.clone(ciphertext)
+        return CTArray(
+            ciphertext, original_shape, self.batch_size, shape, order
+        )

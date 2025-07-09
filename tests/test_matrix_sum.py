@@ -13,7 +13,7 @@ from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
 ###
 
 
-def fhe_matrix_sum(params, data, axis=None, order):
+def fhe_matrix_sum(params, data, axis=None, order=onp.ROW_MAJOR):
     """
     Generic matrix sum operation.
     - params: CKKS parameters dictionary
@@ -43,6 +43,7 @@ def fhe_matrix_sum(params, data, axis=None, order):
         # Generate appropriate keys based on axis
         if axis is None:  # Total sum
             onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+
         elif axis == 0:  # Row sum (sum along rows)
             if ctm_x.order == onp.ROW_MAJOR:
                 ctm_x.extra["rowkey"] = onp.sum_row_keys(
@@ -52,6 +53,7 @@ def fhe_matrix_sum(params, data, axis=None, order):
                 ctm_x.extra["colkey"] = onp.sum_col_keys(
                     keys.secretKey, ctm_x.nrows
                 )
+
             else:
                 raise ValueError("Invalid order.")
         elif axis == 1:  # Column sum (sum along columns)
@@ -67,7 +69,11 @@ def fhe_matrix_sum(params, data, axis=None, order):
                 raise ValueError("Invalid order.")
 
         # Perform sum operation
-        ctm_result = onp.sum(ctm_x, axis)
+        if axis is None:
+            ctm_result = onp.sum(ctm_x)  # Total sum without axis parameter
+        else:
+            assert isinstance(axis, int), f"axis should be int but got {axis!r}"
+            ctm_result = onp.sum(ctm_x, axis)  # Sum along specified axis
 
         # Decrypt result
         result = ctm_result.decrypt(keys.secretKey, unpack_type="original")

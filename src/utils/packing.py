@@ -537,16 +537,20 @@ def vector_row_major_2_col_major(v, block_size, batch_size):
 
 # @validate_call
 def _extract_matrix(data, info):
-    ncols = info["shape"][1]
-    nrows = info["batch_size"] // ncols
-    reshaped = np.reshape(data, (nrows, ncols))
-
     if info["order"] == ArrayEncodingType.ROW_MAJOR:
+        ncols = info["shape"][1]
+        nrows = info["batch_size"] // ncols
+        reshaped = np.reshape(data, (nrows, ncols))
         return reshaped[
             : info["original_shape"][0], : info["original_shape"][1]
         ]
     elif info["order"] == ArrayEncodingType.COL_MAJOR:
+        ncols = info["shape"][0]
+        nrows = info["batch_size"] // ncols
+        reshaped = np.reshape(data, (nrows, ncols))
         tranposed = np.transpose(reshaped)
+        # print("DEBUG ::: reshaped", reshaped)
+        # print("DEBUG ::: tranposed", tranposed)
         return tranposed[
             : info["original_shape"][0], : info["original_shape"][1]
         ]
