@@ -39,10 +39,15 @@ def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
 def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
     """Run homomorphic row sum example."""
     # Generate rotation keys for row sum operations
-    ctm_x.extra["rowkey"] = onp.sum_row_keys(
-        keys.secretKey, ctm_x.ncols, ctm_x.batch_size
-    )
+    if ctm_x.order == onp.ROW_MAJOR:
+        ctm_x.extra["rowkey"] = onp.sum_row_keys(
+            keys.secretKey, ctm_x.ncols, ctm_x.batch_size
+        )
+    elif ctm_x.order == onp.COL_MAJOR:
+        ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.nrows)
 
+    else:
+        raise ValueError("Invalid order.")
     # Perform homomorphic row sum
     ctm_result = onp.sum(ctm_x, axis=0)
 
@@ -56,7 +61,14 @@ def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
 def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
     """Run homomorphic column sum example."""
     # Generate rotation keys for column sum operations
-    ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
+    if ctm_x.order == onp.ROW_MAJOR:
+        ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
+    elif ctm_x.order == onp.COL_MAJOR:
+        ctm_x.extra["rowkey"] = onp.sum_row_keys(
+            keys.secretKey, ctm_x.nrows, ctm_x.batch_size
+        )
+    else:
+        raise ValueError("Invalid order.")
 
     # Perform homomorphic column sum
     ctm_result = onp.sum(ctm_x, axis=1)
@@ -112,6 +124,7 @@ def main():
             [2, 1],
             [3, 1],
             [2, 6],
+            [3, 3],
         ]
     )
 
@@ -128,7 +141,8 @@ def main():
         cc=crypto_context,
         data=matrix,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
+        # order=onp.ROW_MAJOR,
+        order=onp.COL_MAJOR,
         fhe_type="C",
         mode="zero",
         public_key=keys.publicKey,

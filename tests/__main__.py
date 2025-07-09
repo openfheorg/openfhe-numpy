@@ -1,6 +1,13 @@
-"""Main entry point for running OpenFHE-NumPy tests."""
-
-from . import main
+import sys
+import unittest
+from tests.core.test_framework import LoggingTestResult
 
 if __name__ == "__main__":
-    main()
+    # sys.exit(unittest.main(module=None))
+    sys.exit(
+        unittest.main(
+            testRunner=lambda *args, **kwargs: unittest.TextTestRunner(
+                *args, resultclass=LoggingTestResult, **kwargs
+            )
+        )
+    )

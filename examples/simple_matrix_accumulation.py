@@ -7,23 +7,28 @@ import openfhe_numpy as onp
 def validate_and_print_results(computed, expected, operation_name):
     """Helper function to validate and print results."""
     print("\n" + "*" * 60)
-    print(f"* {operation_name} *")
+    print(f"* {operation_name}")
     print("*" * 60)
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{computed}")
-    is_match, error = onp.check_equality_matrix(computed, expected)
-    print(f"\nMatch: {is_match}, Total Error: {error:.6f}")
+    is_match, error = onp.check_equality(computed, expected)
+    print(f"\nMatch: {is_match}, Total Error: {error}")
     return is_match, error
 
 
-def run_row_accumulation_example(cc, keys, ctm_a, matrix):
+def run_row_accumulation_example(cc, keys, ctm_x, matrix):
     """Run homomorphic row accumulation example."""
 
     # Generate rotation keys for row operations
-    onp.gen_accumulate_rows_key(keys.secretKey, ctm_a.ncols)
+    if ctm_x.order == onp.ROW_MAJOR:
+        onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+    elif ctm_x.order == onp.COL_MAJOR:
+        onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.ncols)
+    else:
+        raise ValueError("Invalid order.")
 
     # Perform homomorphic row accumulation
-    ctm_result = onp.cumsum(ctm_a, axis=0)
+    ctm_result = onp.cumsum(ctm_x, axis=0)
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
@@ -33,14 +38,19 @@ def run_row_accumulation_example(cc, keys, ctm_a, matrix):
     validate_and_print_results(result, expected, "Row Accumulation")
 
 
-def run_column_accumulation_example(cc, keys, ctm_a, matrix):
+def run_column_accumulation_example(cc, keys, ctm_x, matrix):
     """Run homomorphic column accumulation example."""
 
     # Generate rotation keys for column operations
-    onp.gen_accumulate_cols_key(keys.secretKey, ctm_a.ncols)
+    if ctm_x.order == onp.ROW_MAJOR:
+        onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.ncols)
+    elif ctm_x.order == onp.COL_MAJOR:
+        onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+    else:
+        raise ValueError("Invalid order.")
 
     # Perform homomorphic column accumulation
-    ctm_result = onp.cumsum(ctm_a, axis=1)
+    ctm_result = onp.cumsum(ctm_x, axis=1)
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
@@ -79,10 +89,10 @@ def main():
 
     # Get system parameters
     ring_dim = cc.GetRingDimension()
-    total_slots = ring_dim // 2
+    batch_size = ring_dim // 2
 
     print(f"\nCrypto Info:")
-    print(f"  - Used slots: {total_slots}")
+    print(f"  - Used slots: {batch_size}")
     print(f"  - Ring dimension: {cc.GetRingDimension()}")
 
     # Sample input matrix (3x8)
@@ -102,11 +112,20 @@ def main():
     # - row-major concatenation (order="ROW_MAJOR") - default
     # - column-major concatenation (order="COL_MAJOR")
 
-    ctm_a = onp.array(cc, matrix, total_slots, order=onp.ROW_MAJOR, public_key=keys.publicKey)
+    ctm_x = onp.array(
+        cc=cc,
+        data=matrix,
+        batch_size=batch_size,
+        # order=onp.ROW_MAJOR,
+        order=onp.COL_MAJOR,
+        fhe_type="C",
+        mode="zero",
+        public_key=keys.publicKey,
+    )
 
     # Run accumulation examples
-    run_row_accumulation_example(cc, keys, ctm_a, matrix)
-    run_column_accumulation_example(cc, keys, ctm_a, matrix)
+    run_row_accumulation_example(cc, keys, ctm_x, matrix)
+    run_column_accumulation_example(cc, keys, ctm_x, matrix)
 
 
 if __name__ == "__main__":

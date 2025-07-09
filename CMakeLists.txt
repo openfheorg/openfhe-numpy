@@ -27,7 +27,7 @@ endif()
 
 option(BUILD_EXAMPLES "Set to ON to build C++ examples for the library" ON)
 # option(BUILD_TESTING "Enable building of tests" OFF)
-# message(STATUS "BUILD_EXAMPLES:     ${BUILD_EXAMPLES}")
+message(STATUS "BUILD_EXAMPLES:     ${BUILD_EXAMPLES}")
 
 find_package(OpenFHE ${OPENFHE_REQUIRED_VERSION} REQUIRED)
 message(STATUS "Building with OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
@@ -35,7 +35,19 @@ message(STATUS "Building with OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
 set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 
-set(OpenFHE_Numpy_INCLUDES "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/include")
+
+# [tango]
+# Must be used for easy structural changes!!!
+# Renamed the source directory from 'openfhe_numpy/openfhe_numpy/' to 'openfhe_numpy/src/' so that
+# 'openfhe_numpy/examples/' and 'openfhe_numpy/tests/' import the installed 'openfhe_numpy' package
+# (with C++ bindings) rather than the local source folder. The local copy
+# lacks the built C++ extensions and would cause import errors.
+
+# Define OPENFHE_NUMPY_INSTALL_DIR for the main source directory.
+set(OpenFHE_Numpy_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src")
+set(OpenFHE_Numpy_INCLUDES "${OpenFHE_Numpy_MAIN_SOURCE}/cpp/include")
+set(OpenFHE_Numpy_SOURCE "${OpenFHE_Numpy_MAIN_SOURCE}/cpp/lib")
+
 include_directories( ${OpenFHE_Numpy_INCLUDES} )
 include_directories(${OpenFHE_INCLUDE})
 include_directories(${OpenFHE_INCLUDE}/third-party/include)
@@ -46,7 +58,6 @@ include_directories(${OpenFHE_INCLUDE}/binfhe)
 set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
 link_libraries(${OpenFHE_SHARED_LIBRARIES})
 
-set(OpenFHE_Numpy_SOURCE "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/lib")
 add_library(openfhe_numpy_cpp STATIC
     ${OpenFHE_Numpy_INCLUDES}/numpy_constants.h
     ${OpenFHE_Numpy_INCLUDES}/numpy_array_metadata.h
@@ -101,27 +112,25 @@ endif()
 
 message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake with -DCMAKE_INSTALL_PREFIX=/your/path")
 
-# Place the openfhe_numpy.so (Python bindings) inside the openfhe_numpy/ subfolder
-# within the Python site-packages directory.
-# Do not install files directly into site-packages; always group them under openfhe_numpy/
-install(
-  TARGETS openfhe_numpy
-  RUNTIME   DESTINATION ${Python_Install_Location}/openfhe_numpy # for Windows .pyd
-  LIBRARY   DESTINATION ${Python_Install_Location}/openfhe_numpy
-  ARCHIVE   DESTINATION ${Python_Install_Location}/openfhe_numpy
-)
+
+# [tango] place all files inside the openfhe_numpy folder. Flattening this structure may shadow modules from other packages.
+# Define OPENFHE_NUMPY_INSTALL_DIR for easy install-path overrides.
+set(OpenFHE_Numpy_INSTALL_PATH "${Python_Install_Location}/openfhe_numpy")
+
+# install the .so with the python bindings
+install(TARGETS openfhe_numpy LIBRARY DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
+install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
 
 # install the required directories: operations, tensor and utils (with *.py files only)
-install(
-  DIRECTORY ${CMAKE_SOURCE_DIR}/openfhe_numpy
-  DESTINATION ${Python_Install_Location}
-  FILES_MATCHING PATTERN "*.py"
-                PATTERN "__init__.py"
-                PATTERN "__pycache__" EXCLUDE
-)
+file(GLOB OPERATIONS_DIR_FILES "${OpenFHE_Numpy_MAIN_SOURCE}/operations/*.py")
+install(FILES ${OPERATIONS_DIR_FILES} DESTINATION ${OpenFHE_Numpy_INSTALL_PATH}/operations/)
+file(GLOB TENSOR_DIR_FILES "${OpenFHE_Numpy_MAIN_SOURCE}/tensor/*.py")
+install(FILES ${TENSOR_DIR_FILES} DESTINATION ${OpenFHE_Numpy_INSTALL_PATH}/tensor/)
+file(GLOB UTILS_DIR_FILES "${OpenFHE_Numpy_MAIN_SOURCE}/utils/*.py")
+install(FILES ${UTILS_DIR_FILES} DESTINATION ${OpenFHE_Numpy_INSTALL_PATH}/utils/)
 
 if(BUILD_EXAMPLES)
-    file(GLOB EXAMPLE_SOURCES "openfhe_numpy/cpp/examples/*.cpp")
+    file(GLOB EXAMPLE_SOURCES "${OpenFHE_Numpy_MAIN_SOURCE}/cpp/examples/*.cpp")
 
     foreach(example_file ${EXAMPLE_SOURCES})
         get_filename_component(example_name ${example_file} NAME_WE)

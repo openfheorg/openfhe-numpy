@@ -1,113 +1,134 @@
 import numpy as np
+import openfhe_numpy as onp
 
-# Import directly from main_unittest - aligned with new framework
-from main_unittest import (
-    generate_random_array,
-    gen_crypto_context,
-    load_ckks_params,
-    suppress_stdout,
-    MainUnittest,
-)
-
-from tensor.constructors import array
-from operations.crypto_context import sum_col_keys, sum_row_keys
-from operations.matrix_api import sum
-
-"""
-Note: Column-wise cumulative sum requires sufficient multiplicative 
-depth and ring dimension to accommodate the computational complexity.
-Small ring dimensions (<4096) may result in high approximation errors.
-"""
+from tests.core.test_framework import MainUnittest
+from tests.core.test_utils import generate_random_array, suppress_stdout
+from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
 
 
-def fhe_matrix_sum(original_params, input):
-    """Execute matrix column summation with suppressed output."""
-    params = original_params.copy()
+###
+# Note: Column-/row-wise cumulative sum may require deeper multiplicative
+# depth or larger ring dimensions for accurate results. Small ring dimensions
+# (<4096) might introduce approximation errors.
+###
+
+
+def fhe_matrix_sum(params, data, axis=None, order):
+    """
+    Generic matrix sum operation.
+    - params: CKKS parameters dictionary
+    - data: list containing the input matrix
+    - axis: None for total sum, 0 for row-wise, 1 for column-wise sum
+    - order: ROW_MAJOR or COLUMN_MAJOR ordering
+    """
+    params_copy = params.copy()
+    matrix = np.array(data[0])
 
     with suppress_stdout(False):
-        matrix = np.array(input[0])
+        # Generate crypto context
+        cc, keys = gen_crypto_context(params_copy)
+        total_slots = params_copy["ringDim"] // 2
 
-        if params["multiplicativeDepth"] < len(matrix[0]):
-            params["multiplicativeDepth"] = len(matrix[0]) + 1
+        # Encrypt matrix
+        ctm_x = onp.array(
+            cc=cc,
+            data=matrix,
+            batch_size=total_slots,
+            order=order,
+            fhe_type="C",
+            mode="zero",
+            public_key=keys.publicKey,
+        )
 
-        # Use gen_crypto_context for consistency with new framework
-        cc, keys = gen_crypto_context(params)
+        # Generate appropriate keys based on axis
+        if axis is None:  # Total sum
+            onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+        elif axis == 0:  # Row sum (sum along rows)
+            if ctm_x.order == onp.ROW_MAJOR:
+                ctm_x.extra["rowkey"] = onp.sum_row_keys(
+                    keys.secretKey, ctm_x.ncols, ctm_x.batch_size
+                )
+            elif ctm_x.order == onp.COL_MAJOR:
+                ctm_x.extra["colkey"] = onp.sum_col_keys(
+                    keys.secretKey, ctm_x.nrows
+                )
+            else:
+                raise ValueError("Invalid order.")
+        elif axis == 1:  # Column sum (sum along columns)
+            if ctm_x.order == onp.ROW_MAJOR:
+                ctm_x.extra["colkey"] = onp.sum_col_keys(
+                    keys.secretKey, ctm_x.ncols
+                )
+            elif ctm_x.order == onp.COL_MAJOR:
+                ctm_x.extra["rowkey"] = onp.sum_row_keys(
+                    keys.secretKey, ctm_x.nrows, ctm_x.batch_size
+                )
+            else:
+                raise ValueError("Invalid order.")
 
-        total_slots = params["ringDim"] // 2
+        # Perform sum operation
+        ctm_result = onp.sum(ctm_x, axis)
 
-        public_key = keys.publicKey
-        ctm_matrix = array(cc, matrix, total_slots, public_key=public_key)
-
-        if input[1] is None:
-            cc.EvalSumKeyGen(keys.secretKey)
-            ctm_result = sum(ctm_matrix)
-        elif input[1] == 0:
-            sum_row_keys(cc, keys.secretKey, ctm_matrix.ncols)
-            ctm_result = sum(ctm_matrix, 0, True)
-        elif input[1] == 1:
-            sum_col_keys(cc, keys.secretKey, ctm_matrix.ncols)
-            ctm_result = sum(ctm_matrix, 1, True)
-        else:
-            ctm_result = None
-        result = ctm_result.decrypt(keys.secretKey, format_type="reshape")
+        # Decrypt result
+        result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     return result
 
 
 class TestMatrixSum(MainUnittest):
-    """Test class for matrix column summation operations."""
+    """Test class for matrix sum operations."""
 
     @classmethod
     def _generate_test_cases(cls):
-        """Generate test cases for matrix column summation."""
+        """Generate test cases for matrix sum operations."""
+        operations = [
+            ("total", None, lambda A: np.sum(A)),  # Total sum
+            ("rows", 0, lambda A: np.sum(A, axis=0)),  # Row sum
+            ("cols", 1, lambda A: np.sum(A, axis=1)),  # Column sum
+        ]
+
+        # Add ordering options
+        orders = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COL_MAJOR)]
+
         ckks_param_list = load_ckks_params()
-        # matrix_sizes = [2, 3, 8, 16]
-        matrix_sizes = [2]
+        matrix_sizes = [2, 3, 8, 16]
         test_counter = 1
 
-        for sum_type in ["sum", "sumcols", "sumrows"]:
-            for param in ckks_param_list:
-                for size in matrix_sizes:
-                    # Generate random test matrix
-                    A = generate_random_array(size)
+        for op_name, axis, np_fn in operations:
+            for order_name, order_value in orders:
+                for param in ckks_param_list:
+                    for size in matrix_sizes:
+                        # Skip large matrices for total sum tests
+                        if op_name == "total" and size > 3:
+                            continue
 
-                    if sum_type == "sum":
-                        name = "TestMatrixSum"
-                        expected = np.sum(A)
-                        _input = [A, None]
-                    elif sum_type == "sumcols":
-                        name = "TestMatrixSumCols"
-                        expected = np.sum(A, axis=1)
-                        _input = [A, 1]
-                    else:
-                        name = "TestMatrixSumRows"
-                        expected = np.sum(A, axis=0)
-                        _input = [A, 0]
+                        # Generate random test matrix
+                        A = generate_random_array(size)
 
-                    # Calculate expected result directly
+                        # Calculate expected result directly
+                        expected = np_fn(A)
 
-                    # Create test name with descriptive format
-                    test_name = (
-                        f"test_{sum_type}_{test_counter}_ring_{param['ringDim']}_size_{size}"
-                    )
+                        # Create test name with descriptive format
+                        test_name = f"sum_{op_name}_{order_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
 
-                    # Generate the test case with debug output
-                    test_method = MainUnittest.generate_test_case(
-                        fhe_matrix_sum,
-                        name,
-                        test_name,
-                        param,
-                        _input,
-                        expected,
-                        debug=True,
-                    )
+                        # Create a closure to capture the current axis and ordering values
+                        def func(current_axis, current_order):
+                            return lambda p, d: fhe_matrix_sum(
+                                p, d, current_axis, current_order
+                            )
 
-                    # Register the test method
-                    setattr(cls, test_name, test_method)
-                    test_counter += 1
+                        # Generate the test case
+                        cls.generate_test_case(
+                            func=func(axis, order_value),
+                            test_name=test_name,
+                            params=param,
+                            input_data=[A],
+                            expected=expected,
+                            compare_fn=onp.check_equality,
+                            debug=True,
+                        )
 
-
-TestMatrixSum._generate_test_cases()
+                        test_counter += 1
 
 
 if __name__ == "__main__":
