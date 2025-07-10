@@ -222,7 +222,7 @@ def _eval_matvec_ct(lhs, rhs):
             cc = lhs.data.GetCryptoContext()
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
             ct_prod = cc.EvalSumRows(
-                ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size
+                ct_mult, lhs.ncols, lhs.extra["rowkey"], lhs.batch_size
             )
             return CTArray(
                 ct_prod,
@@ -270,7 +270,7 @@ def _dot(lhs, rhs):
     if lhs.ndim == 1 and rhs.ndim == 1:
         crypto_context = lhs.data.GetCryptoContext()
         ciphertext = crypto_context.EvalInnerProduct(
-            lhs.data, rhs.data, lhs.original_shape[0]
+            lhs.data, rhs.data, lhs.batch_size
         )
         return CTArray(
             ciphertext, (), lhs.batch_size, (), ArrayEncodingType.ROW_MAJOR
@@ -289,27 +289,7 @@ def dot_ct(a, b):
 # Transpose Operations
 # ------------------------------------------------------------------------------
 def _transpose_ct(ctarray: CTArray) -> "CTArray":
-    """Internal function to evaluate transpose of a tensor."""
-    if ctarray.ndim == 2:
-        ciphertext = EvalTranspose(ctarray.data, ctarray.ncols)
-        pre_padded_shape = (
-            ctarray.original_shape[1],
-            ctarray.original_shape[0],
-        )
-        padded_shape = (ctarray.shape[1], ctarray.shape[0])
-    elif ctarray.ndim == 1:
-        return ctarray
-    else:
-        raise NotImplementedError(
-            "This function is not implemented with dimension > 2"
-        )
-    return CTArray(
-        ciphertext,
-        pre_padded_shape,
-        ctarray.batch_size,
-        padded_shape,
-        ctarray.order,
-    )
+    return ctarray.T
 
 
 @register_tensor_function("transpose", [("CTArray",)])
@@ -368,47 +348,49 @@ def pow_block_ct(a, exp):
 # ------------------------------------------------------------------------------
 # Cumulative Sum Operations
 # ------------------------------------------------------------------------------
-def _cumsum_ct(tensor, axis=0, keepdims=True):
-    """
-    Compute the cumulative sum of tensor elements along a given axis.
+# def _cumsum_ct(tensor, axis=0, keepdims=True):
+#     """
+#     Compute the cumulative sum of tensor elements along a given axis.
 
-    Parameters
-    ----------
-    tensor : CTArray
-        Input encrypted tensor.
-    axis : int, optional
-        Axis along which the cumulative sum is computed. Default is 0.
-    keepdims : bool, optional
-        Whether to keep the dimensions of the original tensor. Default is True.
+#     Parameters
+#     ----------
+#     tensor : CTArray
+#         Input encrypted tensor.
+#     axis : int, optional
+#         Axis along which the cumulative sum is computed. Default is 0.
+#     keepdims : bool, optional
+#         Whether to keep the dimensions of the original tensor. Default is True.
 
-    Returns
-    -------
-    CTArray
-        A new tensor with cumulative sums along the specified axis.
-    """
-    if axis not in (0, 1):
-        ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
-    if axis == 0:
-        ciphertext = EvalSumCumRows(
-            tensor.data, tensor.ncols, tensor.original_shape[1]
-        )
-    else:
-        ciphertext = EvalSumCumCols(tensor.data, tensor.ncols)
-    return tensor.clone(ciphertext)
+#     Returns
+#     -------
+#     CTArray
+#         A new tensor with cumulative sums along the specified axis.
+#     """
+
+#     if axis not in (0, 1):
+#         ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
+#     if axis == 0:
+#         ciphertext = EvalSumCumRows(
+#             tensor.data, tensor.ncols, tensor.original_shape[1]
+#         )
+#     else:
+#         ciphertext = EvalSumCumCols(tensor.data, tensor.ncols)
+#     return tensor.clone(ciphertext)
 
 
 @register_tensor_function(
     "cumsum", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")]
 )
-def cumsum_ct(a, axis=0, keepdims=True):
+def cumsum_ct(obj, axis=0, keepdims=True):
     """Compute cumulative sum of a tensor along specified axis."""
-    return _cumsum_ct(a, axis, keepdims)
+    # return _cumsum_ct(a, axis, keepdims)
+    return obj.cumsum(axis)
 
 
 @register_tensor_function(
     "cumsum", [("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")]
 )
-def cumsum_block_ct(a, axis=0, keepdims=True):
+def cumsum_block_ct(obj, axis=0, keepdims=True):
     """Compute cumulative sum of a block tensor along specified axis."""
     raise NotImplementedError("BlockPTArray cumulative not implemented yet.")
 
@@ -526,9 +508,10 @@ def _ct_sum_matrix(tensor: ArrayLike, axis: Optional[int] = None):
             padded_shape = (nrows, ncols)
             order = ArrayEncodingType.COL_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
-            ct_sum = cc.EvalSumCols(fhe_data, ncols, tensor.extra["colkey"])
+            ct_sum = cc.EvalSumCols(fhe_data, nrows, tensor.extra["colkey"])
             shape = (cols,)
-            padded_shape = (nrows, ncols)
+            padded_shape = (ncols, nrows)
+            order = ArrayEncodingType.ROW_MAJOR
         else:
             ONPNotSupportedError(f"Not support the current encoding [{order}] ")
 
@@ -538,10 +521,14 @@ def _ct_sum_matrix(tensor: ArrayLike, axis: Optional[int] = None):
             ct_sum = cc.EvalSumCols(fhe_data, ncols, tensor.extra["colkey"])
             shape = (rows,)
             padded_shape = (nrows, ncols)
+            order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
-            ct_sum = cc.EvalSumRows(fhe_data, nrows, tensor.extra["rowkey"])
+            ct_sum = cc.EvalSumRows(
+                fhe_data, nrows, tensor.extra["rowkey"], tensor.batch_size
+            )
             shape = (rows,)
-            padded_shape = (nrows, ncols)
+            padded_shape = (ncols, nrows)
+            order = ArrayEncodingType.COL_MAJOR
         else:
             ONPNotSupportedError(f"Not support the current encoding [{order}]")
 

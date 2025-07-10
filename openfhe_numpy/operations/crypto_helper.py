@@ -172,3 +172,11 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
     backend.EvalLinTransKeyGen(
         secret_key, ncols, backend.LinTransType.TRANSPOSE
     )
+
+
+def decrypt_ciphertext(secret_key: openfhe.PrivateKey, ciphertext, size):
+    cc = ciphertext.GetCryptoContext()
+    plaintext = cc.Decrypt(ciphertext, secret_key)
+    plaintext.SetLength(size)
+    result = plaintext.GetRealPackedValue()
+    return result

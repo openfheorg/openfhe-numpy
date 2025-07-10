@@ -5,7 +5,7 @@ import numpy as np
 import openfhe
 
 
-from ..openfhe_numpy import EvalTranspose
+from ..openfhe_numpy import ArrayEncodingType, EvalSumCumCols, EvalSumCumRows
 from ..utils.constants import *
 from ..utils.errors import ONP_ERROR
 from ..utils.packing import process_packed_data
@@ -57,6 +57,8 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
 
         plaintext.SetLength(self.batch_size)
         result = plaintext.GetRealPackedValue()
+
+        # print("DEBUG ::: result = ", result[:32])
 
         if isinstance(unpack_type, str):
             unpack_type = UnpackType(unpack_type.lower())
@@ -120,12 +122,93 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         pass
 
     def _transpose(self) -> "CTArray":
-        """
-        Transpose the encrypted matrix.
-        """
-        from openfhe_numpy.utils.matlib import next_power_of_two
+        # """
+        # Transpose the encrypted matrix.
+        # """
+        # from openfhe_numpy.utils.matlib import next_power_of_two
 
-        ciphertext = EvalTranspose(self.data, self.ncols)
-        shape = (self.original_shape[1], self.original_shape[0])
-        ncols = next_power_of_two(shape[1])
-        return CTArray(ciphertext, shape, self.batch_size, ncols, self.order)
+        # ciphertext = EvalTranspose(self.data, self.ncols)
+        # shape = (self.original_shape[1], self.original_shape[0])
+        # ncols = next_power_of_two(shape[1])
+        # return CTArray(ciphertext, shape, self.batch_size, ncols, self.order)
+
+        """Internal function to evaluate transpose of an encrypted array."""
+        if self.ndim == 2:
+            ciphertext = EvalTranspose(self.data, self.ncols)
+            pre_padded_shape = (
+                self.original_shape[1],
+                self.original_shape[0],
+            )
+            padded_shape = (self.shape[1], self.shape[0])
+        elif self.ndim == 1:
+            return self
+        else:
+            raise NotImplementedError(
+                "This function is not implemented with dimension > 2"
+            )
+        return CTArray(
+            ciphertext,
+            pre_padded_shape,
+            self.batch_size,
+            padded_shape,
+            self.order,
+        )
+
+    def cumsum(self, axis: int) -> "CTArray":
+        """
+        Compute the cumulative sum of tensor elements along a given axis.
+
+        Parameters
+        ----------
+        tensor : CTArray
+            Input encrypted tensor.
+        axis : int, optional
+            Axis along which the cumulative sum is computed. Default is 0.
+        keepdims : bool, optional
+            Whether to keep the dimensions of the original tensor. Default is True.
+
+        Returns
+        -------
+        CTArray
+            A new tensor with cumulative sums along the specified axis.
+        """
+
+        if axis not in (0, 1):
+            ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
+        order = self.order
+        shape = self.shape
+        original_shape = self.original_shape
+        # Cumsum over rows
+        if axis == 0:
+            if self.order == ArrayEncodingType.ROW_MAJOR:
+                ciphertext = EvalSumCumRows(
+                    self.data, self.ncols, self.original_shape[1]
+                )
+
+            elif self.order == ArrayEncodingType.COL_MAJOR:
+                ciphertext = EvalSumCumCols(self.data, self.nrows)
+
+                # shape = self.shape[1], self.shape[0]
+                # original_shape = self.original_shape[1], self.original_shape[0]
+            else:
+                raise ValueError(f"Invalid axis [{self.order}].")
+
+        # Cumsum over cols
+        elif axis == 1:
+            if self.order == ArrayEncodingType.ROW_MAJOR:
+                ciphertext = EvalSumCumCols(self.data, self.ncols)
+
+            elif self.order == ArrayEncodingType.COL_MAJOR:
+                ciphertext = EvalSumCumRows(
+                    self.data, self.nrows, self.original_shape[0]
+                )
+
+                # shape = self.shape[1], self.shape[0]
+                # original_shape = self.original_shape[1], self.original_shape[0]
+            else:
+                raise ValueError(f"Invalid axis [{self.order}].")
+        else:
+            raise ValueError(f"Invalid axis [{axis}].")
+        return CTArray(
+            ciphertext, original_shape, self.batch_size, shape, order
+        )

@@ -44,7 +44,7 @@ find_package(pybind11 REQUIRED)
 # lacks the built C++ extensions and would cause import errors.
 
 # Define OPENFHE_NUMPY_INSTALL_DIR for the main source directory.
-set(OpenFHE_Numpy_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/src")
+set(OpenFHE_Numpy_MAIN_SOURCE "${CMAKE_SOURCE_DIR}/openfhe_numpy")
 set(OpenFHE_Numpy_INCLUDES "${OpenFHE_Numpy_MAIN_SOURCE}/cpp/include")
 set(OpenFHE_Numpy_SOURCE "${OpenFHE_Numpy_MAIN_SOURCE}/cpp/lib")
 
@@ -119,7 +119,7 @@ set(OpenFHE_Numpy_INSTALL_PATH "${Python_Install_Location}/openfhe_numpy")
 
 # install the .so with the python bindings
 install(TARGETS openfhe_numpy LIBRARY DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
-install(FILES ${CMAKE_SOURCE_DIR}/src/__init__.py DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
+install(FILES ${OpenFHE_Numpy_INSTALL_PATH}/__init__.py DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
 
 # install the required directories: operations, tensor and utils (with *.py files only)
 file(GLOB OPERATIONS_DIR_FILES "${OpenFHE_Numpy_MAIN_SOURCE}/operations/*.py")

@@ -179,10 +179,10 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("numRepeats"));
 
     m.def("EvalMatMulSquare",
-        [](const Ciphertext<DCRTPoly>& matrixA, const Ciphertext<DCRTPoly>& matrixB, int32_t numCols) {
-            return EvalMatMulSquare(matrixA, matrixB, numCols);
+        [](const Ciphertext<DCRTPoly>& matrix_a, const Ciphertext<DCRTPoly>& matrixB, int32_t numCols) {
+            return EvalMatMulSquare(matrix_a, matrixB, numCols);
         },
-        py::arg("matrixA"),
+        py::arg("matrix_a"),
         py::arg("matrixB"),
         py::arg("numCols"));
 

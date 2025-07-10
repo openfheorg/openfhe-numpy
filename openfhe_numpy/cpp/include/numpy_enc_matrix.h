@@ -93,7 +93,7 @@ Ciphertext<DCRTPoly> EvalLinTransPsi(PrivateKey<DCRTPoly>& secretKey,
 
 Ciphertext<DCRTPoly> EvalLinTransPsi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats);
 
-Ciphertext<DCRTPoly> EvalMatMulSquare(const Ciphertext<DCRTPoly>& matrixA,
+Ciphertext<DCRTPoly> EvalMatMulSquare(const Ciphertext<DCRTPoly>& matrix_a,
                                      const Ciphertext<DCRTPoly>& matrixB,
                                      int32_t numCols);
 
