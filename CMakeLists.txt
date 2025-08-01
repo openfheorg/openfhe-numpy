@@ -1,14 +1,19 @@
-# Minimum required CMake version - needs at least 3.16 for modern features
 cmake_minimum_required(VERSION 3.16)
 
-# Project declaration with name, version, and languages
-project(OpenFHE-Numpy VERSION 0.0.1 LANGUAGES CXX)
+project(OpenFHE-Numpy)
 
-# Version variables
 set(OPENFHE_NUMPY_VERSION_MAJOR 0)
 set(OPENFHE_NUMPY_VERSION_MINOR 0)
 set(OPENFHE_NUMPY_VERSION_PATCH 1)
 set(OPENFHE_NUMPY_VERSION ${OPENFHE_NUMPY_VERSION_MAJOR}.${OPENFHE_NUMPY_VERSION_MINOR}.${OPENFHE_NUMPY_VERSION_PATCH})
+
+# OpenFHE version can be specified externally (-DOPENFHE_REQUIRED_VERSION=1.3.0)
+if(NOT DEFINED OPENFHE_REQUIRED_VERSION)
+    set(OPENFHE_REQUIRED_VERSION "1.3.0" CACHE STRING "Required OpenFHE version")
+else()
+    # User provided OPENFHE_REQUIRED_VERSION via -D
+    message(STATUS "Using user-specified OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
+endif()
 
 # Build Options
 set(CMAKE_CXX_STANDARD 17)
@@ -16,213 +21,100 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 
-option(ENABLE_DEBUG_LOGGING "Enable debug logging (defines DEBUG)" OFF)
-option(BUILD_EXAMPLES "Build C++ example executables" ON)
-option(BUILD_TESTING "Enable building of tests" OFF)
-
-# Custom OpenFHE options
-option(WITH_CUSTOM_OPENFHE "Use OpenFHE from a custom location" OFF)
-set(CUSTOM_OPENFHE_ROOT "" CACHE PATH "Path to custom OpenFHE installation")
-set(CUSTOM_OPENFHE_PYTHON "" CACHE PATH "Path to custom OpenFHE Python wrapper")
-
-# Set up OpenFHE search paths if custom installation is specified
-if(WITH_CUSTOM_OPENFHE)
-    if(NOT CUSTOM_OPENFHE_ROOT)
-        message(FATAL_ERROR "WITH_CUSTOM_OPENFHE is ON but CUSTOM_OPENFHE_ROOT is not specified")
-    endif()
-    
-    set(OpenFHE_DIR "${CUSTOM_OPENFHE_ROOT}/lib/cmake/OpenFHE" CACHE PATH "Path to OpenFHE cmake config" FORCE)
-    list(APPEND CMAKE_PREFIX_PATH "${CUSTOM_OPENFHE_ROOT}")
-    
-    message(STATUS "Using custom OpenFHE installation: ${CUSTOM_OPENFHE_ROOT}")
-    
-    if(CUSTOM_OPENFHE_PYTHON)
-        message(STATUS "Using custom OpenFHE Python wrapper: ${CUSTOM_OPENFHE_PYTHON}")
-        # Add Python wrapper to PYTHONPATH at build time
-        set(ENV{PYTHONPATH} "${CUSTOM_OPENFHE_PYTHON}:$ENV{PYTHONPATH}")
-    endif()
-endif()
-
 if(APPLE)
     set(CMAKE_CXX_VISIBILITY_PRESET default)
 endif()
 
-if(POLICY CMP0148)
-  cmake_policy(SET CMP0148 NEW)
-endif()
+option(BUILD_EXAMPLES "Set to ON to build C++ examples for the library" ON)
+# option(BUILD_TESTING "Enable building of tests" OFF)
+# message(STATUS "BUILD_EXAMPLES:     ${BUILD_EXAMPLES}")
 
-# Dependencies
-find_package(OpenFHE 1.3.0 REQUIRED)
+find_package(OpenFHE ${OPENFHE_REQUIRED_VERSION} REQUIRED)
+message(STATUS "Building with OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
+
+set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
-find_package(OpenMP QUIET)
+
+set(OpenFHE_Numpy_INCLUDES "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/include")
+include_directories( ${OpenFHE_Numpy_INCLUDES} )
+include_directories(${OpenFHE_INCLUDE})
+include_directories(${OpenFHE_INCLUDE}/third-party/include)
+include_directories(${OpenFHE_INCLUDE}/core)
+include_directories(${OpenFHE_INCLUDE}/pke)
+include_directories(${OpenFHE_INCLUDE}/binfhe)
+
+set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
+link_libraries(${OpenFHE_SHARED_LIBRARIES})
+
+set(OpenFHE_Numpy_SOURCE "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/lib")
+add_library(openfhe_numpy_cpp STATIC
+    ${OpenFHE_Numpy_INCLUDES}/numpy_constants.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_array_metadata.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_enc_matrix.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_helper_functions.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_utils.h
+    ${OpenFHE_Numpy_SOURCE}/numpy_array_metadata.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_enc_matrix.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
+)
+pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
+
+target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
+
+# Allow the user to specify the path to Python executable (if not provided, find it)
+option(PYTHON_EXECUTABLE_PATH "Path to Python executable" "")
+if(PYTHON_EXECUTABLE_PATH)
+    set(Python_EXECUTABLE "${PYTHON_EXECUTABLE_PATH}")
+endif()
 find_package(Python REQUIRED COMPONENTS Interpreter Development)
 
-link_directories(${OpenFHE_LIBDIR})
-
-# Debug OpenFHE
-message(STATUS "OpenFHE version: ${OpenFHE_VERSION}")
-message(STATUS "OpenFHE libraries: ${OpenFHE_LIBRARIES}")
-message(STATUS "OpenFHE include path: ${OpenFHE_INCLUDE}")
-message(STATUS "OpenFHE library path: ${OpenFHE_LIBDIR}")
-
-# Project Structure
-set(OpenFHE_Numpy_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/core/src)
-set(OpenFHE_Numpy_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/core/include)
-set(OpenFHE_Numpy_BINDINGS ${OpenFHE_Numpy_SOURCES}/bindings.cpp)
-# Updated path to reflect new directory structure
-set(OpenFHE_Numpy_PYTHON ${CMAKE_CURRENT_SOURCE_DIR}/python/openfhe_numpy)
-set(OpenFHE_Numpy_BUILD_PYTHON ${CMAKE_BINARY_DIR}/openfhe_numpy)
-
-file(MAKE_DIRECTORY ${OpenFHE_Numpy_BUILD_PYTHON})
-
-# Configuration Header
-configure_file(
-    "${OpenFHE_Numpy_INCLUDES}/openfhe_numpy/config.h.in"
-    "${OpenFHE_Numpy_INCLUDES}/openfhe_numpy/config.h" @ONLY)
-
-# Include Paths
-include_directories(
-    ${OpenFHE_INCLUDE}
-    ${OpenFHE_INCLUDE}/third-party/include
-    ${OpenFHE_INCLUDE}/core
-    ${OpenFHE_INCLUDE}/pke
-    ${OpenFHE_INCLUDE}/binfhe
-    ${OpenFHE_Numpy_INCLUDES})
-
-# Source Files
-file(GLOB_RECURSE CORE_SOURCES ${OpenFHE_Numpy_SOURCES}/*.cpp)
-list(FILTER CORE_SOURCES EXCLUDE REGEX ".*/bindings?\\.cpp$")
-
-add_library(openfhe_numpy_cpp_core STATIC ${CORE_SOURCES})
-
-target_include_directories(openfhe_numpy_cpp_core PUBLIC
-    ${OpenFHE_INCLUDE}
-    ${OpenFHE_INCLUDE}/third-party/include
-    ${OpenFHE_INCLUDE}/core
-    ${OpenFHE_INCLUDE}/pke
-    ${OpenFHE_INCLUDE}/binfhe
-    ${OpenFHE_Numpy_INCLUDES})
-
-target_link_libraries(openfhe_numpy_cpp_core PUBLIC
-    ${OpenFHE_SHARED_LIBRARIES}
-    ${OpenFHE_PKE_SHARED_LIBRARIES}
-    ${OpenFHE_BINFHE_SHARED_LIBRARIES})
-
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(openfhe_numpy_cpp_core PUBLIC OpenMP::OpenMP_CXX)
-endif()
-
-# Python Extension
-pybind11_add_module(_openfhe_numpy MODULE ${OpenFHE_Numpy_BINDINGS})
-target_link_libraries(_openfhe_numpy PRIVATE openfhe_numpy_cpp_core)
-
-configure_file(
-    "${OpenFHE_Numpy_PYTHON}/version.py.in"
-    "${OpenFHE_Numpy_BUILD_PYTHON}/version.py" @ONLY)
-
-# Set output location for the compiled Python extension
-set_target_properties(_openfhe_numpy PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${OpenFHE_Numpy_BUILD_PYTHON}/openfhe_numpy
-    INSTALL_RPATH "$ORIGIN;${OpenFHE_LIBDIR}"
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH TRUE
-)
-
-# Copy Python files to build directory
-file(GLOB_RECURSE PYTHON_SOURCE_FILES "${OpenFHE_Numpy_PYTHON}/*.py")
-foreach(PY_FILE ${PYTHON_SOURCE_FILES})
-    file(RELATIVE_PATH REL_PATH "${OpenFHE_Numpy_PYTHON}" "${PY_FILE}")
-    configure_file(${PY_FILE} "${OpenFHE_Numpy_BUILD_PYTHON}/${REL_PATH}" COPYONLY)
-endforeach()
-
-# Installation Configuration
-include(GNUInstallDirs)
-
-# For pip/scikit-build installations
-if(DEFINED SKBUILD)
-    set(PYTHON_INSTALL_PATH "${SKBUILD_PROJECT_NAME}")
-    message(STATUS "Building for pip/scikit-build: ${PYTHON_INSTALL_PATH}")
+# Check Python version
+if(Python3_VERSION_MAJOR EQUAL 3 AND Python3_VERSION_MINOR GREATER_EQUAL 10)
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c "from sys import exec_prefix; print(exec_prefix)"
+        OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 else()
-    # Determine installation path based on CMAKE_INSTALL_PREFIX
-    if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-        execute_process(
-            COMMAND "${Python_EXECUTABLE}" -c "import site; print(site.getsitepackages()[0])"
-            OUTPUT_VARIABLE PYTHON_SITE_PACKAGES 
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        set(PYTHON_INSTALL_PATH "${PYTHON_SITE_PACKAGES}")
-    else()
-        set(PYTHON_INSTALL_PATH "${CMAKE_INSTALL_PREFIX}")
-    endif()
+    execute_process(
+        COMMAND "${Python_EXECUTABLE}" -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
+        OUTPUT_VARIABLE PYTHON_SITE_PACKAGES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
 endif()
 
-message(STATUS "Python package will be installed to: ${PYTHON_INSTALL_PATH}")
-
-# Install the Python extension and files 
-if(DEFINED SKBUILD)
-    # For pip installations, keep the /openfhe_numpy subdirectory
-    install(TARGETS _openfhe_numpy 
-            LIBRARY DESTINATION "${PYTHON_INSTALL_PATH}/openfhe_numpy")
-
-    install(DIRECTORY "${OpenFHE_Numpy_PYTHON}/"
-            DESTINATION "${PYTHON_INSTALL_PATH}/openfhe_numpy"
-            FILES_MATCHING PATTERN "*.py"
-            PATTERN "__pycache__" EXCLUDE)
-
-    install(FILES "${OpenFHE_Numpy_BUILD_PYTHON}/version.py"
-            DESTINATION "${PYTHON_INSTALL_PATH}/openfhe_numpy")
+message(STATUS "Python site packages directory: ${PYTHON_SITE_PACKAGES}")
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(Python_Install_Location "${PYTHON_SITE_PACKAGES}")
 else()
-    # For custom installations, install directly to specified path
-    install(TARGETS _openfhe_numpy 
-            LIBRARY DESTINATION "${PYTHON_INSTALL_PATH}")
-
-    install(DIRECTORY "${OpenFHE_Numpy_PYTHON}/"
-            DESTINATION "${PYTHON_INSTALL_PATH}"
-            FILES_MATCHING PATTERN "*.py"
-            PATTERN "__pycache__" EXCLUDE)
-
-    install(FILES "${OpenFHE_Numpy_BUILD_PYTHON}/version.py"
-            DESTINATION "${PYTHON_INSTALL_PATH}")
+    set(Python_Install_Location "${CMAKE_INSTALL_PREFIX}")
 endif()
+message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake with -DCMAKE_INSTALL_PREFIX=/your/path")
 
-# Build Examples
+# install the .so with the python bindings 
+install(TARGETS openfhe_numpy LIBRARY DESTINATION ${Python_Install_Location})
+install(FILES ${CMAKE_SOURCE_DIR}/openfhe_numpy/__init__.py DESTINATION ${Python_Install_Location})
+
+# install the required directories: operations, tensor and utils (with *.py files only)
+file(GLOB OPERATIONS_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/operations/*.py")
+install(FILES ${OPERATIONS_DIR_FILES} DESTINATION ${Python_Install_Location}/operations/)
+file(GLOB TENSOR_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/tensor/*.py")
+install(FILES ${TENSOR_DIR_FILES} DESTINATION ${Python_Install_Location}/tensor/)
+file(GLOB UTILS_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/utils/*.py")
+install(FILES ${UTILS_DIR_FILES} DESTINATION ${Python_Install_Location}/utils/)
+
 if(BUILD_EXAMPLES)
-    set(EXAMPLE_OUTPUT_DIR ${CMAKE_BINARY_DIR}/examples)
-    file(MAKE_DIRECTORY ${EXAMPLE_OUTPUT_DIR})
+    file(GLOB EXAMPLE_SOURCES "openfhe_numpy/cpp/examples/*.cpp")
 
-    find_library(OPENFHE_CORE_LIB OPENFHEcore PATHS ${OpenFHE_LIBDIR} REQUIRED)
-    find_library(OPENFHE_PKE_LIB OPENFHEpke PATHS ${OpenFHE_LIBDIR} REQUIRED)
-    find_library(OPENFHE_BINFHE_LIB OPENFHEbinfhe PATHS ${OpenFHE_LIBDIR} REQUIRED)
-
-    file(GLOB EXAMPLES ${CMAKE_CURRENT_SOURCE_DIR}/core/examples/*.cpp)
-    foreach(ex IN LISTS EXAMPLES)
-        get_filename_component(name ${ex} NAME_WE)
-        file(READ ${ex} FILE_CONTENT)
-        if(NOT FILE_CONTENT MATCHES "^\\s*//")
-            add_executable(${name} ${ex})
-            target_link_libraries(${name} PRIVATE
-                openfhe_numpy_cpp_core
-                ${OPENFHE_PKE_LIB}
-                ${OPENFHE_CORE_LIB}
-                ${OPENFHE_BINFHE_LIB})
-            set_target_properties(${name} PROPERTIES 
-                RUNTIME_OUTPUT_DIRECTORY ${EXAMPLE_OUTPUT_DIR}
-                INSTALL_RPATH "${OpenFHE_LIBDIR}")
+    foreach(example_file ${EXAMPLE_SOURCES})
+        get_filename_component(example_name ${example_file} NAME_WE)
+        add_executable(${example_name} ${example_file})
+        target_include_directories(${example_name} PRIVATE ${OpenFHE_Numpy_INCLUDES})
+        if(TARGET OpenFHE::pke)
+            target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp OpenFHE::pke OpenFHE::core OpenFHE::binfhe)
+        else()
+            target_link_libraries(${example_name} PRIVATE openfhe_numpy_cpp)
         endif()
     endforeach()
 endif()
-
-# Testing
-if(BUILD_TESTING)
-    enable_testing()
-endif()
-
-# CPack configuration for creating binary packages
-include(CPack)
-set(CPACK_PACKAGE_NAME "openfhe-numpy")
-set(CPACK_PACKAGE_VENDOR "OpenFHE Team")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "NumPy-like API for homomorphic encryption with OpenFHE")
-set(CPACK_PACKAGE_VERSION "${OPENFHE_NUMPY_VERSION}")
-set(CPACK_PACKAGE_VERSION_MAJOR "${OPENFHE_NUMPY_VERSION_MAJOR}")
-set(CPACK_PACKAGE_VERSION_MINOR "${OPENFHE_NUMPY_VERSION_MINOR}")
-set(CPACK_PACKAGE_VERSION_PATCH "${OPENFHE_NUMPY_VERSION_PATCH}")

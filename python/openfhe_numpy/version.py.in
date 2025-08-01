@@ -1,3 +1,0 @@
-"""Version information for openfhe_numpy."""
-
-__version__ = "@OPENFHE_NUMPY_VERSION@"

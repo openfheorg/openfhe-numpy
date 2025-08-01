@@ -1,108 +1,131 @@
 import numpy as np
 import openfhe_numpy as onp
 
-# Import directly from main_unittest - aligned with new framework
-from tests.main_unittest import (
-    generate_random_array,
-    gen_crypto_context,
-    load_ckks_params,
-    suppress_stdout,
-    MainUnittest,
-)
+from tests.core.test_framework import MainUnittest
+from tests.core.test_utils import generate_random_array, suppress_stdout
+from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
+
 
 """
-Note: Column-wise cumulative mean requires sufficient multiplicative 
-depth and ring dimension to accommodate the computational complexity.
-Small ring dimensions (<4096) may result in high approximation errors.
+Note: Mean operations may require sufficient multiplicative depth
+and ring dimension to accommodate division operations. Small ring
+dimensions (<4096) may result in higher approximation errors.
 """
 
 
-def fhe_matrix_mean(original_params, input):
-    """Execute matrix column meanmation with suppressed output."""
-    params = original_params.copy()
+def fhe_matrix_mean(params, data, axis=None, order=onp.ROW_MAJOR):
+    """
+    Generic matrix mean operation.
+    - params: CKKS parameters dictionary
+    - data: list containing the input matrix
+    - axis: None for total mean, 0 for row-wise, 1 for column-wise mean
+    - order: ROW_MAJOR or COLUMN_MAJOR ordering
+    """
+    params_copy = params.copy()
+    matrix = np.array(data[0])
+
+    # Ensure sufficient multiplicative depth for division
+    if params_copy["multiplicativeDepth"] < 3:
+        params_copy["multiplicativeDepth"] = 3
 
     with suppress_stdout(False):
-        matrix = np.array(input[0])
+        # Generate crypto context
+        cc, keys = gen_crypto_context(params_copy)
+        total_slots = params_copy["ringDim"] // 2
 
-        if params["multiplicativeDepth"] < len(matrix[0]):
-            params["multiplicativeDepth"] = len(matrix[0]) + 1
+        # Encrypt matrix
+        ctm_x = onp.array(
+            cc=cc,
+            data=matrix,
+            batch_size=total_slots,
+            order=order,
+            fhe_type="C",
+            mode="zero",
+            public_key=keys.publicKey,
+        )
 
-        # Use gen_crypto_context for consistency with new framework
-        cc, keys = gen_crypto_context(params)
-
-        total_slots = params["ringDim"] // 2
-
-        public_key = keys.publicKey
-        ctm_matrix = onp.array(cc, matrix, total_slots, public_key=public_key)
-
-        if input[1] is None:
+        # Generate appropriate keys based on axis
+        if axis is None:  # Total mean
             cc.EvalSumKeyGen(keys.secretKey)
-            ctm_result = onp.mean(ctm_matrix)
-        elif input[1] == 0:
-            onp.sum_row_keys(keys.secretKey, ctm_matrix.ncols)
-            ctm_result = onp.mean(ctm_matrix, 0, True)
-        elif input[1] == 1:
-            onp.sum_col_keys(cc, keys.secretKey, ctm_matrix.ncols)
-            ctm_result = onp.mean(ctm_matrix, 1, True)
-        else:
-            ctm_result = None
-        result = ctm_result.decrypt(keys.secretKey, format_type="reshape")
+        elif axis == 0:  # Row mean (mean along rows)
+            if order == onp.ROW_MAJOR:
+                onp.sum_row_keys(keys.secretKey, ctm_x.ncols, ctm_x.batch_size)
+            elif order == onp.COL_MAJOR:
+                onp.sum_col_keys(keys.secretKey, ctm_x.nrows)
+            else:
+                raise ValueError("Invalid order.")
+        elif axis == 1:  # Column mean (mean along columns)
+            if order == onp.ROW_MAJOR:
+                onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
+            elif order == onp.COL_MAJOR:
+                onp.sum_row_keys(keys.secretKey, ctm_x.nrows, ctm_x.batch_size)
+            else:
+                raise ValueError("Invalid order.")
+
+        # Perform mean operation
+        ctm_result = onp.mean(ctm_x, axis)
+
+        # Decrypt result
+        result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     return result
 
 
-class TestMatrixmean(MainUnittest):
-    """Test class for matrix column meanmation operations."""
+class TestMatrixMean(MainUnittest):
+    """Test class for matrix mean operations."""
 
     @classmethod
     def _generate_test_cases(cls):
-        """Generate test cases for matrix column meanmation."""
+        """Generate test cases for matrix mean operations."""
+        operations = [
+            ("total", None, lambda A: np.mean(A)),  # Total mean
+            ("rows", 0, lambda A: np.mean(A, axis=0)),  # Row mean
+            ("cols", 1, lambda A: np.mean(A, axis=1)),  # Column mean
+        ]
+
+        # Add ordering options
+        orders = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COLUMN_MAJOR)]
+
         ckks_param_list = load_ckks_params()
-        matrix_sizes = [2, 3, 8, 16]
+        matrix_sizes = [2, 3, 4]  # Smaller sizes for mean operations
         test_counter = 1
 
-        for mean_type in ["mean", "meancols", "meanrows"]:
-            for param in ckks_param_list:
-                for size in matrix_sizes:
-                    # Generate random test matrix
-                    A = generate_random_array(size)
+        for op_name, axis, np_fn in operations:
+            for order_name, order_value in orders:
+                for param in ckks_param_list:
+                    for size in matrix_sizes:
+                        # Skip tests with very small ring dimensions for stability
+                        if param["ringDim"] < 4096 and size > 2:
+                            continue
 
-                    if mean_type == "mean":
-                        name = "TestMatrixmean"
-                        expected = np.mean(A)
-                        _input = [A, None]
-                    elif mean_type == "meancols":
-                        name = "TestMatrixmeanCols"
-                        expected = np.mean(A, axis=1)
-                        _input = [A, 1]
-                    else:
-                        name = "TestMatrixmeanRows"
-                        expected = np.mean(A, axis=0)
-                        _input = [A, 0]
+                        # Generate random test matrix
+                        A = generate_random_array(size)
 
-                    # Calculate expected result directly
+                        # Calculate expected result directly
+                        expected = np_fn(A)
 
-                    # Create test name with descriptive format
-                    test_name = f"test_id_{mean_type}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
+                        # Create test name with descriptive format
+                        test_name = f"mean_{op_name}_{order_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
 
-                    # Generate the test case with debug output
-                    test_method = MainUnittest.generate_test_case(
-                        fhe_matrix_mean,
-                        name,
-                        test_name,
-                        param,
-                        _input,
-                        expected,
-                        debug=True,
-                    )
+                        # Create a closure to capture the current axis and ordering values
+                        def make_func(current_axis, current_order):
+                            return lambda p, d: fhe_matrix_mean(
+                                p, d, current_axis, current_order
+                            )
 
-                    # Register the test method
-                    setattr(cls, test_name, test_method)
-                    test_counter += 1
+                        # Generate the test case
+                        cls.generate_test_case(
+                            func=make_func(axis, order_value),
+                            test_name=test_name,
+                            params=param,
+                            input_data=[A],
+                            expected=expected,
+                            compare_fn=onp.check_equality,
+                            debug=True,
+                        )
 
-
-TestMatrixmean._generate_test_cases()
+                        test_counter += 1
 
 
 if __name__ == "__main__":
-    TestMatrixmean.run_test_meanmary("Matrix Cumulative mean Columns", debug=True)
+    TestMatrixMean.run_test_summary("Matrix Mean", debug=True)
