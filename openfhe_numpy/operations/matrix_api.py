@@ -373,6 +373,11 @@ def mean(
     pass
 
 
+@tensor_function_api("roll", binary=False)
+def roll(a: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
+    pass
+
+
 # ===========================
 # Planned Future Functionality
 # ===========================

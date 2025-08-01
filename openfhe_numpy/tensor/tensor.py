@@ -141,7 +141,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
             if self._ndim > 2 or self._ndim < 0:
                 ONP_ERROR("Dimension is invalid!!!")
             self._order = order
-            # dtyle in ["CTArray", "BlockCTArray"]
+            # dtype in ["CTArray", "BlockCTArray"]
             self._dtype = self.__class__.__name__
             self.extra = {}
 
@@ -167,15 +167,38 @@ class FHETensor(BaseTensor[T], Generic[T]):
         """Underlying encrypted/plaintext payload."""
         return self._data
 
+    @data.setter
+    def data(self, data):
+        import openfhe
+
+        if isinstance(data, openfhe.Ciphertext):
+            self._dtype = "CTArray"
+        elif isinstance(data, openfhe.Plaintext):
+            self._dtype = "PTArray"
+        else:
+            ONP_ERROR(
+                "Object data is incorrect. \
+                      Only support FHETensor only supports Ciphertext or Plaintext"
+            )
+        self._data = data
+
     @property
     def original_shape(self) -> Tuple[int, int]:
         """Original shape before any padding was applied."""
         return self._original_shape
 
+    @original_shape.setter
+    def original_shape(self, original_shape):
+        self._original_shape = original_shape
+
     @property
     def shape(self) -> Tuple[int, int]:
         """Shape after padding."""
         return self._shape
+
+    @shape.setter
+    def shape(self, value: Tuple[int, int]):
+        self._shape = value
 
     @property
     def ndim(self) -> int:
@@ -186,6 +209,15 @@ class FHETensor(BaseTensor[T], Generic[T]):
     def batch_size(self) -> int:
         """Total number of packed slots."""
         return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, size: int):
+        """Set batch size with validation."""
+        if not isinstance(size, int):
+            raise TypeError(f"Batch size must be integer, got {type(size)}")
+        if size <= 0:
+            raise ValueError(f"Batch size must be positive, got {size}")
+        self._batch_size = size
 
     @property
     def ncols(self) -> int:
@@ -204,6 +236,13 @@ class FHETensor(BaseTensor[T], Generic[T]):
         """Packing order constant (row-major or column-major)."""
         return self._order
 
+    @order.setter
+    def order(self, order: int):
+        if order in ["R", "C"]:
+            self._order = order
+        else:
+            ONP_ERROR("Not support order [{order}]")
+
     @property
     def is_encrypted(self) -> int:
         return "CT" in self.dtype
@@ -221,20 +260,13 @@ class FHETensor(BaseTensor[T], Generic[T]):
             "ndim": self.ndim,
         }
 
+    @property
+    def T(self):
+        return self.transpose()
+
     ###
     ### Update properties in some specific cases
     ###
-
-    def set_batch_size(self, value: int):
-        """Set batch size with validation."""
-        if not isinstance(value, int):
-            raise TypeError(f"Batch size must be integer, got {type(value)}")
-        if value <= 0:
-            raise ValueError(f"Batch size must be positive, got {value}")
-        self._batch_size = value
-
-    def set_shape(self, value: Tuple[int, int]):
-        self._shape = value
 
     def clone(self, data: Optional[T] = None) -> "BaseTensor[T]":
         """

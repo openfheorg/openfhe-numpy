@@ -97,7 +97,7 @@ def gen_accumulate_cols_key(secret_key: openfhe.PrivateKey, ncols: int):
     backend.EvalSumCumColsKeyGen(secret_key, ncols)
 
 
-def gen_rotation_keys(secret_key: openfhe.PrivateKey, rotation_indices: int):
+def gen_rotation_keys(secret_key: openfhe.PrivateKey, shifts: int):
     """
     Generate rotation keys for the specified indices.
 
@@ -107,11 +107,12 @@ def gen_rotation_keys(secret_key: openfhe.PrivateKey, rotation_indices: int):
         The OpenFHE crypto context
     secret_key : PrivateKey
         The private key to use for key generation
-    rotation_indices : list
+    shifts : list
         List of rotation indices to generate keys for
     """
+    standard_indices = [-x for x in shifts]
     context = secret_key.GetCryptoContext()
-    context.EvalRotateKeyGen(secret_key, rotation_indices)
+    context.EvalRotateKeyGen(secret_key, standard_indices)
 
 
 def gen_lintrans_keys(

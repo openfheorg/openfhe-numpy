@@ -14,6 +14,7 @@ from .matrix_api import (
     cumsum,
     cumreduce,
     sum,
+    roll,
 )
 
 # Import crypto context utilities
@@ -42,6 +43,7 @@ __all__ = [
     "cumsum",
     "cumreduce",
     "sum",
+    "roll",
     # Key generation utilities
     "sum_row_keys",
     "sum_col_keys",

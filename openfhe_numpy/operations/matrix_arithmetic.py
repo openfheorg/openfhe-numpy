@@ -32,6 +32,8 @@ from openfhe_numpy import (
     EvalSumCumCols,
     EvalReduceCumRows,
     EvalReduceCumCols,
+    EvalLinTransPsi,
+    EvalLinTransPhi,
 )
 
 
@@ -289,7 +291,7 @@ def dot_ct(a, b):
 # Transpose Operations
 # ------------------------------------------------------------------------------
 def _transpose_ct(ctarray: CTArray) -> "CTArray":
-    return ctarray.T
+    return ctarray._transpose()
 
 
 @register_tensor_function("transpose", [("CTArray",)])
@@ -598,3 +600,39 @@ def mean_ct(
         )
     else:
         ONP_ERROR(f"The dimension is invalid axis = {axis}")
+
+
+# ------------------------------------------------------------------------------
+# Rotation Operations
+# ------------------------------------------------------------------------------
+
+
+@register_tensor_function(
+    "roll", [("CTArray", "int"), ("CTArray", "int", "int")]
+)
+def roll(x: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
+    if axis is None:
+        return _ct_vector_rotation(x, -shift)
+    else:
+        ONP_ERROR(f"This function only supports packed vector")
+
+
+# def _ct_vector_roll(cta: CTArray, shift: int):
+#     # cc = cta.data.GetCryptoContext()
+#     print("order = ", cta.order)
+#     if cta.order == ArrayEncodingType.COL_MAJOR:
+#         ct_rotated = EvalLinTransPsi(cta.data, 1, -shift)
+#     elif cta.order == ArrayEncodingType.ROW_MAJOR:
+#         ct_rotated = EvalLinTransPhi(cta.data, 1, -shift)
+#     else:
+#         ONP_ERROR(f"Not support the current encoding = {cta.order}")
+#     cta.data = ct_rotated
+#     return cta
+
+
+def _ct_vector_rotation(ctv: CTArray, shift: int):
+    cc = ctv.data.GetCryptoContext()
+    ct_rotated = cc.EvalRotate(ctv.data, shift)
+    ctv_cloned = ctv.clone()
+    ctv_cloned.data = ct_rotated
+    return ctv_cloned
