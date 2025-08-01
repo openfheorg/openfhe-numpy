@@ -16,7 +16,7 @@ def validate_and_print_results(computed, expected, operation_name):
 
 
 def run_matmul_example(cc, keys, A, B, description):
-    """Run a homomorphic matrixxmatrix multiplication example."""
+    """Run a homomorphic matrix x matrix multiplication example."""
     print(f"\n--- {description} ---")
     print("Input A:\n", A)
     print("Input B:\n", B)

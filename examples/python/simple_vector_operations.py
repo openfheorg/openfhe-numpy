@@ -38,6 +38,7 @@ def main():
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
+    onp.gen_rotation_keys(keys.secretKey, [1, 2, 3, 4, 5, 6, 7])
 
     ring_dim = cc.GetRingDimension()
     batch_size = ring_dim // 2
@@ -47,13 +48,17 @@ def main():
     # Sample input vectors
     vector_a = [1.0, 2.0, 3.0, 4.0, 5.0]
     vector_b = [4.0, 0.0, 1.0, 3.0, 6.0]
+    vector_c = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8]
 
     print("\nInput vectors")
     print("vector_a:", vector_a)
     print("vector_b:", vector_b)
+    print("vector_c:", vector_c)
 
     # Encrypt vector_a directly to ciphertext
-    # ctv_a = onp.array(cc, vector_a, batch_size, public_key=keys.publicKey)
+
+    # Vector_a will be packed as:
+    # 1.0, 2.0, 3.0, 4.0, 5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     ctv_a = onp.array(
         cc=cc,
         data=vector_a,
@@ -63,13 +68,25 @@ def main():
         fhe_type="C",
         public_key=keys.publicKey,
     )
-    # ctv_b = onp.array(cc, vector_b, batch_size, public_key=keys.publicKey)
+
     ctv_b = onp.array(
         cc=cc,
         data=vector_b,
         batch_size=batch_size,
         order=onp.ROW_MAJOR,
         mode="zero",
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
+
+    # vector_c will be packed, tiled and encrypted:
+    # 1.1, 2.2, 3.3, 4.0, 5.5, 6.6, 7.7, 8.8, 1.1, 2.2, 3.3, 4.0, 5.5, 6.6, 7.7, 8.8
+    ctv_c = onp.array(
+        cc=cc,
+        data=vector_c,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        mode="tile",
         fhe_type="C",
         public_key=keys.publicKey,
     )
@@ -138,6 +155,18 @@ def main():
     validate_and_print_results(
         res_sum_decrypted, np.sum(vector_a), "Sum of vector\n" + str(vector_a)
     )
+
+    # 8) Rotation.
+    for shift in range(1, 8):
+        ctv_c_rotated = onp.roll(ctv_c, shift)
+        res_rotation = ctv_c_rotated.decrypt(
+            keys.secretKey, unpack_type="original"
+        )
+        validate_and_print_results(
+            res_rotation,
+            np.roll(vector_c, shift),
+            "Rotate vector " + str(vector_c) + " by " + str(shift),
+        )
 
 
 if __name__ == "__main__":
