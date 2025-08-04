@@ -59,6 +59,9 @@ add_library(openfhe_numpy_cpp STATIC
     ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
 )
 pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
+# The next line ensures that the installed openfhe module can find its shared library dependencies
+# in the 'openfhe/lib/' subdirectory relative to itself without requiring LD_LIBRARY_PATH.
+target_link_options(openfhe PRIVATE "-Wl,-rpath=$ORIGIN/../lib" "-Wl,--disable-new-dtags")
 
 target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 
