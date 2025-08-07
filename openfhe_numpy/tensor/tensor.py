@@ -261,7 +261,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
         }
 
     @property
-    def T(self):
+    def trnsps(self):
         return self.transpose()
 
     ###
