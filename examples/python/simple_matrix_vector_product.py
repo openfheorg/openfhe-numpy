@@ -71,10 +71,12 @@ def demo():
     expected = matrix @ vector
     print(f"\nExpected:\n{expected}")
 
+    # ---------------------------------------------
     # Case 1:
     #   - Matrix Packing Style: row-major
     #   - Vector Packing Style: col-major
     #   - Product Packing Style: row-major
+    # ---------------------------------------------
 
     ctm_m_rm = onp.array(
         cc=cc,
@@ -105,10 +107,12 @@ def demo():
     print(f"\nDecrypted Result:\n{result_rm}")
     print(f"\nMatch: {is_match_rm}, Total Error: {error_rm}")
 
+    # ---------------------------------------------
     # Case 2:
     #   - Matrix Packing Style: col-major
     #   - Vector Packing Style: row-major
     #   - Product Packing Style: col-major
+    # ---------------------------------------------
     ctm_m_cm = onp.array(
         cc=cc,
         data=matrix,
@@ -133,7 +137,6 @@ def demo():
     ctm_m_cm.extra["rowkey"] = onp.sum_row_keys(
         keys.secretKey, ctm_m_cm.ncols, ctm_m_cm.batch_size
     )
-
     ctv_result_cm = ctm_m_cm @ ctv_v_rm
     result_cm = ctv_result_cm.decrypt(keys.secretKey, unpack_type="original")
     is_match_cm, error_cm = onp.check_equality(result_cm, expected)

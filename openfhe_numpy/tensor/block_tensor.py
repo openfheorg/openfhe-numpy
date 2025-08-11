@@ -1,9 +1,9 @@
-from typing import TypeVar, Generic, Tuple, List
+from typing import Generic
 from openfhe_numpy.openfhe_numpy import ArrayEncodingType
-from openfhe_numpy.tensor.tensor import FHETensor, T
+from .tensor import FHETensor, TPL
 
 
-class BlockFHETensor(FHETensor[T], Generic[T]):
+class BlockFHETensor(FHETensor[TPL], Generic[TPL]):
     """Base class for block tensor implementations"""
 
     def __init__(

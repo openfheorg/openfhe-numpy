@@ -4,7 +4,12 @@ import numpy as np
 import openfhe
 
 
-from ..openfhe_numpy import ArrayEncodingType, EvalSumCumCols, EvalSumCumRows
+from ..openfhe_numpy import (
+    ArrayEncodingType,
+    EvalSumCumCols,
+    EvalSumCumRows,
+    EvalTranspose,
+)
 from ..utils.constants import *
 from ..utils.errors import ONP_ERROR
 from ..utils.packing import process_packed_data
@@ -153,7 +158,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.order,
         )
 
-    def cumsum(self, axis: int) -> "CTArray":
+    def cumulative_sum(self, axis: int) -> "CTArray":
         """
         Compute the cumulative sum of tensor elements along a given axis.
 
@@ -172,12 +177,26 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             A new tensor with cumulative sums along the specified axis.
         """
 
-        if axis not in (0, 1):
+        if self.ndim != 1 or self.ndim != 2:
+            ONP_ERROR(f"Dimension of array {self.ndim} is illegal ")
+
+        if self.ndim != 1 and axis is None:
+            ONP_ERROR("axis=None not allowed for >1D")
+
+        if self.ndim == 2 and axis not in (0, 1):
             ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
+
         order = self.order
         shape = self.shape
         original_shape = self.original_shape
-        # Cumsum over rows
+
+        # cumulative_sum for vector
+        if axis is None:
+            ciphertext = EvalSumCumRows(
+                self.data, self.ncols, self.original_shape[1]
+            )
+
+        # cumulative_sum over rows
         if axis == 0:
             if self.order == ArrayEncodingType.ROW_MAJOR:
                 ciphertext = EvalSumCumRows(
@@ -190,9 +209,11 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
                 # shape = self.shape[1], self.shape[0]
                 # original_shape = self.original_shape[1], self.original_shape[0]
             else:
-                raise ValueError(f"Invalid axis [{self.order}].")
+                raise ValueError(
+                    f"Not support this packing order [{self.order}]."
+                )
 
-        # Cumsum over cols
+        # cumulative_sum over cols
         elif axis == 1:
             if self.order == ArrayEncodingType.ROW_MAJOR:
                 ciphertext = EvalSumCumCols(self.data, self.ncols)
