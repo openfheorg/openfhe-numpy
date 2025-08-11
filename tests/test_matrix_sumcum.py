@@ -6,7 +6,7 @@ from tests.core.test_utils import generate_random_array, suppress_stdout
 from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
 
 
-def fhe_matrix_cumsum(params, data, axis=0, order=onp.ROW_MAJOR):
+def fhe_matrix_cumulative_sum(params, data, axis=0, order=onp.ROW_MAJOR):
     """
     Generic matrix cumulative sum operation.
     - params: CKKS parameters dictionary
@@ -39,19 +39,19 @@ def fhe_matrix_cumsum(params, data, axis=0, order=onp.ROW_MAJOR):
         )
 
         # Generate appropriate keys based on axis
-        if axis == 0:  # cumsum rows
+        if axis == 0:  # cumulative_sum rows
             if order == onp.ROW_MAJOR:
                 onp.gen_accumulate_rows_key(keys.secretKey, ctm_matrix.ncols)
             else:  # order == onp.COL_MAJOR:
                 onp.gen_accumulate_cols_key(keys.secretKey, ctm_matrix.ncols)
-        else:  # cumsum cols
+        else:  # cumulative_sum cols
             if order == onp.ROW_MAJOR:
                 onp.gen_accumulate_cols_key(keys.secretKey, ctm_matrix.ncols)
             else:  # order == onp.COL_MAJOR:
                 onp.gen_accumulate_rows_key(keys.secretKey, ctm_matrix.ncols)
 
         # Perform cumulative sum
-        ctm_result = onp.cumsum(ctm_matrix, axis=axis)
+        ctm_result = onp.cumulative_sum(ctm_matrix, axis=axis)
 
         # Decrypt result
         result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
@@ -59,15 +59,15 @@ def fhe_matrix_cumsum(params, data, axis=0, order=onp.ROW_MAJOR):
     return result
 
 
-class TestMatrixCumSum(MainUnittest):
+class TestMatrixcumulative_sum(MainUnittest):
     """Test class for matrix cumulative sum operations."""
 
     @classmethod
     def _generate_test_cases(cls):
         """Generate test cases for matrix cumulative sum operations."""
         operations = [
-            ("rows", 0, lambda A: np.cumsum(A, axis=0)),  # Row-wise
-            ("cols", 1, lambda A: np.cumsum(A, axis=1)),  # Column-wise
+            ("rows", 0, lambda A: np.cumulative_sum(A, axis=0)),  # Row-wise
+            ("cols", 1, lambda A: np.cumulative_sum(A, axis=1)),  # Column-wise
         ]
 
         # Add ordering options
@@ -88,11 +88,11 @@ class TestMatrixCumSum(MainUnittest):
                         expected = np_fn(A)
 
                         # Create test name with descriptive format
-                        test_name = f"cumsum_{op_name}_{order_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
+                        test_name = f"cumulative_sum_{op_name}_{order_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
 
                         # Create a closure to capture the current axis and ordering values
                         def func(current_axis, current_order):
-                            return lambda p, d: fhe_matrix_cumsum(
+                            return lambda p, d: fhe_matrix_cumulative_sum(
                                 p, d, current_axis, current_order
                             )
 
@@ -111,4 +111,6 @@ class TestMatrixCumSum(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixCumSum.run_test_summary("Matrix Cumulative Sum", debug=True)
+    TestMatrixcumulative_sum.run_test_summary(
+        "Matrix Cumulative Sum", debug=True
+    )

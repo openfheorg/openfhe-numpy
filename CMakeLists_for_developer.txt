@@ -1,4 +1,3 @@
-# Change the name to CMakeLists.txt to build with cmake
 cmake_minimum_required(VERSION 3.16)
 
 project(OpenFHE-Numpy)
@@ -120,7 +119,7 @@ set(OpenFHE_Numpy_INSTALL_PATH "${Python_Install_Location}/openfhe_numpy")
 
 # install the .so with the python bindings
 install(TARGETS openfhe_numpy LIBRARY DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
-install(FILES ${OpenFHE_Numpy_INSTALL_PATH}/__init__.py DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
+install(FILES ${OpenFHE_Numpy_MAIN_SOURCE}/__init__.py DESTINATION ${OpenFHE_Numpy_INSTALL_PATH})
 
 # install the required directories: operations, tensor and utils (with *.py files only)
 file(GLOB OPERATIONS_DIR_FILES "${OpenFHE_Numpy_MAIN_SOURCE}/operations/*.py")

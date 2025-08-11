@@ -164,7 +164,7 @@ OpenFHE-NumPy currently supports the following operations:
 | `multiply`  | Element-wise multiplication | `onp.multiply(a, b)` or `a * b` |
 | `matmul`    | Matrix multiplication       | `onp.matmul(a, b)` or `a @ b`   |
 | `transpose` | Matrix transposition        | `onp.transpose(a)`              |
-| `cumsum`    | Cumulative sum along axis   | `onp.cumsum(a, axis)`           |
+| `cumulative_sum`    | Cumulative sum along axis   | `onp.cumulative_sum(a, axis)`           |
 | `power`     | Element-wise power          | `onp.power(a, exp)`             |
 | `dot`       | Dot product                 | `onp.dot(a, b)`                 |
 | `sum`       | Sum along axis              | `onp.sum(a, axis)`              |

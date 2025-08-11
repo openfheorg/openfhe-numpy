@@ -7,9 +7,9 @@ set(OPENFHE_NUMPY_VERSION_MINOR 0)
 set(OPENFHE_NUMPY_VERSION_PATCH 1)
 set(OPENFHE_NUMPY_VERSION ${OPENFHE_NUMPY_VERSION_MAJOR}.${OPENFHE_NUMPY_VERSION_MINOR}.${OPENFHE_NUMPY_VERSION_PATCH})
 
-# OpenFHE version can be specified externally (-DOPENFHE_REQUIRED_VERSION=1.3.1)
+# OpenFHE version can be specified externally (-DOPENFHE_REQUIRED_VERSION=1.3.0)
 if(NOT DEFINED OPENFHE_REQUIRED_VERSION)
-    set(OPENFHE_REQUIRED_VERSION "1.3.1" CACHE STRING "Required OpenFHE version")
+    set(OPENFHE_REQUIRED_VERSION "1.3.0" CACHE STRING "Required OpenFHE version")
 else()
     # User provided OPENFHE_REQUIRED_VERSION via -D
     message(STATUS "Using user-specified OpenFHE version: ${OPENFHE_REQUIRED_VERSION}")
@@ -36,7 +36,7 @@ set(PYBIND11_FINDPYTHON ON)
 find_package(pybind11 REQUIRED)
 
 set(OpenFHE_Numpy_INCLUDES "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/include")
-include_directories(${OpenFHE_Numpy_INCLUDES} )
+include_directories( ${OpenFHE_Numpy_INCLUDES} )
 include_directories(${OpenFHE_INCLUDE})
 include_directories(${OpenFHE_INCLUDE}/third-party/include)
 include_directories(${OpenFHE_INCLUDE}/core)
@@ -59,9 +59,6 @@ add_library(openfhe_numpy_cpp STATIC
     ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
 )
 pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
-# The next line ensures that the installed openfhe module can find its shared library dependencies
-# in the 'openfhe/lib/' subdirectory relative to itself without requiring LD_LIBRARY_PATH.
-target_link_options(openfhe_numpy PRIVATE "-Wl,-rpath=$ORIGIN/../openfhe/lib" "-Wl,--disable-new-dtags")
 
 target_link_libraries(openfhe_numpy PRIVATE openfhe_numpy_cpp)
 
