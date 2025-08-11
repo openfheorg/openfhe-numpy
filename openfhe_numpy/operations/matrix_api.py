@@ -82,8 +82,8 @@ def multiply(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     pass
 
 
-@tensor_function_api("power", binary=True)
-def power(a: ArrayLike, exponent: int) -> ArrayLike:
+@tensor_function_api("pow", binary=True)
+def pow(a: ArrayLike, exponent: int) -> ArrayLike:
     """
     For each element of the tensor, it raises that element to the given power.
 
@@ -105,7 +105,7 @@ def power(a: ArrayLike, exponent: int) -> ArrayLike:
 
     See Also
     --------
-    numpy.power : Corresponding element-wise power function.
+    numpy.pow : Corresponding element-wise power function.
     numpy.linalg.matrix_power : Repeated matrix multiplication for square matrices.
 
     Examples
@@ -226,43 +226,49 @@ def transpose(a: ArrayLike) -> ArrayLike:
 # ===========================
 
 
-@tensor_function_api("cumsum", binary=False)
-def cumsum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
+@tensor_function_api("cumulative_sum", binary=False)
+def cumulative_sum(x: ArrayLike, /, *, axis: Optional[int] = None) -> ArrayLike:
     """
-    Compute the cumulative sum of tensor elements along an axis.
+        Compute the cumulative sum of tensor elements along a specified axis.\
+        - For 1D inputs, axis must be None.
+        - For 2D inputs, axis must be 0 or 1.
+        - The include_initial argument is not supported.
 
-    Parameters
-    ----------
-    a : ArrayLike
-        Input tensor.
-    axis : int, optional
-        Axis along which to compute the sum. Default is 0.
-    keepdims : bool, optional
-        If True, retains reduced dimensions. Default is False.
+        Parameters
+        ----------
+        a : ArrayLike
+            Input tensor.
+        axis : int, optional
+            Axis along which to compute the sum. Default is 0.
 
-    Returns
-    -------
-    out : ArrayLike
-        Cumulative sum along an axis.
+        Returns
+        -------
+        out : ArrayLike
+            Cumulative sum along an axis.
 
-    See Also
-    --------
-    numpy.cumsum : Corresponding NumPy function.
+        See Also
+        --------
+        numpy.cumulative_sum : Corresponding NumPy function.
 
-    Examples
-    --------
-    >>> import numpy as np
-    >>> cumsum(np.array([[1, 2], [3, 4]]), axis=1)
-    array([[1, 3],
-           [3, 7]])
+        Examples
+        --------
+        >>> import numpy as onp
+        >>> cumulative_sum(np.array([[1, 2], [3, 4]]), axis=1)
+        array([[1, 3],
+               [3, 7]])
     """
     pass
 
 
-@tensor_function_api("cumreduce", binary=False)
-def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
+@tensor_function_api("cumulative_reduce", binary=False)
+def cumulative_reduce(
+    a: ArrayLike, axis: int = 0, keepdims: bool = False
+) -> ArrayLike:
     """
-    Compute the cumulative reduction (e.g., product) along an axis.
+    Compute the cumulative reduction of tensor elements along a specified axis.\
+        - For 1D inputs, axis must be None.
+        - For 2D inputs, axis must be 0 or 1.
+        - The include_initial argument is not supported.
 
     Parameters
     ----------
@@ -270,8 +276,6 @@ def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
         Input tensor.
     axis : int, optional
         Axis along which to compute the reduction. Default is 0.
-    keepdims : bool, optional
-        If True, retains reduced dimensions. Default is False.
 
     Returns
     -------
@@ -280,12 +284,12 @@ def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 
     See Also
     --------
-    numpy.cumprod : Similar operation for product.
+    numpy.cumulative_sum : Similar operation for sum.
 
     Examples
     --------
     >>> import numpy as np
-    >>> cumreduce(np.array([[1, 2, 3], [4, 5, 6]]), axis=0)
+    >>> cumulative_reduce(np.array([[1, 2, 3], [4, 5, 6]]), axis=0)
     array([[1, 2, 3],
            [-3, -3, -3]])
     """
@@ -293,7 +297,9 @@ def cumreduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 
 
 @tensor_function_api("sum", binary=False)
-def sum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
+def sum(
+    a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False
+) -> ArrayLike:
     """
     Sum of elements over an axis or all.
 
@@ -333,7 +339,13 @@ def sum(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
 
 @tensor_function_api("mean", binary=False)
 def mean(
-    a: ArrayLike, axis: Optional[int] = 0, keepdims: bool = False
+    a: ArrayLike,
+    /,
+    *,
+    axis: Optional[int] = None,
+    dtype=None,
+    out=None,
+    keepdims: bool = False,
 ) -> ArrayLike:
     """
     Compute the arithmetic mean along an axis or all elements.
@@ -374,7 +386,48 @@ def mean(
 
 
 @tensor_function_api("roll", binary=False)
-def roll(a: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
+def roll(a: ArrayLike, shift, axis: Optional[int] = None) -> ArrayLike:
+    """
+    Roll array elements along a given axis.
+
+    Elements that roll beyond the last position are re-introduced at the first.
+
+    Parameters
+    ----------
+    a : ArrayLike
+        Input array.
+    shift : int or tuple of ints
+        The number of places by which elements are shifted. If a tuple, then
+        axis must be a tuple of the same size, and each of the given axes is
+        shifted by the corresponding number. If an int while axis is a tuple
+        of ints, then the same value is used for all given axes.
+    axis : int or tuple of ints, optional
+        Axis or axes along which elements are shifted. By default, the array
+        is flattened before shifting, after which the original shape is restored.
+
+    Returns
+    -------
+    res : ArrayLike
+        Output array, with the same shape as a.
+
+    See Also
+    --------
+    numpy.roll : Corresponding NumPy function.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.arange(10)
+    >>> roll(x, 2)
+    array([8, 9, 0, 1, 2, 3, 4, 5, 6, 7])
+    >>> x2 = np.reshape(x, (2, 5))
+    >>> roll(x2, 1, axis=0)
+    array([[5, 6, 7, 8, 9],
+           [0, 1, 2, 3, 4]])
+    >>> roll(x2, (1, 1), axis=(1, 0))  # Multiple axes
+    array([[9, 5, 6, 7, 8],
+           [4, 0, 1, 2, 3]])
+    """
     pass
 
 

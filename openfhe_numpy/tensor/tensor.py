@@ -11,11 +11,11 @@ from openfhe_numpy.utils.constants import *
 
 # -----------------------------------------------------------
 # Ultilities Imports
-T = TypeVar("T")
+TPL = TypeVar("Template")
 
 
 # BaseTensor - Abstract Interface
-class BaseTensor(ABC, Generic[T]):
+class BaseTensor(ABC, Generic[TPL]):
     @property
     @abstractmethod
     def shape(self) -> Tuple[int, ...]: ...
@@ -49,7 +49,7 @@ class BaseTensor(ABC, Generic[T]):
     def info(self) -> dict: ...
 
     @abstractmethod
-    def clone(self, data: T = None) -> "BaseTensor[T]": ...
+    def clone(self, data: TPL = None) -> "BaseTensor[TPL]": ...
 
     @abstractmethod
     def decrypt(self, *args, **kwargs): ...
@@ -60,7 +60,7 @@ class BaseTensor(ABC, Generic[T]):
 # -----------------------------------------------------------
 @dataclass
 class PackedArrayInformation:
-    data: list | np.ndarray | T
+    data: list | np.ndarray | TPL
     original_shape: tuple[int, int]
     ndim: int
     batch_size: int
@@ -68,13 +68,13 @@ class PackedArrayInformation:
     order: int
 
 
-class FHETensor(BaseTensor[T], Generic[T]):
+class FHETensor(BaseTensor[TPL], Generic[TPL]):
     """
     Concrete base class for tensors in FHE computation.
 
     Parameters
     ----------
-    data : T
+    data : TPL
         Underlying encrypted or encoded of a packed encoding array.
     original_shape : Tuple[int, int]
         Shape before any padding.
@@ -100,7 +100,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
     @overload
     def __init__(
         self,
-        data: T,
+        data: TPL,
         original_shape: Tuple[int, int],
         batch_size: int,
         new_shape: Tuple[int, int],
@@ -163,7 +163,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
         return self._dtype
 
     @property
-    def data(self) -> T:
+    def data(self) -> TPL:
         """Underlying encrypted/plaintext payload."""
         return self._data
 
@@ -268,7 +268,7 @@ class FHETensor(BaseTensor[T], Generic[T]):
     ### Update properties in some specific cases
     ###
 
-    def clone(self, data: Optional[T] = None) -> "BaseTensor[T]":
+    def clone(self, data: Optional[TPL] = None) -> "BaseTensor[TPL]":
         """
         Copy the tensor, optionally replacing the data payload.
         """

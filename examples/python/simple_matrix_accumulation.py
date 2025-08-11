@@ -28,11 +28,11 @@ def run_row_accumulation_example(cc, keys, ctm_x, matrix):
         raise ValueError("Invalid order.")
 
     # Perform homomorphic row accumulation
-    ctm_result = onp.cumsum(ctm_x, axis=0)
+    ctm_result = onp.cumulative_sum(ctm_x, axis=0)
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
-    expected = np.cumsum(matrix, axis=0)
+    expected = np.cumulative_sum(matrix, axis=0)
 
     # Validate and print results
     validate_and_print_results(result, expected, "Row Accumulation")
@@ -50,11 +50,11 @@ def run_column_accumulation_example(cc, keys, ctm_x, matrix):
         raise ValueError("Invalid order.")
 
     # Perform homomorphic column accumulation
-    ctm_result = onp.cumsum(ctm_x, axis=1)
+    ctm_result = onp.cumulative_sum(ctm_x, axis=1)
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
-    expected = np.cumsum(matrix, axis=1)
+    expected = np.cumulative_sum(matrix, axis=1)
 
     # Validate and print results
     validate_and_print_results(result, expected, "Column Accumulation")
