@@ -1,0 +1,83 @@
+OpenFHE-Numpy Documentation
+============================
+
+Welcome to OpenFHE-Numpy! This library provides NumPy-compatible matrix operations
+that can be performed on encrypted data using homomorphic encryption.
+
+OpenFHE-Numpy allows you to perform mathematical operations on encrypted data without
+decrypting it, maintaining privacy while enabling computation on sensitive information.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   installation
+   quickstart
+   api/modules
+
+Features
+========
+
+* **NumPy Compatibility**: Familiar NumPy-like API for encrypted computations
+* **Homomorphic Encryption**: Perform operations on encrypted data
+* **Matrix Operations**: Support for matrix arithmetic, linear algebra, and reductions
+* **Type Safety**: Full type hints and comprehensive documentation
+
+Quick Example
+=============
+
+.. code-block:: python
+
+   import numpy as np
+   import openfhe_numpy as onp
+
+   # Create encrypted matrices
+   a = onp.array([[1, 2], [3, 4]], encrypted=True)
+   b = onp.array([[5, 6], [7, 8]], encrypted=True)
+
+   # Perform encrypted operations
+   c = onp.add(a, b)       # Element-wise addition
+   d = onp.matmul(a, b)    # Matrix multiplication
+   e = onp.sum(a, axis=0)  # Sum along axis
+
+API Reference
+=============
+
+.. autosummary::
+   :toctree: api/
+   :recursive:
+
+   openfhe_numpy
+
+Core Operations
+===============
+
+.. autosummary::
+   :toctree: api/
+
+   openfhe_numpy.operations.matrix_api.add
+   openfhe_numpy.operations.matrix_api.subtract
+   openfhe_numpy.operations.matrix_api.multiply
+   openfhe_numpy.operations.matrix_api.matmul
+   openfhe_numpy.operations.matrix_api.dot
+   openfhe_numpy.operations.matrix_api.sum
+   openfhe_numpy.operations.matrix_api.mean
+   openfhe_numpy.operations.matrix_api.cumulative_sum
+   openfhe_numpy.operations.matrix_api.transpose
+   openfhe_numpy.operations.matrix_api.roll
+
+Tensor Classes
+==============
+
+.. autosummary::
+   :toctree: api/
+
+   openfhe_numpy.tensor.tensor.Tensor
+   openfhe_numpy.tensor.ctarray.CTArray
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
