@@ -548,7 +548,7 @@ def _ct_sum_matrix(
     return CTArray(ct_sum, shape, x.batch_size, padded_shape, order)
 
 
-def _ct_sum_vector(x: ArrayLike, axis: Optional[int] = None):
+def _ct_sum_vector(x: ArrayLike, axis: Optional[int] = None,):
     crypto_context = x.data.GetCryptoContext()
     nrows = x.shape[0]
     if axis is not None:
@@ -558,6 +558,7 @@ def _ct_sum_vector(x: ArrayLike, axis: Optional[int] = None):
     for i in range(nrows):
         rotated = crypto_context.EvalRotate(rotated, 1)
         ct_sum = crypto_context.EvalAdd(ct_sum, rotated)
+
     shape, padded_shape = (), ()
     return CTArray(ct_sum, shape, x.batch_size, padded_shape)
 
@@ -569,7 +570,7 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     if x.ndim == 2:
         return _ct_sum_matrix(x, axis, keepdims)
     elif x.ndim == 1:
-        return _ct_sum_vector(x, axis, keepdims)
+        return _ct_sum_vector(x, axis)
     else:
         ONP_ERROR(f"The dimension is invalid = {x.ndims}")
 
