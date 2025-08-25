@@ -49,7 +49,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         Returns
         -------
         np.ndarray
-            The decrypted data, formatted per `unpack_type`.
+            The decrypted data, formatted by 'unpack_type'.
         """
         if secret_key is None:
             ONP_ERROR("Secret key is missing.")
@@ -177,7 +177,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             A new tensor with cumulative sums along the specified axis.
         """
 
-        if self.ndim != 1 or self.ndim != 2:
+        if self.ndim != 1 and self.ndim != 2:
             ONP_ERROR(f"Dimension of array {self.ndim} is illegal ")
 
         if self.ndim != 1 and axis is None:
@@ -232,3 +232,16 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         return CTArray(
             ciphertext, original_shape, self.batch_size, shape, order
         )
+
+    def gen_sum_row_key(self, secret_key: openfhe.PrivateKey):
+        context = secret_key.GetCryptoContext()
+        if self.order == ArrayEncodingType.ROW_MAJOR:
+            sum_rows_key = context.EvalSumRowsKeyGen(
+                secret_key, self.ncols, self.batch_size
+            )
+        elif self.order == ArrayEncodingType.COL_MAJOR:
+            sum_rows_key = context.EvalSumColsKeyGen(secret_key)
+        else:
+            raise ValueError("Invalid order.")
+
+        return sum_rows_key

@@ -1,12 +1,11 @@
-import time
 import numpy as np
 from openfhe import *
-
 import openfhe_numpy as onp
 
 
 def validate_and_print_results(computed, expected, operation_name):
-    """Helper function to validate and print results."""
+    ### Helper function to validate and print results ###
+
     print("\n" + "*" * 60)
     print(f"* {operation_name} ")
     print("*" * 60)
@@ -22,7 +21,8 @@ def validate_and_print_results(computed, expected, operation_name):
 
 
 def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
-    """Run homomorphic total sum example."""
+    ### Run homomorphic total sum example ###
+
     # Generate rotation keys for total sum operations
     onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
 
@@ -37,7 +37,8 @@ def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
 
 
 def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
-    """Run homomorphic row sum example."""
+    ### Run homomorphic row sum example ###
+
     # Generate rotation keys for row sum operations
     if ctm_x.order == onp.ROW_MAJOR:
         ctm_x.extra["rowkey"] = onp.sum_row_keys(
@@ -48,6 +49,7 @@ def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
 
     else:
         raise ValueError("Invalid order.")
+
     # Perform homomorphic row sum
     ctm_result = onp.sum(ctm_x, axis=0)
 
@@ -59,8 +61,9 @@ def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
 
 
 def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
-    """Run homomorphic column sum example."""
-    # Generate rotation keys for column sum operations
+    ### Run homomorphic column sum example ###
+
+    # Generate rotation keys for column sum operations.
     if ctm_x.order == onp.ROW_MAJOR:
         ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
     elif ctm_x.order == onp.COL_MAJOR:
@@ -81,9 +84,7 @@ def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
 
 
 def main():
-    """
-    Run a demonstration of homomorphic matrix sum using OpenFHE-NumPy.
-    """
+    ### Run a demonstration of homomorphic matrix sum using OpenFHE-NumPy ###
 
     # Setup CKKS parameters
     params = CCParamsCKKSRNS()
@@ -109,14 +110,12 @@ def main():
     print(f"  - Used slots: {batch_size}")
     print(f"  - Ring dimension: {crypto_context.GetRingDimension()}")
 
-    # Sample input matrix - using a simple 2x2 matrix for demonstration
-    matrix = np.array(
-        [
-            [2.0, -3.0],
-            [0.5, 0.25],
-            [-1.125, 1.875],
-        ]
-    )
+    # Sample input matrix - using a simple matrix for demonstration
+    matrix = [
+        [2.0, -3.0],
+        [0.5, 0.25],
+        [-1.125, 1.875],
+    ]
 
     print(f"\nInput Matrix:\n{matrix}")
 

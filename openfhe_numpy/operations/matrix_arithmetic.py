@@ -224,7 +224,7 @@ def _eval_matvec_ct(lhs, rhs):
             cc = lhs.data.GetCryptoContext()
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
             ct_prod = cc.EvalSumRows(
-                ct_mult, lhs.ncols, lhs.extra["rowkey"], lhs.batch_size
+                ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size * 4
             )
             return CTArray(
                 ct_prod,
@@ -448,7 +448,7 @@ def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
 
 # NOTE: Sum Operations
 # Here is a running example illustrating the behavior of onp.sum when summing over axes 0 and 1
-# Orginal matrix: [11 // 21 // 31 // 26]
+# Original matrix: [11 // 21 // 31 // 26]
 # Expected result:
 #                   - axis = 0: 8 9
 #                   - axis = 1: 2 // 3 // 4 // 8
@@ -463,10 +463,10 @@ def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
 #     89 89 89 89
 # 2. Sum over columns: axis = 1.
 #    using EvalSumCols(rows = 4, cols = 2)
-#     1121 3126
-#     1213 1261
-#     2334 4387
-#     2233 4488
+#     11 21 31 26
+#     12 13 12 61
+#     23 34 43 87
+#     22 33 44 88
 # B. Column-Major: 1232 1116
 # 1. Sum over rows: axis = 0.
 #    using EvalSumCol(rows = 2, cols = 4)
@@ -509,7 +509,7 @@ def _ct_sum_matrix(
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
             ct_sum = cc.EvalSumRows(
-                fhe_data, ncols, x.extra["rowkey"], x.batch_size
+                fhe_data, ncols, x.extra["rowkey"], x.batch_size * 4
             )
             padded_shape = (nrows, ncols)
             order = ArrayEncodingType.COL_MAJOR
@@ -520,8 +520,10 @@ def _ct_sum_matrix(
             ONPNotSupportedError(f"Not support the current encoding [{order}] ")
 
         if keepdims:
+            # shape, padded_shape = (cols, 1), (ncols, nrows)
             shape, padded_shape = (cols, 1), (ncols, nrows)
         else:
+            # shape, padded_shape = (cols,), (ncols, nrows)
             shape, padded_shape = (cols,), (ncols, nrows)
 
     elif axis == 1:
@@ -531,16 +533,16 @@ def _ct_sum_matrix(
             order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
             ct_sum = cc.EvalSumRows(
-                fhe_data, nrows, x.extra["rowkey"], x.batch_size
+                fhe_data, nrows, x.extra["rowkey"], x.batch_size * 4
             )
             order = ArrayEncodingType.COL_MAJOR
         else:
             ONPNotSupportedError(f"Not support the current encoding [{order}]")
 
         if keepdims:
-            shape, padded_shape = (rows, 1), (ncols, nrows)
+            shape, padded_shape = (rows, 1), (nrows, ncols)
         else:
-            shape, padded_shape = (rows,), (ncols, nrows)
+            shape, padded_shape = (rows,), (nrows, ncols)
 
     else:
         ONPValueError(f"Invalid axis [{axis}]")
@@ -548,7 +550,10 @@ def _ct_sum_matrix(
     return CTArray(ct_sum, shape, x.batch_size, padded_shape, order)
 
 
-def _ct_sum_vector(x: ArrayLike, axis: Optional[int] = None):
+def _ct_sum_vector(
+    x: ArrayLike,
+    axis: Optional[int] = None,
+):
     crypto_context = x.data.GetCryptoContext()
     nrows = x.shape[0]
     if axis is not None:
@@ -558,6 +563,7 @@ def _ct_sum_vector(x: ArrayLike, axis: Optional[int] = None):
     for i in range(nrows):
         rotated = crypto_context.EvalRotate(rotated, 1)
         ct_sum = crypto_context.EvalAdd(ct_sum, rotated)
+
     shape, padded_shape = (), ()
     return CTArray(ct_sum, shape, x.batch_size, padded_shape)
 
@@ -569,7 +575,7 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     if x.ndim == 2:
         return _ct_sum_matrix(x, axis, keepdims)
     elif x.ndim == 1:
-        return _ct_sum_vector(x, axis, keepdims)
+        return _ct_sum_vector(x, axis)
     else:
         ONP_ERROR(f"The dimension is invalid = {x.ndims}")
 

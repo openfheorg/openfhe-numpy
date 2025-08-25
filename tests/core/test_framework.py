@@ -2,7 +2,7 @@
 OpenFHE-NumPy Test Framework
 """
 
-import os, sys, logging, contextlib, pprint
+import sys, logging, pprint
 from pathlib import Path
 from typing import Any, Dict, Callable
 from datetime import datetime
@@ -12,8 +12,8 @@ import unittest
 import openfhe_numpy as onp
 
 # local
-from tests.core.test_utils import suppress_stdout
-from tests.core.test_crypto_context import get_cached_crypto_context
+from .test_utils import suppress_stdout
+# from .test_crypto_context import get_cached_crypto_context
 
 # ===============================
 # Paths and Directories

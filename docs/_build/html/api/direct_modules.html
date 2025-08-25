@@ -1,0 +1,466 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Reference (Direct Modules) &mdash; OpenFHE-Numpy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="API Reference" href="modules.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            OpenFHE-Numpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#main-package">Main Package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#operations">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#tensor-classes">Tensor Classes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html#utilities">Utilities</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API Reference (Direct Modules)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#matrix-api-operations">Matrix API Operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#matrix-arithmetic-backend">Matrix Arithmetic Backend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#utility-functions">Utility Functions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-openfhe_numpy.utils.errors">Error Classes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.get_config"><code class="docutils literal notranslate"><span class="pre">get_config()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.get_logger"><code class="docutils literal notranslate"><span class="pre">get_logger()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPError"><code class="docutils literal notranslate"><span class="pre">ONPError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPTypeError"><code class="docutils literal notranslate"><span class="pre">ONPTypeError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPDimensionError"><code class="docutils literal notranslate"><span class="pre">ONPDimensionError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPValueError"><code class="docutils literal notranslate"><span class="pre">ONPValueError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPIncompatibleShape"><code class="docutils literal notranslate"><span class="pre">ONPIncompatibleShape</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPNotImplementedError"><code class="docutils literal notranslate"><span class="pre">ONPNotImplementedError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONPNotSupportedError"><code class="docutils literal notranslate"><span class="pre">ONPNotSupportedError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONP_INFO"><code class="docutils literal notranslate"><span class="pre">ONP_INFO()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONP_ERROR"><code class="docutils literal notranslate"><span class="pre">ONP_ERROR()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONP_DEBUG"><code class="docutils literal notranslate"><span class="pre">ONP_DEBUG()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.ONP_WARNING"><code class="docutils literal notranslate"><span class="pre">ONP_WARNING()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.errors.capture_logs"><code class="docutils literal notranslate"><span class="pre">capture_logs()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-openfhe_numpy.utils.typecheck">Type Checking</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.typecheck.is_numeric_scalar"><code class="docutils literal notranslate"><span class="pre">is_numeric_scalar()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#openfhe_numpy.utils.typecheck.is_numeric_arraylike"><code class="docutils literal notranslate"><span class="pre">is_numeric_arraylike()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#individual-module-code">Individual Module Code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#matrix-api-source">Matrix API Source</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">OpenFHE-Numpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API Reference (Direct Modules)</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/openfheorg/openfhe-numpy/blob/main/docs/api/direct_modules.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api-reference-direct-modules">
+<h1>API Reference (Direct Modules)<a class="headerlink" href="#api-reference-direct-modules" title="Link to this heading"></a></h1>
+<p>This section provides direct access to individual modules without going through
+the main package import, which avoids issues with the compiled C++ extension.</p>
+<section id="matrix-api-operations">
+<h2>Matrix API Operations<a class="headerlink" href="#matrix-api-operations" title="Link to this heading"></a></h2>
+</section>
+<section id="matrix-arithmetic-backend">
+<h2>Matrix Arithmetic Backend<a class="headerlink" href="#matrix-arithmetic-backend" title="Link to this heading"></a></h2>
+</section>
+<section id="utility-functions">
+<h2>Utility Functions<a class="headerlink" href="#utility-functions" title="Link to this heading"></a></h2>
+<section id="module-openfhe_numpy.utils.errors">
+<span id="error-classes"></span><h3>Error Classes<a class="headerlink" href="#module-openfhe_numpy.utils.errors" title="Link to this heading"></a></h3>
+<p>Logging and error handling for OpenFHE-NumPy.</p>
+<p>This module provides:
+1. A configured logger with consistent log formatting
+2. Custom exceptions with stack trace information
+3. Convenience functions for logging at different levels
+4. Configuration management via environment variables</p>
+<dl>
+<dt>Environment Variables:</dt><dd><p>OPENFHE_DEBUG: Enable debug logging (“ON”, “1”, “TRUE”)
+OPENFHE_LOG_FORMAT: Custom log format string
+OPENFHE_LOG_FILE: Path to log file (optional)
+OPENFHE_LOG_MAX_SIZE: Maximum log file size in bytes
+OPENFHE_LOG_BACKUP_COUNT: Number of backup log files</p>
+</dd>
+<dt>Usage:</dt><dd><p>from openfhe_numpy.utils.errors import ONP_DEBUG, ONP_ERROR, ONP_WARNING</p>
+<p>ONP_DEBUG(“Processing data…”)
+ONP_WARNING(“Unusual input detected”)
+if problem:</p>
+<blockquote>
+<div><p>ONP_ERROR(“Invalid input data”)</p>
+</div></blockquote>
+</dd>
+</dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.get_config">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">get_config</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#get_config"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.get_config" title="Link to this definition"></a></dt>
+<dd><p>Get logging configuration from environment variables with defaults.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Dict" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.13)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.get_logger">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">get_logger</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#get_logger"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.get_logger" title="Link to this definition"></a></dt>
+<dd><p>Thread-safe singleton logger with console + optional rotating file output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/logging.html#logging.Logger" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Logger</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPError">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#Exception" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></a></p>
+<p>Base class for OpenFHE-NumPy errors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPError.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPError.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPError.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPTypeError">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPTypeError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPTypeError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPTypeError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modules.html#openfhe_numpy.utils.errors.ONPError" title="openfhe_numpy.utils.errors.ONPError"><code class="xref py py-class docutils literal notranslate"><span class="pre">ONPError</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#TypeError" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypeError</span></code></a></p>
+<p>Raised when incorrect types are provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPDimensionError">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPDimensionError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPDimensionError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPDimensionError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modules.html#openfhe_numpy.utils.errors.ONPError" title="openfhe_numpy.utils.errors.ONPError"><code class="xref py py-class docutils literal notranslate"><span class="pre">ONPError</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code></a></p>
+<p>Raised when an invalid axis is provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPValueError">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPValueError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Invalid</span> <span class="pre">value</span> <span class="pre">encountered.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPValueError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPValueError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modules.html#openfhe_numpy.utils.errors.ONPError" title="openfhe_numpy.utils.errors.ONPError"><code class="xref py py-class docutils literal notranslate"><span class="pre">ONPError</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code></a></p>
+<p>Raised when an invalid value is encountered.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPValueError.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'Invalid</span> <span class="pre">value</span> <span class="pre">encountered.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPValueError.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPValueError.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPIncompatibleShape">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPIncompatibleShape</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape_a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape_b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPIncompatibleShape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPIncompatibleShape" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modules.html#openfhe_numpy.utils.errors.ONPValueError" title="openfhe_numpy.utils.errors.ONPValueError"><code class="xref py py-class docutils literal notranslate"><span class="pre">ONPValueError</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code></a></p>
+<p>Raised when tensor shapes are incompatible.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPIncompatibleShape.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape_a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shape_b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPIncompatibleShape.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPIncompatibleShape.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPNotImplementedError">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPNotImplementedError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'This</span> <span class="pre">feature</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">implemented.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPNotImplementedError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPNotImplementedError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modules.html#openfhe_numpy.utils.errors.ONPError" title="openfhe_numpy.utils.errors.ONPError"><code class="xref py py-class docutils literal notranslate"><span class="pre">ONPError</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#NotImplementedError" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">NotImplementedError</span></code></a></p>
+<p>Raised when a feature is not implemented.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPNotImplementedError.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'This</span> <span class="pre">feature</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">implemented.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPNotImplementedError.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPNotImplementedError.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPNotSupportedError">
+<em class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONPNotSupportedError</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'This</span> <span class="pre">feature</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">supported.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPNotSupportedError"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPNotSupportedError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="modules.html#openfhe_numpy.utils.errors.ONPError" title="openfhe_numpy.utils.errors.ONPError"><code class="xref py py-class docutils literal notranslate"><span class="pre">ONPError</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#NotImplementedError" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">NotImplementedError</span></code></a></p>
+<p>Raised when a feature is not supported.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONPNotSupportedError.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'This</span> <span class="pre">feature</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">supported.'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONPNotSupportedError.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONPNotSupportedError.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONP_INFO">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONP_INFO</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONP_INFO"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONP_INFO" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONP_ERROR">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONP_ERROR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raise_exception</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONP_ERROR"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONP_ERROR" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p></li>
+<li><p><strong>raise_exception</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONP_DEBUG">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONP_DEBUG</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONP_DEBUG"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONP_DEBUG" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.ONP_WARNING">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">ONP_WARNING</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#ONP_WARNING"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.ONP_WARNING" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.13)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>message</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.13)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.errors.capture_logs">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.errors.</span></span><span class="sig-name descname"><span class="pre">capture_logs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">logging.DEBUG</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/errors.html#capture_logs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.errors.capture_logs" title="Link to this definition"></a></dt>
+<dd><p>Capture logs for testing.</p>
+<p>Returns a handler that collects logs for inspection in tests.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>level</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <em>optional</em>) – Logging level to capture (default: logging.DEBUG)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A handler with a ‘messages’ attribute containing captured log messages</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/logging.html#logging.Handler" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">logging.Handler</span></code></a></p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>handler = capture_logs()
+ONP_DEBUG(“Test message”)
+assert “Test message” in handler.messages</p>
+</dd></dl>
+
+</section>
+<section id="module-openfhe_numpy.utils.typecheck">
+<span id="type-checking"></span><h3>Type Checking<a class="headerlink" href="#module-openfhe_numpy.utils.typecheck" title="Link to this heading"></a></h3>
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.typecheck.is_numeric_scalar">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.typecheck.</span></span><span class="sig-name descname"><span class="pre">is_numeric_scalar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/typecheck.html#is_numeric_scalar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.typecheck.is_numeric_scalar" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="openfhe_numpy.utils.typecheck.is_numeric_arraylike">
+<span class="sig-prename descclassname"><span class="pre">openfhe_numpy.utils.typecheck.</span></span><span class="sig-name descname"><span class="pre">is_numeric_arraylike</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/openfhe_numpy/utils/typecheck.html#is_numeric_arraylike"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#openfhe_numpy.utils.typecheck.is_numeric_arraylike" title="Link to this definition"></a></dt>
+<dd><p>Check if x can be converted to a numeric array.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Any</span></code>) – The value to check</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if x can be converted to a numeric array, False otherwise</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.13)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+<section id="individual-module-code">
+<h2>Individual Module Code<a class="headerlink" href="#individual-module-code" title="Link to this heading"></a></h2>
+<p>For direct inspection, here are some key modules:</p>
+<section id="matrix-api-source">
+<h3>Matrix API Source<a class="headerlink" href="#matrix-api-source" title="Link to this heading"></a></h3>
+<p>The matrix_api.py module provides the main NumPy-compatible interface.
+Key functions include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">add(a,</span> <span class="pre">b)</span></code> - Element-wise addition</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">multiply(a,</span> <span class="pre">b)</span></code> - Element-wise multiplication</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">matmul(a,</span> <span class="pre">b)</span></code> - Matrix multiplication</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sum(a,</span> <span class="pre">axis=None,</span> <span class="pre">keepdims=False)</span></code> - Sum reduction</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mean(a,</span> <span class="pre">axis=None,</span> <span class="pre">keepdims=False)</span></code> - Mean calculation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cumulative_sum(a,</span> <span class="pre">axis=None)</span></code> - Cumulative sum</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">transpose(a,</span> <span class="pre">axes=None)</span></code> - Transpose operation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">roll(a,</span> <span class="pre">shift,</span> <span class="pre">axis=None)</span></code> - Roll/shift elements</p></li>
+</ul>
+<p>For detailed function signatures and docstrings, see the source files in
+<code class="docutils literal notranslate"><span class="pre">openfhe_numpy/operations/</span></code> directory.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modules.html" class="btn btn-neutral float-left" title="API Reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, OpenFHE Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
