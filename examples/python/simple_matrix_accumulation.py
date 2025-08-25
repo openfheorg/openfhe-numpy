@@ -32,7 +32,8 @@ def run_row_accumulation_example(cc, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
-    expected = np.cumulative_sum(matrix, axis=0)
+    # expected = np.cumulative_sum(matrix, axis=0)
+    expected = np.cumsum(matrix, axis=0)
 
     # Validate and print results
     validate_and_print_results(result, expected, "Row Accumulation")
@@ -54,7 +55,8 @@ def run_column_accumulation_example(cc, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
-    expected = np.cumulative_sum(matrix, axis=1)
+    # expected = np.cumulative_sum(matrix, axis=1)
+    expected = np.cumsum(matrix, axis=1)
 
     # Validate and print results
     validate_and_print_results(result, expected, "Column Accumulation")
@@ -102,13 +104,15 @@ def main():
     #     [8.08, 8.0, 4.55, 5.625, 8.125, 2.0, 6.618, 0.33231],
     # ]
 
-    matrix = [
-        [1, 3, 1, 1],
-        [2, 2, 2, 2],
-        [3, 3, 3, 3],
-        [3, 3, 3, 3],
-        [3, 3, 3, 3],
-    ]
+    # matrix = [
+    #     [1, 3, 1, 1],
+    #     [2, 2, 2, 2],
+    #     [3, 3, 3, 3],
+    #     [3, 3, 3, 3],
+    #     [3, 3, 3, 3],
+    # ]
+
+    matrix = [[1.26475507, 2.15868416], [1.16980177, 9.97609032]]
 
     print(f"\nInput Matrix\n{np.array(matrix)}")
 
@@ -124,8 +128,8 @@ def main():
         cc=cc,
         data=matrix,
         batch_size=batch_size,
-        # order=onp.ROW_MAJOR,
-        order=onp.COL_MAJOR,
+        order=onp.ROW_MAJOR,
+        # order=onp.COL_MAJOR,
         fhe_type="C",
         mode="zero",
         public_key=keys.publicKey,

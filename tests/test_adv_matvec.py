@@ -1,9 +1,9 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from tests.core.test_framework import MainUnittest
-from tests.core.test_utils import generate_random_array, suppress_stdout
-from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
+from core.test_framework import MainUnittest
+from core.test_utils import generate_random_array, suppress_stdout
+from core.test_crypto_context import load_ckks_params, gen_crypto_context
 
 
 def fhe_matrix_vector_product_case1(params, data):
@@ -13,12 +13,12 @@ def fhe_matrix_vector_product_case1(params, data):
     - Vector: column-major
     - Result: row-major
     """
-    params_copy = params.copy()
-    total_slots = params_copy["ringDim"] // 2
+
+    total_slots = params["ringDim"] // 2
 
     with suppress_stdout(False):
         # Generate crypto context
-        cc, keys = gen_crypto_context(params_copy)
+        cc, keys = gen_crypto_context(params)
 
         # Extract input data
         matrix = np.array(data[0])
@@ -31,7 +31,7 @@ def fhe_matrix_vector_product_case1(params, data):
             batch_size=total_slots,
             order=onp.ROW_MAJOR,
             fhe_type="C",
-            mode="zero",
+            mode="tile",
             public_key=keys.publicKey,
         )
 
@@ -45,7 +45,7 @@ def fhe_matrix_vector_product_case1(params, data):
             batch_size=total_slots,
             order=onp.COL_MAJOR,
             fhe_type="C",
-            mode="zero",
+            mode="tile",
             public_key=keys.publicKey,
         )
 
