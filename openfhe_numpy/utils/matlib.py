@@ -140,7 +140,7 @@ def _rotate_vector(vec, k):
     vec : list or ndarray
         The input vector to rotate.
     k : int
-        Number of positions to rotate the vector.
+        Number of positions to rotate the vector: left rotation if k > 0, right rotation if k < 0.
 
     Returns
     -------
@@ -148,5 +148,9 @@ def _rotate_vector(vec, k):
         Rotated vector.
     """
     n = len(vec)
-    new_vec = vec[:]
-    return [new_vec[(i + k) % n] for i in range(n)]
+    # avoid division by zero if vec is empty
+    if n == 0:
+        return []
+
+    k %= n
+    return vec[k:] + vec[:k]
