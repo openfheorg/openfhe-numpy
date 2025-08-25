@@ -83,6 +83,7 @@ def demo():
         data=matrix,
         batch_size=batch_size,
         order=onp.ROW_MAJOR,
+        mode="tile",
         fhe_type="C",
         public_key=keys.publicKey,
     )
@@ -92,6 +93,7 @@ def demo():
         data=vector,
         batch_size=batch_size,
         order=onp.COL_MAJOR,
+        mode="tile",
         fhe_type="C",
         public_key=keys.publicKey,
     )
@@ -100,6 +102,7 @@ def demo():
     result_rm = ctv_result_rm.decrypt(keys.secretKey, unpack_type="original")
     is_match_rm, error_rm = onp.check_equality(result_rm, expected)
 
+    print("\n--------------------------------\n")
     print("Case 1:")
     print("  - Matrix Packing Style: row-major")
     print("  - Vector Packing Style: col-major")
@@ -141,6 +144,7 @@ def demo():
     result_cm = ctv_result_cm.decrypt(keys.secretKey, unpack_type="original")
     is_match_cm, error_cm = onp.check_equality(result_cm, expected)
 
+    print("\n--------------------------------\n")
     print("Case 2:")
     print("  - Matrix Packing Style: col-major")
     print("  - Vector Packing Style: row-major")

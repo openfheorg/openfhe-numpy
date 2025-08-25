@@ -51,7 +51,7 @@ def sum_row_keys(
         Generated sum keys
     """
     context = secret_key.GetCryptoContext()
-    return context.EvalSumRowsKeyGen(secret_key, None, ncols, slots)
+    return context.EvalSumRowsKeyGen(secret_key, None, ncols, slots * 4)
 
 
 def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):

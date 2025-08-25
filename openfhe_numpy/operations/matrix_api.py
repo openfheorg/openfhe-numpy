@@ -296,6 +296,19 @@ def cumulative_reduce(
     pass
 
 
+@tensor_function_api("gen_sum_key", binary=False)
+def gen_sum_keys(x, axis: int):
+    if x.ndims == 1:
+        return x.gen_sum_key()
+    else:
+        if axis == 0:
+            return x.gen_sum_rows_key()
+        elif axis == 1:
+            return x.gen_sum_cols_key()
+        else:
+            return x.gen_sum_key()
+
+
 @tensor_function_api("sum", binary=False)
 def sum(
     a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False
