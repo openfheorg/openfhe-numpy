@@ -3,9 +3,9 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from tests.core.test_framework import MainUnittest
-from tests.core.test_utils import generate_random_array
-from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
+from core.test_framework import MainUnittest
+from core.test_utils import generate_random_array
+from core.test_crypto_context import load_ckks_params, gen_crypto_context
 
 
 def fhe_vector_op(params, data, op_name):

@@ -1,9 +1,9 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from tests.core.test_framework import MainUnittest
-from tests.core.test_utils import generate_random_array, suppress_stdout
-from tests.core.test_crypto_context import load_ckks_params, gen_crypto_context
+from core.test_framework import MainUnittest
+from core.test_utils import generate_random_array, suppress_stdout
+from core.test_crypto_context import load_ckks_params, gen_crypto_context
 
 
 def fhe_matrix_cumulative_sum(params, data, axis=0, order=onp.ROW_MAJOR):
@@ -65,9 +65,10 @@ class TestMatrixcumulative_sum(MainUnittest):
     @classmethod
     def _generate_test_cases(cls):
         """Generate test cases for matrix cumulative sum operations."""
+        # use Numpy API < 2.0 for testing purpose. Update in the next release
         operations = [
-            ("rows", 0, lambda A: np.cumulative_sum(A, axis=0)),  # Row-wise
-            ("cols", 1, lambda A: np.cumulative_sum(A, axis=1)),  # Column-wise
+            ("rows", 0, lambda A: np.cumsum(A, axis=0)),  # Row-wise
+            ("cols", 1, lambda A: np.cumsum(A, axis=1)),  # Column-wise
         ]
 
         # Add ordering options
