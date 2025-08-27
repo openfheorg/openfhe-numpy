@@ -499,13 +499,7 @@ def _ct_sum_matrix(
 
     if axis is None:
         # Sum all elements in a packed-encoded matrix ciphertext: fhe_data
-        # rotated = fhe_data
-        # ct_sum = fhe_data
         ct_sum = cc.EvalSum(fhe_data, nrows * ncols - 1)
-        # for i in range(nrows * ncols - 1):
-        #     rotated = cc.EvalRotate(rotated, 1)
-        #     ct_sum = cc.EvalAdd(ct_sum, rotated)
-
         if keepdims:
             shape, padded_shape = (1,1), x.shape
         else:
