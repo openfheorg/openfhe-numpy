@@ -561,7 +561,6 @@ def _ct_sum_vector(
     crypto_context = x.data.GetCryptoContext()
     if axis is not None:
         ONP_ERROR(f"The dimension is invalid axis = {axis}")
-    print("lenght of vector: ", x.shape)
     ct_sum = crypto_context.EvalSum(x.data, x.shape[0])
     return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
 
