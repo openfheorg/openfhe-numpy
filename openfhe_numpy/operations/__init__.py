@@ -21,6 +21,7 @@ from .matrix_api import (
 from .crypto_helper import (
     sum_row_keys,
     sum_col_keys,
+    gen_sum_key,
     gen_rotation_keys,
     gen_lintrans_keys,
     gen_transpose_keys,
@@ -47,6 +48,7 @@ __all__ = [
     # Key generation utilities
     "sum_row_keys",
     "sum_col_keys",
+    "gen_sum_key",
     "gen_rotation_keys",
     "gen_lintrans_keys",
     "gen_transpose_keys",

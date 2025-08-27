@@ -24,7 +24,8 @@ def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
     ### Run homomorphic total sum example ###
 
     # Generate rotation keys for total sum operations
-    onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+    # onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+    onp.gen_sum_key(keys.secretKey)
 
     # Perform homomorphic total sum
     ctm_result = onp.sum(ctm_x)

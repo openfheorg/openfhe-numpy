@@ -51,8 +51,9 @@ def _eval_add(lhs, rhs):
 
     if isinstance(rhs, (int, float)):
         rhs = crypto_context.MakeCKKSPackedPlaintext([rhs] * lhs.batch_size)
-
-    result = crypto_context.EvalAdd(lhs.data, rhs)
+        result = crypto_context.EvalAdd(lhs.data, rhs)
+    else:
+        result = crypto_context.EvalAdd(lhs.data, rhs.data)
     return CTArray(
         result, lhs.original_shape, lhs.batch_size, lhs.shape, lhs.order
     )
@@ -63,9 +64,13 @@ def _eval_add(lhs, rhs):
 )
 def add_ct(a, b):
     """Add two tensors."""
-    if a.shape != b.shape:
-        raise ONPIncompatibleShape(a.shape, b.shape)
-    return _eval_add(a, b.data)
+    if a.shape == ():
+        return _eval_add(b, a)
+    elif b.shape == ():
+        return _eval_add(a, b)
+    elif a.shape == b.shape:
+        return _eval_add(a, b)
+    raise ONPIncompatibleShape(a.shape, b.shape)
 
 
 @register_tensor_function("add", ("CTArray", "scalar"))
@@ -494,14 +499,9 @@ def _ct_sum_matrix(
 
     if axis is None:
         # Sum all elements in a packed-encoded matrix ciphertext: fhe_data
-        rotated = fhe_data
-        ct_sum = fhe_data
-        for i in range(nrows * ncols - 1):
-            rotated = cc.EvalRotate(rotated, 1)
-            ct_sum = cc.EvalAdd(ct_sum, rotated)
-
+        ct_sum = cc.EvalSum(fhe_data, nrows * ncols - 1)
         if keepdims:
-            shape, padded_shape = (1, 1), ()
+            shape, padded_shape = (1, 1), x.shape
         else:
             shape, padded_shape = (), ()
 
@@ -520,10 +520,8 @@ def _ct_sum_matrix(
             ONPNotSupportedError(f"Not support the current encoding [{order}] ")
 
         if keepdims:
-            # shape, padded_shape = (cols, 1), (ncols, nrows)
             shape, padded_shape = (cols, 1), (ncols, nrows)
         else:
-            # shape, padded_shape = (cols,), (ncols, nrows)
             shape, padded_shape = (cols,), (ncols, nrows)
 
     elif axis == 1:
@@ -555,17 +553,10 @@ def _ct_sum_vector(
     axis: Optional[int] = None,
 ):
     crypto_context = x.data.GetCryptoContext()
-    nrows = x.shape[0]
     if axis is not None:
         ONP_ERROR(f"The dimension is invalid axis = {axis}")
-    rotated = x.data
-    ct_sum = x.data
-    for i in range(nrows):
-        rotated = crypto_context.EvalRotate(rotated, 1)
-        ct_sum = crypto_context.EvalAdd(ct_sum, rotated)
-
-    shape, padded_shape = (), ()
-    return CTArray(ct_sum, shape, x.batch_size, padded_shape)
+    ct_sum = crypto_context.EvalSum(x.data, x.shape[0])
+    return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
 
 
 @register_tensor_function(
