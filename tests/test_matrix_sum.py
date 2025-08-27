@@ -42,7 +42,7 @@ def fhe_matrix_sum(params, data, axis=None, order=onp.ROW_MAJOR):
 
         # Generate appropriate keys based on axis
         if axis is None:  # Total sum
-            onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
+            onp.gen_sum_key(keys.secretKey)
 
         elif axis == 0:  # Row sum (sum along rows)
             if ctm_x.order == onp.ROW_MAJOR:
