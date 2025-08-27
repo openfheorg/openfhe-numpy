@@ -501,7 +501,7 @@ def _ct_sum_matrix(
         # Sum all elements in a packed-encoded matrix ciphertext: fhe_data
         ct_sum = cc.EvalSum(fhe_data, nrows * ncols - 1)
         if keepdims:
-            shape, padded_shape = (1,1), x.shape
+            shape, padded_shape = (1, 1), x.shape
         else:
             shape, padded_shape = (), ()
 
