@@ -181,7 +181,7 @@ We provide several examples showcasing the library's functionality:
 - [Matrix Addition](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_addition.py)
 - [Matrix Summation](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_sum.py)
 - [Matrix Transpostion](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_transpose.py)
-- [Matrix-Vector Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matvec_product.py)
+- [Matrix-Vector Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_vector_product.py)
 - [Square Matrix Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_square_matrix_product.py)
 - [Vector Operations](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_vector_operations.py)
 
