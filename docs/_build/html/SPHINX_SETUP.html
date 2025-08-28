@@ -1,0 +1,186 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenFHE-Numpy Sphinx Documentation Setup &mdash; OpenFHE-Numpy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            OpenFHE-Numpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html#main-package">Main Package</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html#operations">Operations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html#tensor-classes">Tensor Classes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html#utilities">Utilities</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/direct_modules.html">API Reference (Direct Modules)</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">OpenFHE-Numpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">OpenFHE-Numpy Sphinx Documentation Setup</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/openfheorg/openfhe-numpy/blob/main/docs/SPHINX_SETUP.md" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="openfhe-numpy-sphinx-documentation-setup">
+<h1>OpenFHE-Numpy Sphinx Documentation Setup<a class="headerlink" href="#openfhe-numpy-sphinx-documentation-setup" title="Link to this heading"></a></h1>
+<p>This document summarizes the Sphinx documentation setup for the OpenFHE-Numpy project.</p>
+<section id="what-was-accomplished">
+<h2>What Was Accomplished<a class="headerlink" href="#what-was-accomplished" title="Link to this heading"></a></h2>
+<section id="sphinx-environment-setup">
+<h3>1. Sphinx Environment Setup<a class="headerlink" href="#sphinx-environment-setup" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Created isolated virtual environment <code class="docutils literal notranslate"><span class="pre">sphinx-env</span></code></p></li>
+<li><p>Installed required packages:</p>
+<ul>
+<li><p>sphinx (8.2.3)</p></li>
+<li><p>sphinx-rtd-theme (3.0.2)</p></li>
+<li><p>sphinx-autodoc-typehints (2.4.4)</p></li>
+<li><p>numpy (for intersphinx linking)</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="documentation-structure-created">
+<h3>2. Documentation Structure Created<a class="headerlink" href="#documentation-structure-created" title="Link to this heading"></a></h3>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>docs/
+├── conf.py                    # Sphinx configuration
+├── index.rst                  # Main documentation page
+├── installation.rst           # Installation instructions
+├── quickstart.rst            # Quick start guide
+├── api/
+│   ├── modules.rst           # API reference (main package)
+│   └── direct_modules.rst    # Direct module documentation
+├── _build/html/              # Generated HTML output
+└── Makefile                  # Build commands
+</pre></div>
+</div>
+</section>
+<section id="configuration-features">
+<h3>3. Configuration Features<a class="headerlink" href="#configuration-features" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Extensions</strong>: autodoc, napoleon, viewcode, intersphinx, sphinx_autodoc_typehints</p></li>
+<li><p><strong>Theme</strong>: Read the Docs theme with proper styling</p></li>
+<li><p><strong>NumPy-style docstrings</strong>: Full support via napoleon extension</p></li>
+<li><p><strong>Cross-references</strong>: Links to NumPy and Python documentation</p></li>
+<li><p><strong>Mock imports</strong>: Handles missing C++ compiled modules gracefully</p></li>
+</ul>
+</section>
+<section id="documentation-content">
+<h3>4. Documentation Content<a class="headerlink" href="#documentation-content" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>Installation guide</strong>: Development setup instructions</p></li>
+<li><p><strong>Quick start</strong>: Basic usage examples with code snippets</p></li>
+<li><p><strong>API reference</strong>: Attempts to document all modules (limited by import issues)</p></li>
+<li><p><strong>Direct modules</strong>: Fallback documentation approach</p></li>
+</ul>
+</section>
+</section>
+<section id="usage-instructions">
+<h2>Usage Instructions<a class="headerlink" href="#usage-instructions" title="Link to this heading"></a></h2>
+<section id="building-documentation">
+<h3>Building Documentation<a class="headerlink" href="#building-documentation" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>docs
+<span class="nb">source</span><span class="w"> </span>../sphinx-env/bin/activate
+make<span class="w"> </span>html
+</pre></div>
+</div>
+</section>
+<section id="viewing-documentation">
+<h3>Viewing Documentation<a class="headerlink" href="#viewing-documentation" title="Link to this heading"></a></h3>
+<p>Open <code class="docutils literal notranslate"><span class="pre">docs/_build/html/index.html</span></code> in a web browser or use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>-d<span class="w"> </span>_build/html
+</pre></div>
+</div>
+</section>
+<section id="rebuilding-after-changes">
+<h3>Rebuilding After Changes<a class="headerlink" href="#rebuilding-after-changes" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>clean<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>html
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, OpenFHE Team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
