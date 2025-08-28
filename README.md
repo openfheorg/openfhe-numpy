@@ -37,15 +37,15 @@ OpenFHE-NumPy is organized as a hybrid C++/Python project with the following str
 
 ```
 openfhe-numpy/
+├── config/              # Configuration files
+├── docs/                # Documentation
+├── examples/            # Python examples
 ├── openfhe_numpy/       # Main Python package
 │   ├── cpp/             # C++ implementation
 │   ├── operations/      # Matrix operations
 │   ├── tensor/          # Tensor implementations
 │   └── utils/           # Utility functions
 ├── tests/               # Test suite
-├── examples/            # Python examples
-├── config/              # Configuration files
-├── docs/                # Documentation
 └── CMakeLists.txt       # Build configuration
 ```
 
@@ -177,13 +177,13 @@ For detailed documentation on the API, please visit our [documentation site](htt
 
 We provide several examples showcasing the library's functionality:
 
-- [Matrix Addition](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_matrix_addition.py)
-- [Matrix Transpose](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_matrix_transpose.py)
-- [Matrix-Vector Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_matvec_product.py)
-- [Square Matrix Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_square_matrix_product.py)
-- [Cumulative Matrix Operations](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_matrix_accumulation.py)
-- [Matrix Sum](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_matrix_sum.py)
-- [Vector Operations](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/simple_vector_operations.py)
+- [Matrix Accumulation](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_accumulation.py)
+- [Matrix Addition](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_addition.py)
+- [Matrix Summation](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_sum.py)
+- [Matrix Transpostion](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_transpose.py)
+- [Matrix-Vector Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matvec_product.py)
+- [Square Matrix Multiplication](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_square_matrix_product.py)
+- [Vector Operations](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_vector_operations.py)
 
 
 ## Contributing
