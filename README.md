@@ -171,7 +171,7 @@ OpenFHE-NumPy currently supports the following operations:
 
 ## Documentation
 
-For detailed documentation on the API, please visit our [documentation site](https://openfheorg.github.io/openfhe-numpy).
+For detailed documentation on the API, please visit our [documentation site](https://openfheorg.github.io/openfhe-python/html/index.html).
 
 ## Examples
 
