@@ -1,3 +1,34 @@
+# ==================================================================================
+#  BSD 2-Clause License
+#
+#  Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
+#
+#  All rights reserved.
+#
+#  Author TPOC: contact@openfhe.org
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+#  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# ==================================================================================
+
 """Logging and error handling for OpenFHE-NumPy.
 
 This module provides:
@@ -45,21 +76,14 @@ DEFAULT_CONFIG = {
 def get_config() -> Dict[str, Any]:
     """Get logging configuration from environment variables with defaults."""
     return {
-        "enable_debug": os.getenv("OPENFHE_DEBUG", "OFF").upper()
-        in ("ON", "1", "TRUE"),
-        "log_format": os.getenv(
-            "OPENFHE_LOG_FORMAT", DEFAULT_CONFIG["log_format"]
-        ),
+        "enable_debug": os.getenv("OPENFHE_DEBUG", "OFF").upper() in ("ON", "1", "TRUE"),
+        "log_format": os.getenv("OPENFHE_LOG_FORMAT", DEFAULT_CONFIG["log_format"]),
         "log_file": os.getenv("OPENFHE_LOG_FILE", DEFAULT_CONFIG["log_file"]),
         "max_file_size": int(
-            os.getenv(
-                "OPENFHE_LOG_MAX_SIZE", str(DEFAULT_CONFIG["max_file_size"])
-            )
+            os.getenv("OPENFHE_LOG_MAX_SIZE", str(DEFAULT_CONFIG["max_file_size"]))
         ),
         "backup_count": int(
-            os.getenv(
-                "OPENFHE_LOG_BACKUP_COUNT", str(DEFAULT_CONFIG["backup_count"])
-            )
+            os.getenv("OPENFHE_LOG_BACKUP_COUNT", str(DEFAULT_CONFIG["backup_count"]))
         ),
     }
 
@@ -100,17 +124,13 @@ def get_logger() -> logging.Logger:
                             file_handler.setFormatter(formatter)
                             _logger.addHandler(file_handler)
                         except Exception as e:
-                            print(
-                                f"Warning: Could not set up file logging: {e}"
-                            )
+                            print(f"Warning: Could not set up file logging: {e}")
 
                     # Console handler
                     stream_handler = logging.StreamHandler()
                     stream_handler.setFormatter(formatter)
                     stream_handler.setLevel(
-                        logging.DEBUG
-                        if _config["enable_debug"]
-                        else logging.INFO
+                        logging.DEBUG if _config["enable_debug"] else logging.INFO
                     )
                     _logger.addHandler(stream_handler)
 
