@@ -1,4 +1,5 @@
 import numpy as np
+from openfhe import *
 import openfhe_numpy as onp
 
 from core.test_framework import MainUnittest
@@ -109,9 +110,7 @@ class TestMatrixMean(MainUnittest):
 
                         # Create a closure to capture the current axis and ordering values
                         def make_func(current_axis, current_order):
-                            return lambda p, d: fhe_matrix_mean(
-                                p, d, current_axis, current_order
-                            )
+                            return lambda p, d: fhe_matrix_mean(p, d, current_axis, current_order)
 
                         # Generate the test case
                         cls.generate_test_case(

@@ -1,4 +1,5 @@
 import numpy as np
+from openfhe import *
 import openfhe_numpy as onp
 
 from core.test_framework import MainUnittest
@@ -144,7 +145,9 @@ class TestMatrixVectorProduct(MainUnittest):
                     expected = np.dot(A, b)
 
                     # Create test name with descriptive format
-                    test_name = f"matvec_{op_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
+                    test_name = (
+                        f"matvec_{op_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
+                    )
 
                     # Generate the test case
                     cls.generate_test_case(
@@ -161,6 +164,4 @@ class TestMatrixVectorProduct(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixVectorProduct.run_test_summary(
-        "Matrix-Vector Product", debug=True
-    )
+    TestMatrixVectorProduct.run_test_summary("Matrix-Vector Product", debug=True)
