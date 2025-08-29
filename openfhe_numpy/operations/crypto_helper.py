@@ -67,12 +67,12 @@ def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0, slots: int = 0)
 
     Parameters
     ----------
-    context : CryptoContext
-        The OpenFHE crypto context
     secret_key : PrivateKey
         The private key to use for key generation
     ncols : int, optional
         Number of cols for the matrix, by default 0
+    slots: int
+        The total plaintext slots
 
     Returns
     -------
@@ -99,6 +99,14 @@ def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
 
 
 def gen_sum_key(secret_key: openfhe.PrivateKey):
+    """
+    Generate keys for summing all slots
+
+    Parameters
+    ----------
+    secret_key : openfhe.PrivateKey
+
+    """
     context = secret_key.GetCryptoContext()
     context.EvalSumKeyGen(secret_key)
 
@@ -131,19 +139,18 @@ def gen_accumulate_cols_key(secret_key: openfhe.PrivateKey, ncols: int):
     backend.EvalSumCumColsKeyGen(secret_key, ncols)
 
 
-def gen_rotation_keys(secret_key: openfhe.PrivateKey, shifts: int):
+def gen_rotation_keys(secret_key: openfhe.PrivateKey, shifts: list):
     """
     Generate rotation keys for the specified indices.
 
     Parameters
     ----------
-    context : CryptoContext
-        The OpenFHE crypto context
     secret_key : PrivateKey
         The private key to use for key generation
     shifts : list
         List of rotation indices to generate keys for
     """
+
     standard_indices = [-x for x in shifts]
     context = secret_key.GetCryptoContext()
     context.EvalRotateKeyGen(secret_key, standard_indices)
@@ -203,11 +210,3 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
         ncols = ctm_matrix.ncols
 
     backend.EvalLinTransKeyGen(secret_key, ncols, backend.LinTransType.TRANSPOSE)
-
-
-def decrypt_ciphertext(secret_key: openfhe.PrivateKey, ciphertext, size):
-    cc = ciphertext.GetCryptoContext()
-    plaintext = cc.Decrypt(ciphertext, secret_key)
-    plaintext.SetLength(size)
-    result = plaintext.GetRealPackedValue()
-    return result

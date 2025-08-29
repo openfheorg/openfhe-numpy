@@ -37,9 +37,7 @@ including support for block-based tensor operations.
 """
 
 # Third‐party imports
-from dataclasses import dataclass
-from typing import Literal, Optional, Union, overload
-
+from typing import Literal, Optional, Union
 import numpy as np
 from openfhe import CryptoContext, PublicKey
 
@@ -59,11 +57,6 @@ from openfhe_numpy.utils.typecheck import (
     is_numeric_scalar,
 )
 
-from openfhe_numpy.operations.dispatch import (
-    tensor_function_api,
-    register_tensor_function,
-)
-
 
 # Tensor imports
 from .ctarray import CTArray
@@ -71,7 +64,7 @@ from .ptarray import PTArray
 from .tensor import FHETensor, PackedArrayInformation
 
 
-def _get_block_dimensions(data, slots) -> tuple[int, int]:
+def _get_block_dimensions(data: np.ndarray, slots: int) -> tuple[int, int]:
     """
     TODO: Compute the block‐matrix dimensions (rows, cols)
     given raw `data` and number of slots.
@@ -84,7 +77,7 @@ def block_array(
     data: np.ndarray | Number | list,
     batch_size: Optional[int] = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
-    type: Literal["C", "P"] = "C",
+    fhe_type: Literal["C", "P"] = "C",
     mode: str = "tile",
     package: Optional[dict] = None,
     public_key: PublicKey = None,
@@ -120,7 +113,7 @@ def _pack_array(
 ) -> PackedArrayInformation:
     """
     Flatten a scalar, vector, or matrix into a 1D array, padding
-    or tileing elements to fill all slots.
+    or tiling elements to fill all slots.
 
     Parameters
     ----------
@@ -134,7 +127,7 @@ def _pack_array(
 
     Returns
     -------
-    a metadata (PackedArrayInformation) with keys:
+    metadata (PackedArrayInformation) with keys:
       - data           : packed 1D numpy array
       - original_shape : tuple
       - ndim           : int
@@ -182,7 +175,7 @@ def _pack_array(
 
 def array(
     cc: CryptoContext,
-    data: Union[np.ndarray | Number | list],
+    data: np.ndarray | Number | list,
     batch_size: Optional[int] = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
     fhe_type: Literal["C", "P"] = "P",
@@ -200,7 +193,7 @@ def array(
     data       : matrix | vector | scalar
     batch_size : Optional[int]
     order      : ArrayEncodingType
-    type      : "C" or "P"
+    fhe_type   : "C" (ciphertext) or "P" (plaintext)
     package    : dict from `_pack_array` (optional)
     public_key : required if type == "C"
 
@@ -218,12 +211,6 @@ def array(
 
     if not package:
         package = _pack_array(data, batch_size, order, mode, **kwargs)
-
-    # print("DEBUG ::: PACKED DATA = ", package.data[:32])
-    # print("DEBUG ::: original_shape = ", package.original_shape)
-    # print("DEBUG ::: shape = ", package.shape)
-    # print("DEBUG ::: batch_size = ", package.batch_size)
-    # print("DEBUG ::: order = ", package.order)
 
     try:
         plaintext = cc.MakeCKKSPackedPlaintext(package.data)
@@ -267,7 +254,27 @@ def _ravel_matrix(
     """
     Encode a 2D matrix into a packed array.
 
+    Parameters
+    ----------
+    data : np.ndarray
+        Input 2D matrix to encode
+    batch_size : int
+        Number of available plaintext slots
+    order : int, optional
+        Encoding order (default: ROW_MAJOR)
+    pad_to_pow2 : bool, optional
+        Whether to pad to power of 2 (default: True)
+    mode : str, optional
+        Padding mode "tile" or "zero" (default: "tile")
+    **kwargs
+        Additional keyword arguments
+
+    Returns
+    -------
+    tuple[np.ndarray, tuple[int, int]]
+        Packed array and shape tuple (rows, cols)
     """
+
     if order == ArrayEncodingType.ROW_MAJOR:
         return _pack_matrix_row_wise(data, batch_size, pad_to_pow2, mode)
     elif order == ArrayEncodingType.COL_MAJOR:
@@ -281,11 +288,30 @@ def _ravel_vector(
     batch_size: int,
     order: int = ArrayEncodingType.ROW_MAJOR,
     pad_to_pow2: bool = True,
-    tile: str = "tile",
+    mode: str = "tile",
     **kwargs,
 ) -> tuple[np.ndarray, tuple[int, int]]:
     """
     Encode a 1D vector into a packed array.
+    Parameters
+    ----------
+    data : list | np.ndarray
+        Input 1D vector to encode
+    batch_size : int
+        Number of available plaintext slots
+    order : int, optional
+        Encoding order (default: ROW_MAJOR)
+    pad_to_pow2 : bool, optional
+        Whether to pad to power of 2 (default: True)
+    mode : str, optional
+        Padding mode "tile" or "zero" (default: "tile")
+    **kwargs
+        Additional keyword arguments including target_cols, pad_value, expand
+
+    Returns
+    -------
+    tuple[np.ndarray, tuple[int, int]]
+        Packed array and shape tuple (rows, cols)
     """
     target_cols = kwargs.get("target_cols")
     if target_cols is not None and not (isinstance(target_cols, int) and target_cols > 0):
@@ -296,11 +322,11 @@ def _ravel_vector(
 
     if order == ArrayEncodingType.ROW_MAJOR:
         return _pack_vector_row_wise(
-            data, batch_size, target_cols, expand, tile, pad_to_pow2, pad_value
+            data, batch_size, target_cols, expand, mode, pad_to_pow2, pad_value
         )
     elif order == ArrayEncodingType.COL_MAJOR:
         return _pack_vector_col_wise(
-            data, batch_size, target_cols, expand, tile, pad_to_pow2, pad_value
+            data, batch_size, target_cols, expand, mode, pad_to_pow2, pad_value
         )
     else:
         ONP_ERROR("Unsupported encoding order")

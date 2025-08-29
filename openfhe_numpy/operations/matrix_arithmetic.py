@@ -30,7 +30,7 @@
 # ==================================================================================
 
 """
-Arithmetic operations for homomorphic encryption tensors.
+matrix_arithmetic.py
 
 This module implements the core arithmetic operations for encrypted tensors
 using the OpenFHE library. Operations include addition, subtraction, multiplication,
@@ -49,22 +49,16 @@ from openfhe_numpy.tensor.ctarray import CTArray
 from openfhe_numpy.utils.errors import (
     ONP_ERROR,
     ONPIncompatibleShape,
-    ONPNotImplementedError,
     ONPNotSupportedError,
-    ONPDimensionError,
     ONPValueError,
+    ONPDimensionError,
 )
 from openfhe_numpy.utils.typecheck import is_numeric_scalar
 from openfhe_numpy import (
     ArrayEncodingType,
     EvalMatMulSquare,
-    EvalTranspose,
-    EvalSumCumRows,
-    EvalSumCumCols,
     EvalReduceCumRows,
     EvalReduceCumCols,
-    EvalLinTransPsi,
-    EvalLinTransPhi,
 )
 
 
@@ -294,14 +288,12 @@ def dot_ct(a, b):
 # ------------------------------------------------------------------------------
 # Transpose Operations
 # ------------------------------------------------------------------------------
-def _transpose_ct(ctarray: CTArray) -> "CTArray":
-    return ctarray._transpose()
 
 
 @register_tensor_function("transpose", [("CTArray",)])
 def transpose_ct(a):
-    """Transpose a x."""
-    return _transpose_ct(a)
+    """Transpose array axes (2-D: swap rows/cols). For 1-D, the array is unchanged."""
+    return a._transpose()
 
 
 ##############################################################################
@@ -547,7 +539,7 @@ def _ct_sum_vector(
 ):
     crypto_context = x.data.GetCryptoContext()
     if axis is not None:
-        ONP_ERROR(f"The dimension is invalid axis = {axis}")
+        ONPDimensionError(f"The dimension is invalid axis = {axis}")
     ct_sum = crypto_context.EvalSum(x.data, x.shape[0])
     return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
 
@@ -559,7 +551,7 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     elif x.ndim == 1:
         return _ct_sum_vector(x, axis)
     else:
-        ONP_ERROR(f"The dimension is invalid = {x.ndims}")
+        ONPDimensionError(f"The dimension is invalid = {x.ndims}")
 
 
 # ------------------------------------------------------------------------------
@@ -580,7 +572,7 @@ def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     elif axis == 1:  # sum over cols
         res = cc.EvalMul(1.0 / ncols, sum_x)
     else:
-        ONP_ERROR(f"The dimension is invalid axis = {axis}")
+        ONPDimensionError(f"The dimension is invalid axis = {axis}")
 
     return CTArray(res, sum_x.shape, sum_x.padded_shape, sum_x.batch_size)
 

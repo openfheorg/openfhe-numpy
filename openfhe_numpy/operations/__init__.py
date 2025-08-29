@@ -29,7 +29,11 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ==================================================================================
 
-"""Operations for homomorphic encryption tensors."""
+"""Operations for homomorphic encryption tensors.
+
+This module provides arithmetic operations and cryptographic utilities
+for working with homomorphically encrypted matrix/vector using OpenFHE.
+"""
 
 from . import matrix_arithmetic
 
@@ -59,7 +63,6 @@ from .crypto_helper import (
     gen_square_matmult_key,
     gen_accumulate_rows_key,
     gen_accumulate_cols_key,
-    decrypt_ciphertext,
 )
 
 # Define public API
@@ -86,5 +89,4 @@ __all__ = [
     "gen_square_matmult_key",
     "gen_accumulate_rows_key",
     "gen_accumulate_cols_key",
-    "decrypt_ciphertext",
 ]
