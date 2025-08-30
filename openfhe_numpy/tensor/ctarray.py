@@ -1,3 +1,34 @@
+# ==================================================================================
+#  BSD 2-Clause License
+#
+#  Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
+#
+#  All rights reserved.
+#
+#  Author TPOC: contact@openfhe.org
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+#  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# ==================================================================================
+
 import io
 from typing import Optional, Tuple, Union
 import numpy as np
@@ -10,7 +41,7 @@ from ..openfhe_numpy import (
     EvalSumCumRows,
     EvalTranspose,
 )
-from ..utils.constants import *
+from ..utils.constants import UnpackType, DataType
 from ..utils.errors import ONP_ERROR
 from ..utils.packing import process_packed_data
 
@@ -41,8 +72,8 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         unpack_type : UnpackType
             - RAW: raw data, no reshape
             - ORIGINAL: reshape to original dimensions
-            - ROUND: reshape and round to integers
-            - AUTO: auto-detect best format
+            - ROUND: reshape and round to integers (not support now)
+            - AUTO: auto-detect best format (not support now)
         new_shape : tuple or int, optional
             Custom shape for the output array. If None, uses original shape.
 
@@ -62,8 +93,6 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         plaintext.SetLength(self.batch_size)
         result = plaintext.GetRealPackedValue()
 
-        # print("DEBUG ::: result = ", result[:32])
-
         if isinstance(unpack_type, str):
             unpack_type = UnpackType(unpack_type.lower())
 
@@ -71,6 +100,8 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             return result
         if unpack_type == UnpackType.ORIGINAL:
             return process_packed_data(result, self.info)
+
+        return result
 
     def serialize(self) -> dict:
         """
@@ -126,16 +157,6 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         pass
 
     def _transpose(self) -> "CTArray":
-        # """
-        # Transpose the encrypted matrix.
-        # """
-        # from openfhe_numpy.utils.matlib import next_power_of_two
-
-        # ciphertext = EvalTranspose(self.data, self.ncols)
-        # shape = (self.original_shape[1], self.original_shape[0])
-        # ncols = next_power_of_two(shape[1])
-        # return CTArray(ciphertext, shape, self.batch_size, ncols, self.order)
-
         """Internal function to evaluate transpose of an encrypted array."""
         if self.ndim == 2:
             ciphertext = EvalTranspose(self.data, self.ncols)
@@ -147,9 +168,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         elif self.ndim == 1:
             return self
         else:
-            raise NotImplementedError(
-                "This function is not implemented with dimension > 2"
-            )
+            raise NotImplementedError("This function is not implemented with dimension > 2")
         return CTArray(
             ciphertext,
             pre_padded_shape,
@@ -158,18 +177,14 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.order,
         )
 
-    def cumulative_sum(self, axis: int) -> "CTArray":
+    def cumulative_sum(self, axis: int = 0) -> "CTArray":
         """
         Compute the cumulative sum of tensor elements along a given axis.
 
         Parameters
         ----------
-        tensor : CTArray
-            Input encrypted tensor.
         axis : int, optional
             Axis along which the cumulative sum is computed. Default is 0.
-        keepdims : bool, optional
-            Whether to keep the dimensions of the original tensor. Default is True.
 
         Returns
         -------
@@ -190,28 +205,19 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         shape = self.shape
         original_shape = self.original_shape
 
-        # cumulative_sum for vector
         if axis is None:
-            ciphertext = EvalSumCumRows(
-                self.data, self.ncols, self.original_shape[1]
-            )
+            ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
 
         # cumulative_sum over rows
-        if axis == 0:
+        elif axis == 0:
             if self.order == ArrayEncodingType.ROW_MAJOR:
-                ciphertext = EvalSumCumRows(
-                    self.data, self.ncols, self.original_shape[1]
-                )
+                ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
 
             elif self.order == ArrayEncodingType.COL_MAJOR:
                 ciphertext = EvalSumCumCols(self.data, self.nrows)
 
-                # shape = self.shape[1], self.shape[0]
-                # original_shape = self.original_shape[1], self.original_shape[0]
             else:
-                raise ValueError(
-                    f"Not support this packing order [{self.order}]."
-                )
+                raise ONP_ERROR(f"Not support this packing order [{self.order}].")
 
         # cumulative_sum over cols
         elif axis == 1:
@@ -219,26 +225,18 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
                 ciphertext = EvalSumCumCols(self.data, self.ncols)
 
             elif self.order == ArrayEncodingType.COL_MAJOR:
-                ciphertext = EvalSumCumRows(
-                    self.data, self.nrows, self.original_shape[0]
-                )
+                ciphertext = EvalSumCumRows(self.data, self.nrows, self.original_shape[0])
 
-                # shape = self.shape[1], self.shape[0]
-                # original_shape = self.original_shape[1], self.original_shape[0]
             else:
-                raise ValueError(f"Invalid axis [{self.order}].")
+                raise ONP_ERROR(f"Not support this packing order[{self.order}].")
         else:
-            raise ValueError(f"Invalid axis [{axis}].")
-        return CTArray(
-            ciphertext, original_shape, self.batch_size, shape, order
-        )
+            raise ONP_ERROR(f"Invalid axis [{axis}].")
+        return CTArray(ciphertext, original_shape, self.batch_size, shape, order)
 
-    def gen_sum_row_key(self, secret_key: openfhe.PrivateKey):
+    def gen_sum_row_key(self, secret_key: openfhe.PrivateKey) -> openfhe.EvalKey:
         context = secret_key.GetCryptoContext()
         if self.order == ArrayEncodingType.ROW_MAJOR:
-            sum_rows_key = context.EvalSumRowsKeyGen(
-                secret_key, self.ncols, self.batch_size
-            )
+            sum_rows_key = context.EvalSumRowsKeyGen(secret_key, self.ncols, self.batch_size)
         elif self.order == ArrayEncodingType.COL_MAJOR:
             sum_rows_key = context.EvalSumColsKeyGen(secret_key)
         else:

@@ -1,4 +1,5 @@
 import numpy as np
+from openfhe import *
 import openfhe_numpy as onp
 
 from core.test_framework import MainUnittest
@@ -112,6 +113,4 @@ class TestMatrixcumulative_sum(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixcumulative_sum.run_test_summary(
-        "Matrix Cumulative Sum", debug=True
-    )
+    TestMatrixcumulative_sum.run_test_summary("Matrix Cumulative Sum", debug=True)

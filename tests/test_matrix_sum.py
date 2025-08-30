@@ -1,4 +1,5 @@
 import numpy as np
+from openfhe import *
 import openfhe_numpy as onp
 
 from core.test_framework import MainUnittest
@@ -50,17 +51,13 @@ def fhe_matrix_sum(params, data, axis=None, order=onp.ROW_MAJOR):
                     keys.secretKey, ctm_x.ncols, ctm_x.batch_size
                 )
             elif ctm_x.order == onp.COL_MAJOR:
-                ctm_x.extra["colkey"] = onp.sum_col_keys(
-                    keys.secretKey, ctm_x.nrows
-                )
+                ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.nrows)
 
             else:
                 raise ValueError("Invalid order.")
         elif axis == 1:  # Column sum (sum along columns)
             if ctm_x.order == onp.ROW_MAJOR:
-                ctm_x.extra["colkey"] = onp.sum_col_keys(
-                    keys.secretKey, ctm_x.ncols
-                )
+                ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
             elif ctm_x.order == onp.COL_MAJOR:
                 ctm_x.extra["rowkey"] = onp.sum_row_keys(
                     keys.secretKey, ctm_x.nrows, ctm_x.batch_size
@@ -119,9 +116,7 @@ class TestMatrixSum(MainUnittest):
 
                         # Create a closure to capture the current axis and ordering values
                         def func(current_axis, current_order):
-                            return lambda p, d: fhe_matrix_sum(
-                                p, d, current_axis, current_order
-                            )
+                            return lambda p, d: fhe_matrix_sum(p, d, current_axis, current_order)
 
                         # Generate the test case
                         cls.generate_test_case(

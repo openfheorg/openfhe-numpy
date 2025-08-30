@@ -1,5 +1,38 @@
+# ==================================================================================
+#  BSD 2-Clause License
+#
+#  Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
+#
+#  All rights reserved.
+#
+#  Author TPOC: contact@openfhe.org
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are met:
+#
+#  1. Redistributions of source code must retain the above copyright notice, this
+#     list of conditions and the following disclaimer.
+#
+#  2. Redistributions in binary form must reproduce the above copyright notice,
+#     this list of conditions and the following disclaimer in the documentation
+#     and/or other materials provided with the distribution.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+#  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+# ==================================================================================
+
 """
-Matrix operations API for OpenFHE-Numpy.
+matrix_api.py
+
+Handles documenting and the public interface of the matrix operation.
 
 This module provides NumPy-compatible matrix operations that can be performed on
 encrypted data using homomorphic encryption. Functions follow NumPy naming
@@ -21,7 +54,7 @@ from .dispatch import tensor_function_api
 
 def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Element-wise add: tensor + tensor or tensor + scalar.
+     Element-wise addition of two arrays (or array and scalar).
 
     See Also
     --------
@@ -32,13 +65,13 @@ def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 
 @tensor_function_api("add", binary=True)
 def _add_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """Dispatch for `add` operation."""
+    """Dispatch for 'add' operation."""
     pass
 
 
 def subtract(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Element-wise subtract: tensor - tensor or tensor - scalar.
+     Element-wise subtraction of two arrays (or array and scalar).
 
     See Also
     --------
@@ -49,26 +82,26 @@ def subtract(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 
 @tensor_function_api("subtract", binary=True)
 def _subtract_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """Dispatch for `subtract` operation."""
+    """Dispatch for 'subtract' operation."""
     pass
 
 
 @tensor_function_api("multiply", binary=True)
 def multiply(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Element-wise multiply two tensors or a tensor and a scalar.
+    Element-wise multiplication of two arrays (or array and scalar).
 
     Parameters
     ----------
     a : ArrayLike
         First operand.
-    b : ArrayLike or scalar
-        Second operand.
+    b : ArrayLike
+        Second operand (array or scalar).
 
     Returns
     -------
     out : ArrayLike
-        Element-wise product of `a` and `b`.
+        Element-wise product.
 
     See Also
     --------
@@ -85,6 +118,7 @@ def multiply(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 @tensor_function_api("pow", binary=True)
 def pow(a: ArrayLike, exponent: int) -> ArrayLike:
     """
+
     For each element of the tensor, it raises that element to the given power.
 
     Note
@@ -96,12 +130,12 @@ def pow(a: ArrayLike, exponent: int) -> ArrayLike:
     a : ArrayLike
         Base tensor.
     exponent : int
-        Power to raise each array element to.
+        Non-negative integer exponent.
 
     Returns
     -------
     out : ArrayLike
-        Element-wise `a` raised to `exponent`.
+        Element-wise 'a' raised to 'exponent'.
 
     See Also
     --------
@@ -124,33 +158,29 @@ def pow(a: ArrayLike, exponent: int) -> ArrayLike:
 @tensor_function_api("dot", binary=True)
 def dot(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     """
-    Dot product or matrix multiplication:
-      - 1-D vectors: inner product
-      - 2-D matrices: standard matmul
+    Dot product / matrix multiplication.
+
+    - 1-D inputs: inner product
+    - 2-D inputs: matrix product
 
     Parameters
     ----------
-    a : ArrayLike
-        First operand.
-    b : ArrayLike
-        Second operand.
+    a, b : ArrayLike
+        Operands.
 
-    Returns
+    returns
     -------
-    out : ArrayLike
-        Dot product of `a` and `b`.
+    ArrayLike
+        Result of the dot product.
 
     See Also
     --------
-    numpy.dot : Corresponding NumPy function.
+    numpy.dot
 
     Examples
     --------
-    # 1-D vectors: inner product
     >>> dot([1, 2], [3, 4])
     11
-
-    # 2-D matrices: matrix multiplication
     >>> import numpy as np
     >>> A = np.array([[1, 2], [3, 4]])
     >>> B = np.array([[5, 6], [7, 8]])
@@ -176,7 +206,7 @@ def matmul(a: ArrayLike, b: ArrayLike) -> ArrayLike:
     Returns
     -------
     out : ArrayLike
-        Matrix product of `a` and `b`.
+        Matrix product of 'a' and 'b'.
 
     See Also
     --------
@@ -195,8 +225,8 @@ def matmul(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 @tensor_function_api("transpose", binary=False)
 def transpose(a: ArrayLike) -> ArrayLike:
     """
-    Transpose a tensor.
-
+    Transpose array axes (for 2-D: swap rows and columns).
+    For 1-D inputs (vectors), the array is returned unchanged.
     Parameters
     ----------
     a : ArrayLike
@@ -261,9 +291,7 @@ def cumulative_sum(x: ArrayLike, /, *, axis: Optional[int] = None) -> ArrayLike:
 
 
 @tensor_function_api("cumulative_reduce", binary=False)
-def cumulative_reduce(
-    a: ArrayLike, axis: int = 0, keepdims: bool = False
-) -> ArrayLike:
+def cumulative_reduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
     """
     Compute the cumulative reduction of tensor elements along a specified axis.\
         - For 1D inputs, axis must be None.
@@ -280,7 +308,7 @@ def cumulative_reduce(
     Returns
     -------
     out : ArrayLike
-        Cumulative reduction of `a`.
+        Cumulative reduction of 'a'.
 
     See Also
     --------
@@ -296,23 +324,8 @@ def cumulative_reduce(
     pass
 
 
-@tensor_function_api("gen_sum_key", binary=False)
-def gen_sum_keys(x, axis: int):
-    if x.ndims == 1:
-        return x.gen_sum_key()
-    else:
-        if axis == 0:
-            return x.gen_sum_rows_key()
-        elif axis == 1:
-            return x.gen_sum_cols_key()
-        else:
-            return x.gen_sum_key()
-
-
 @tensor_function_api("sum", binary=False)
-def sum(
-    a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False
-) -> ArrayLike:
+def sum(a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False) -> ArrayLike:
     """
     Sum of elements over an axis or all.
 
@@ -330,7 +343,7 @@ def sum(
     Returns
     -------
     out : ArrayLike
-        Sum of `a` elements.
+        Sum of 'a' elements.
 
     See Also
     --------
@@ -378,7 +391,7 @@ def mean(
     Returns
     -------
     out : ArrayLike
-        Mean of `a` elements.
+        Mean of 'a' elements.
 
     See Also
     --------
