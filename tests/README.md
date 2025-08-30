@@ -6,7 +6,7 @@ Our tests use a custom framework built on top of Python's `unittest`
 ## Prerequisites
 
 * Python 3.8+
-* openfhe_numpy installed
+* openfhe and openfhe_numpy installed
 * No additional test frameworks required - we use Python's built-in `unittest`
 
 ## Running Tests
