@@ -68,5 +68,3 @@ Test results are written to log files and displayed on the console:
   ```bash
   python3 -m unittest discover -s tests -p "test_matrix_*.py"
   ```
-
-## Adding New Tests

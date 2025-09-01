@@ -4,32 +4,23 @@
 [![Python Versions](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.2.3%2B-green)](https://github.com/openfheorg/openfhe-development)
 
-A NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax.
+OpenFHE-NumPy is a NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax.
 
-The project is currently in development, with a planned release shortly.
 ## Table of Contents
 - [OpenFHE-NumPy](#openfhe-numpy)
   - [Table of Contents](#table-of-contents)
-  - [Features](#features)
   - [Project Structure](#project-structure)
   - [Installation](#installation)
     - [Prerequisites](#prerequisites)
     - [Building from Source](#building-from-source)
-  - [Example Usage](#example-usage)
+  - [Running Tests](#running-tests)
+  - [Code Examples](#code-examples)
   - [Available Operations](#available-operations)
+  - [Limitation](#limitation)
   - [Documentation](#documentation)
   - [Examples](#examples)
   - [Contributing](#contributing)
   - [License](#license)
-
-## Features
-
-- **NumPy-compatible API**: Use familiar NumPy-style syntax for homomorphic operations
-- **Encrypted tensor manipulation**: Create and manipulate encrypted multi-dimensional arrays
-- **Matrix operations**: Perform matrix addition, multiplication, transposition on encrypted data
-- **Optimized implementation**: Built on top of OpenFHE for optimal performance
-- **Type flexibility**: Support for both encrypted (CT) and plaintext (PT) data types
-- **Interoperability**: Seamless integration with Python machine learning workflows
 
 ## Project Structure
 
@@ -61,9 +52,13 @@ openfhe-numpy/
 - **OpenFHE Python**: Any version
 
 ### Building from Source
-Please refer to the following repositories for installation instructions:
-- [OpenFHE Development](https://github.com/openfheorg/openfhe-development)
-- [OpenFHE Python Bindings](https://github.com/openfheorg/openfhe-python)
+Before building, make sure you have the following dependencies installed:
+- [OpenFHE 1.4.0+](https://github.com/openfheorg/openfhe-development) by following the instructions in [OpenFHE Documentation](https://openfhe-development.readthedocs.io/en/latest/sphinx_rsts/intro/installation/installation.html)
+- [OpenFHE Python Bindings](https://github.com/openfheorg/openfhe-python) by following the instructions in [OpenFHE Python Documentation](https://openfheorg.github.io/openfhe-python/html/index.html)
+
+We recommend following OpenFHE C++ and OpenFHE Python installation instructions first (which covers Linux, Windows and MacOS) and then getting back to this repo.
+
+
 ```bash
 # Clone the repository
 git clone https://github.com/openfheorg/openfhe-numpy.git
@@ -79,20 +74,21 @@ cmake ..
 make
 
 # Install
-make install
+sudo make install
 ```
 
-<!-- ## Running Tests
+## Running Tests
+Run tests with [unittest](https://docs.python.org/3/library/unittest.html). See the [testing readme](tests/README.md) for more information.
 
 ```bash
 # Run all tests
-python -m tests
+python3 -m tests
 
 # Run a specific test
-python -m tests.test_matrix_addition
-``` -->
+python3 -m tests/test_matrix_addition
+```
 
-## Example Usage
+## Code Examples
 
 ```python
 import numpy as np
@@ -168,6 +164,9 @@ OpenFHE-NumPy currently supports the following operations:
 | `power`     | Element-wise power          | `onp.power(a, exp)`             |
 | `dot`       | Dot product                 | `onp.dot(a, b)`                 |
 | `sum`       | Sum along axis              | `onp.sum(a, axis)`              |
+
+## Limitation
+In the current version, the OpenFHE-NumPy  package supports operations on a single ciphertext vector, where the vector size is smaller than the available plaintext slots. We plan to release a future version with support for block ciphertext later
 
 ## Documentation
 

@@ -5,7 +5,7 @@ project(OpenFHE-Numpy)
 set(OPENFHE_NUMPY_VERSION_MAJOR 1)
 set(OPENFHE_NUMPY_VERSION_MINOR 4)
 set(OPENFHE_NUMPY_VERSION_PATCH 0)
-set(OPENFHE_NUMPY_VERSION_TWEAK 1)
+set(OPENFHE_NUMPY_VERSION_TWEAK 2)
 set(OPENFHE_NUMPY_VERSION ${OPENFHE_NUMPY_VERSION_MAJOR}.${OPENFHE_NUMPY_VERSION_MINOR}.${OPENFHE_NUMPY_VERSION_PATCH}.${OPENFHE_NUMPY_VERSION_TWEAK})
 
 # OpenFHE version can be specified externally (-DOPENFHE_REQUIRED_VERSION=1.4.0)
@@ -90,23 +90,25 @@ endif()
 
 message(STATUS "Python site packages directory: ${PYTHON_SITE_PACKAGES}")
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(Python_Install_Location "${PYTHON_SITE_PACKAGES}")
+    set(Python_Install_Location "${PYTHON_SITE_PACKAGES}/openfhe_numpy")
 else()
     set(Python_Install_Location "${CMAKE_INSTALL_PREFIX}")
 endif()
 message("***** INSTALL IS AT ${Python_Install_Location}; to change, run cmake with -DCMAKE_INSTALL_PREFIX=/your/path")
 
-# install the .so with the python bindings 
-install(TARGETS openfhe_numpy LIBRARY DESTINATION ${Python_Install_Location})
-install(FILES ${CMAKE_SOURCE_DIR}/openfhe_numpy/__init__.py DESTINATION ${Python_Install_Location})
+set(OPENFHE_NUMPY_INSTALL_DIR "${Python_Install_Location}")
+
+# install the .so with the python bindings
+install(TARGETS openfhe_numpy LIBRARY DESTINATION ${OPENFHE_NUMPY_INSTALL_DIR})
+install(FILES ${CMAKE_SOURCE_DIR}/openfhe_numpy/__init__.py DESTINATION ${OPENFHE_NUMPY_INSTALL_DIR})
 
 # install the required directories: operations, tensor and utils (with *.py files only)
 file(GLOB OPERATIONS_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/operations/*.py")
-install(FILES ${OPERATIONS_DIR_FILES} DESTINATION ${Python_Install_Location}/operations/)
+install(FILES ${OPERATIONS_DIR_FILES} DESTINATION ${OPENFHE_NUMPY_INSTALL_DIR}/operations/)
 file(GLOB TENSOR_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/tensor/*.py")
-install(FILES ${TENSOR_DIR_FILES} DESTINATION ${Python_Install_Location}/tensor/)
+install(FILES ${TENSOR_DIR_FILES} DESTINATION ${OPENFHE_NUMPY_INSTALL_DIR}/tensor/)
 file(GLOB UTILS_DIR_FILES "${CMAKE_SOURCE_DIR}/openfhe_numpy/utils/*.py")
-install(FILES ${UTILS_DIR_FILES} DESTINATION ${Python_Install_Location}/utils/)
+install(FILES ${UTILS_DIR_FILES} DESTINATION ${OPENFHE_NUMPY_INSTALL_DIR}/utils/)
 
 if(BUILD_EXAMPLES)
     file(GLOB EXAMPLE_SOURCES "openfhe_numpy/cpp/examples/*.cpp")
@@ -122,4 +124,3 @@ if(BUILD_EXAMPLES)
         endif()
     endforeach()
 endif()
-
