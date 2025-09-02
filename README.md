@@ -17,7 +17,7 @@ OpenFHE-NumPy is a NumPy-like API for homomorphic encryption operations, built o
   - [Running Tests](#running-tests)
   - [Code Examples](#code-examples)
   - [Available Operations](#available-operations)
-  - [Limitation](#limitation)
+  - [Current Limitations](#current-limitations)
   - [Documentation](#documentation)
   - [Examples](#examples)
   - [Contributing](#contributing)
@@ -179,7 +179,7 @@ OpenFHE-NumPy currently supports the following operations:
 | `dot`       | Dot product                 | `onp.dot(a, b)`                 |
 | `sum`       | Sum along axis              | `onp.sum(a, axis)`              |
 
-## Limitation
+## Currrent Limitations
 In the current version, the OpenFHE-NumPy package supports operations on a single ciphertext vector, where each encrypted array variable (which has type CTArray or PTArray) contains only a single encoding vector.
 
 For example, we can consider a matrix:
@@ -201,6 +201,7 @@ For detailed documentation on the API, please visit our [documentation site](htt
 
 We provide several examples showcasing the library's functionality:
 
+- [1D Convolution](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_convolution.py)
 - [Matrix Accumulation](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_accumulation.py)
 - [Matrix Addition](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_addition.py)
 - [Matrix Summation](https://github.com/openfheorg/openfhe-numpy/blob/main/examples/python/simple_matrix_sum.py)
