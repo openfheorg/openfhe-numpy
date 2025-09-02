@@ -31,7 +31,7 @@
 
 import numpy as np
 from typing import Union
-from constants import UnpackType
+from .constants import UnpackType
 
 
 # ===  Visual Format Array ==

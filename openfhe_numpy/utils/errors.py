@@ -44,7 +44,7 @@ Environment Variables:
     OPENFHE_LOG_MAX_SIZE: Maximum log file size in bytes
     OPENFHE_LOG_BACKUP_COUNT: Number of backup log files
 
-Usage:
+Usage::
     from openfhe_numpy.utils.errors import ONP_DEBUG, ONP_ERROR, ONP_WARNING
 
     ONP_DEBUG("Processing data...")

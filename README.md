@@ -4,32 +4,24 @@
 [![Python Versions](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.2.3%2B-green)](https://github.com/openfheorg/openfhe-development)
 
-A NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax.
+OpenFHE-NumPy is a NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax.
 
-The project is currently in development, with a planned release shortly.
 ## Table of Contents
 - [OpenFHE-NumPy](#openfhe-numpy)
   - [Table of Contents](#table-of-contents)
-  - [Features](#features)
   - [Project Structure](#project-structure)
   - [Installation](#installation)
     - [Prerequisites](#prerequisites)
-    - [Building from Source](#building-from-source)
-  - [Example Usage](#example-usage)
+    - [Installing from Source](#installing-from-source)
+    - [Installing using pip (for Ubuntu)](#installing-using-pip-for-ubuntu)
+  - [Running Tests](#running-tests)
+  - [Code Examples](#code-examples)
   - [Available Operations](#available-operations)
+  - [Limitation](#limitation)
   - [Documentation](#documentation)
   - [Examples](#examples)
   - [Contributing](#contributing)
   - [License](#license)
-
-## Features
-
-- **NumPy-compatible API**: Use familiar NumPy-style syntax for homomorphic operations
-- **Encrypted tensor manipulation**: Create and manipulate encrypted multi-dimensional arrays
-- **Matrix operations**: Perform matrix addition, multiplication, transposition on encrypted data
-- **Optimized implementation**: Built on top of OpenFHE for optimal performance
-- **Type flexibility**: Support for both encrypted (CT) and plaintext (PT) data types
-- **Interoperability**: Seamless integration with Python machine learning workflows
 
 ## Project Structure
 
@@ -60,10 +52,13 @@ openfhe-numpy/
 - **OpenFHE**: Any version
 - **OpenFHE Python**: Any version
 
-### Building from Source
-Please refer to the following repositories for installation instructions:
-- [OpenFHE Development](https://github.com/openfheorg/openfhe-development)
-- [OpenFHE Python Bindings](https://github.com/openfheorg/openfhe-python)
+### Installing from Source
+Before building, make sure you have the following dependencies installed:
+- [OpenFHE 1.4.0+](https://github.com/openfheorg/openfhe-development) by following the instructions in [OpenFHE Documentation](https://openfhe-development.readthedocs.io/en/latest/sphinx_rsts/intro/installation/installation.html)
+- [OpenFHE Python Bindings](https://github.com/openfheorg/openfhe-python) by following the instructions in [OpenFHE Python Documentation](https://openfheorg.github.io/openfhe-python/html/index.html)
+
+We recommend following OpenFHE C++ and OpenFHE Python installation instructions first (which covers Linux, Windows and MacOS) and then getting back to this repo. If the some package cannot be found when running a Python example (occurs only for some environments), check the `PYTHONPATH` (OpenFHE Python) environment variable and the `LD_LIBRARY_PATH` (OpenFHE libraries). This ensures that the packages can be correctly located and imported.
+
 ```bash
 # Clone the repository
 git clone https://github.com/openfheorg/openfhe-numpy.git
@@ -79,20 +74,35 @@ cmake ..
 make
 
 # Install
-make install
+sudo make install
 ```
 
-<!-- ## Running Tests
+### Installing using pip (for Ubuntu)
+
+
+On Ubuntu, openfhe_numpy can be installed using pip.  All available releases are listed at [Python Package Index OpenFHE-Numpy Release History](https://pypi.org/project/openfhe_numpy/#history). Find the release for your version of Ubuntu and run
+
+```
+pip install openfhe_numpy==<openfhe_package_version>
+```
+
+Once installed, any python example at https://github.com/openfheorg/openfhe-numpy/tree/main/examples/python can be executed.
+
+Note that Ubuntu LTS 20.04, 22.04, and 24.04 are currently supported. `pip uninstall` can be used to uninstall the openfhe package.
+
+
+## Running Tests
+Run tests with [unittest](https://docs.python.org/3/library/unittest.html). See the [testing readme](tests/README.md) for more information.
 
 ```bash
 # Run all tests
-python -m tests
+python3 -m tests
 
 # Run a specific test
-python -m tests.test_matrix_addition
-``` -->
+python3 -m tests/test_matrix_addition
+```
 
-## Example Usage
+## Code Examples
 
 ```python
 import numpy as np
@@ -168,6 +178,20 @@ OpenFHE-NumPy currently supports the following operations:
 | `power`     | Element-wise power          | `onp.power(a, exp)`             |
 | `dot`       | Dot product                 | `onp.dot(a, b)`                 |
 | `sum`       | Sum along axis              | `onp.sum(a, axis)`              |
+
+## Limitation
+In the current version, the OpenFHE-NumPy package supports operations on a single ciphertext vector, where each encrypted array variable (which has type CTArray or PTArray) contains only a single encoding vector.
+
+For example, we can consider a matrix:
+```
+1 2 3
+4 5 6
+7 8 9
+```
+As an encoding vector of the form: ```1 2 3 0 4 5 6 0 7 8 9 0```
+
+The size of the encoded vector must be smaller than the number of available plaintext slots. Certain operations, such as matrix–vector multiplication, may require the ciphertext vector to be duplicated. In such cases, users should ensure that a sufficient number of slots are available for the function to execute correctly.
+We plan to release a future version with support for block ciphertexts, which will remove this limitation in the future.
 
 ## Documentation
 

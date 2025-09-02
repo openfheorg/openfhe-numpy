@@ -38,6 +38,10 @@ EPSILON_HIGH = 1e-4
 
 # Types of data representation
 class DataType(str, Enum):
+    """
+    Enum class to indicate whether tensor contains ciphertext or plaintext
+    """
+
     PLAINTEXT = "P"
     CIPHERTEXT = "C"
 
@@ -47,6 +51,10 @@ class DataType(str, Enum):
 
 # Default format result
 class UnpackType(Enum):
+    """
+    Enum class to indicate data's format after decryption
+    """
+
     RAW = "raw"
     ORIGINAL = "original"
     RESHAPE = "reshape"
