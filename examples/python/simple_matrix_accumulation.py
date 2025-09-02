@@ -32,7 +32,7 @@ def run_row_accumulation_example(cc, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
-    # expected = np.cumulative_sum(matrix, axis=0)
+    # NumPy >= 2.0: please use numpy.cumulative_sum instead of numpy.cumsum.
     expected = np.cumsum(matrix, axis=0)
 
     # Validate and print results
@@ -55,7 +55,7 @@ def run_column_accumulation_example(cc, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Compare with plain result
-    # expected = np.cumulative_sum(matrix, axis=1)
+    # NumPy >= 2.0: please use numpy.cumulative_sum instead of numpy.cumsum.
     expected = np.cumsum(matrix, axis=1)
 
     # Validate and print results
