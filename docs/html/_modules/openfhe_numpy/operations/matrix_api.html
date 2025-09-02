@@ -1,0 +1,582 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>openfhe_numpy.operations.matrix_api &mdash; OpenFHE-Numpy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            OpenFHE-Numpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../example.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../SPHINX_SETUP.html">OpenFHE-Numpy Sphinx Documentation Setup</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">OpenFHE-Numpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">openfhe_numpy.operations.matrix_api</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for openfhe_numpy.operations.matrix_api</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Matrix operations API for OpenFHE-Numpy.</span>
+
+<span class="sd">This module provides NumPy-compatible matrix operations that can be performed on</span>
+<span class="sd">encrypted data using homomorphic encryption. Functions follow NumPy naming</span>
+<span class="sd">conventions and similar signatures where possible.</span>
+
+<span class="sd">All functions use the tensor_function_api decorator to handle different tensor types</span>
+<span class="sd">and dispatch to the appropriate backend implementation.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numpy.typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ArrayLike</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.dispatch</span><span class="w"> </span><span class="kn">import</span> <span class="n">tensor_function_api</span>
+
+
+<span class="c1"># ===========================</span>
+<span class="c1"># Element-wise Operations</span>
+<span class="c1"># ===========================</span>
+
+
+<div class="viewcode-block" id="add">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.add">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Add two tensors or a tensor and a scalar.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        First operand.</span>
+<span class="sd">    b : ArrayLike</span>
+<span class="sd">        Second operand.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Element-wise sum of `a` and `b`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.add : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; add([1, 2], [3, 4])</span>
+<span class="sd">    array([4, 6])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_add_dispatch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span></div>
+
+
+
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;add&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_add_dispatch</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+    <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="subtract">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.subtract">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;subtract&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">subtract</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Subtract two tensors or a tensor and a scalar.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        First operand.</span>
+<span class="sd">    b : ArrayLike</span>
+<span class="sd">        Second operand.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Element-wise difference of `a` and `b`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.subtract : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; subtract([5, 7], [2, 4])</span>
+<span class="sd">    array([3, 3])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="multiply">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.multiply">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;multiply&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">multiply</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Element-wise multiply two tensors or a tensor and a scalar.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        First operand.</span>
+<span class="sd">    b : ArrayLike or scalar</span>
+<span class="sd">        Second operand.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Element-wise product of `a` and `b`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.multiply : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; multiply([1, 2], [3, 4])</span>
+<span class="sd">    array([3, 8])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="power">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.power">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">power</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">exponent</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    For each element of the tensor, it raises that element to the given power.</span>
+
+<span class="sd">    Note</span>
+<span class="sd">    ----</span>
+<span class="sd">    This only supports integer exponents due to homomorphic-encryption constraints.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        Base tensor.</span>
+<span class="sd">    exponent : int</span>
+<span class="sd">        Power to raise each array element to.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Element-wise `a` raised to `exponent`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.power : Corresponding element-wise power function.</span>
+<span class="sd">    numpy.linalg.matrix_power : Repeated matrix multiplication for square matrices.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; power([1, 2, 3], 2)</span>
+<span class="sd">    array([1, 4, 9])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<span class="c1"># ===========================</span>
+<span class="c1"># Matrix Operations</span>
+<span class="c1"># ===========================</span>
+
+
+<div class="viewcode-block" id="dot">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.dot">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;dot&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dot</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the dot (inner) product of two tensors.</span>
+<span class="sd">    1-D vectors: inner product</span>
+<span class="sd">    2-D matrices: matrix multiplication</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        First operand.</span>
+<span class="sd">    b : ArrayLike</span>
+<span class="sd">        Second operand.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Dot product of `a` and `b`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.dot : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    # 1-D vectors: inner product</span>
+<span class="sd">    &gt;&gt;&gt; dot([1, 2], [3, 4])</span>
+<span class="sd">    11</span>
+
+<span class="sd">    # 2-D matrices: matrix multiplication</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; A = np.array([[1, 2], [3, 4]])</span>
+<span class="sd">    &gt;&gt;&gt; B = np.array([[5, 6], [7, 8]])</span>
+<span class="sd">    &gt;&gt;&gt; dot(A, B)</span>
+<span class="sd">    array([[19, 22],</span>
+<span class="sd">           [43, 50]])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="matmul">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.matmul">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;matmul&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">matmul</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Matrix multiply two tensors.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        First operand.</span>
+<span class="sd">    b : ArrayLike</span>
+<span class="sd">        Second operand.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Matrix product of `a` and `b`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.matmul : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; matmul(np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]]))</span>
+<span class="sd">    array([[19, 22],</span>
+<span class="sd">           [43, 50]])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="transpose">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.transpose">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;transpose&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">transpose</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Transpose a tensor.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        Input tensor.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Transposed tensor.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.transpose : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; transpose(np.array([[1, 2], [3, 4]]))</span>
+<span class="sd">    array([[1, 3],</span>
+<span class="sd">           [2, 4]])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<span class="c1"># ===========================</span>
+<span class="c1"># Reduction Operations</span>
+<span class="c1"># ===========================</span>
+
+
+<div class="viewcode-block" id="cumsum">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.cumsum">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;cumsum&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cumsum</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">keepdims</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the cumulative sum of tensor elements along an axis.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        Input tensor.</span>
+<span class="sd">    axis : int, optional</span>
+<span class="sd">        Axis along which to compute the sum. Default is 0.</span>
+<span class="sd">    keepdims : bool, optional</span>
+<span class="sd">        If True, retains reduced dimensions. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Cumulative sum of `a`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.cumsum : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; cumsum(np.array([[1, 2], [3, 4]]), axis=1)</span>
+<span class="sd">    array([[1, 3],</span>
+<span class="sd">           [3, 7]])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="cumreduce">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.cumreduce">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;cumreduce&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">cumreduce</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">keepdims</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the cumulative reduction (e.g., product) of tensor elements.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        Input tensor.</span>
+<span class="sd">    axis : int, optional</span>
+<span class="sd">        Axis along which to compute the reduction. Default is 0.</span>
+<span class="sd">    keepdims : bool, optional</span>
+<span class="sd">        If True, retains reduced dimensions. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Cumulative reduction of `a`.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.cumprod : Similar operation for product.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; cumreduce(np.array([[1, 2, 3], [4, 5, 6]]), axis=0)</span>
+<span class="sd">    array([[1, 2, 3],</span>
+<span class="sd">           [-3, -3, -3]])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="sum">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.sum">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;sum&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sum</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">keepdims</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sum of tensor elements over a given axis.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        Input tensor.</span>
+<span class="sd">    axis : int, optional</span>
+<span class="sd">        Axis along which to compute the sum. Default is 0.</span>
+<span class="sd">        0: sum over rows</span>
+<span class="sd">        1: sum over cols</span>
+<span class="sd">    keepdims : bool, optional</span>
+<span class="sd">        If True, retains reduced dimensions. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Sum of `a` elements.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.sum : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; a = np.array([[1, 2],</span>
+<span class="sd">                      [3, 4]])</span>
+<span class="sd">    &gt;&gt;&gt; sum(a)</span>
+<span class="sd">    10</span>
+<span class="sd">    &gt;&gt;&gt; sum(a, axis=0)</span>
+<span class="sd">    array([4, 6])</span>
+<span class="sd">    &gt;&gt;&gt; sum(a, axis=1)</span>
+<span class="sd">    array([3, 7])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="mean">
+<a class="viewcode-back" href="../../../matrix_arithmetic.html#openfhe_numpy.operations.matrix_api.mean">[docs]</a>
+<span class="nd">@tensor_function_api</span><span class="p">(</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="n">binary</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mean</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">ArrayLike</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">keepdims</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ArrayLike</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the arithmetic mean along the specified axis.</span>
+
+<span class="sd">    Returns the average of the array elements. The average is taken over</span>
+<span class="sd">    the flattened array by default, otherwise over the specified axis.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    a : ArrayLike</span>
+<span class="sd">        Input tensor.</span>
+<span class="sd">    axis : int, optional</span>
+<span class="sd">        Axis along which to compute the mean. Default is 0.</span>
+<span class="sd">    keepdims : bool, optional</span>
+<span class="sd">        If True, retains reduced dimensions. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    out : ArrayLike</span>
+<span class="sd">        Mean of `a` elements.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    numpy.mean : Corresponding NumPy function.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import numpy as np</span>
+<span class="sd">    &gt;&gt;&gt; a = np.array([[1, 2], [3, 4]])</span>
+<span class="sd">    &gt;&gt;&gt; mean(a)</span>
+<span class="sd">    2.5</span>
+<span class="sd">    &gt;&gt;&gt; mean(a, axis=0)</span>
+<span class="sd">    array([2., 3.])</span>
+<span class="sd">    &gt;&gt;&gt; mean(a, axis=1)</span>
+<span class="sd">    array([1.5, 3.5])</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<span class="c1"># ===========================</span>
+<span class="c1"># Planned Future Functionality</span>
+<span class="c1"># ===========================</span>
+
+<span class="c1"># Array Creation Functions:</span>
+
+<span class="c1"># def zeros(shape, crypto_context, key):</span>
+<span class="c1">#     &quot;&quot;&quot;Create an encrypted array of zeros.&quot;&quot;&quot;</span>
+<span class="c1">#     pass</span>
+
+
+<span class="c1"># def ones(shape, crypto_context, key):</span>
+<span class="c1">#     &quot;&quot;&quot;Create an encrypted array of ones.&quot;&quot;&quot;</span>
+<span class="c1">#     pass</span>
+
+
+<span class="c1"># def eye(n, crypto_context, key):</span>
+<span class="c1">#     &quot;&quot;&quot;Create an encrypted identity matrix.&quot;&quot;&quot;</span>
+<span class="c1">#     pass</span>
+
+
+<span class="c1"># Broadcasting Support:</span>
+
+<span class="c1"># def _get_broadcast_shape(self, other):</span>
+<span class="c1">#     &quot;&quot;&quot;Calculate broadcast shape between tensors.&quot;&quot;&quot;</span>
+<span class="c1">#     # Implementation...</span>
+
+
+<span class="c1"># def _broadcast_tensor(self, target_shape):</span>
+<span class="c1">#     &quot;&quot;&quot;Broadcast this tensor to target shape.&quot;&quot;&quot;</span>
+<span class="c1">#     # Implementation...</span>
+
+
+<span class="c1"># Array Manipulation Methods:</span>
+
+<span class="c1"># def reshape(self, new_shape):</span>
+<span class="c1">#     &quot;&quot;&quot;Reshape tensor to new dimensions.&quot;&quot;&quot;</span>
+<span class="c1">#     # Implementation...</span>
+
+
+<span class="c1"># def concat(tensors, axis=0):</span>
+<span class="c1">#     &quot;&quot;&quot;Concatenate tensors along specified axis.&quot;&quot;&quot;</span>
+<span class="c1">#     # Implementation...</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

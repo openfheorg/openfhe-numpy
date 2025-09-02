@@ -1,0 +1,437 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>openfhe_numpy.tensor.ctarray &mdash; OpenFHE-Numpy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            OpenFHE-Numpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../example.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../SPHINX_SETUP.html">OpenFHE-Numpy Sphinx Documentation Setup</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">OpenFHE-Numpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">openfhe_numpy.tensor.ctarray</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for openfhe_numpy.tensor.ctarray</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">openfhe</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">_onp_cpp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnpackType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.log</span><span class="w"> </span><span class="kn">import</span> <span class="n">ONP_ERROR</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.packing</span><span class="w"> </span><span class="kn">import</span> <span class="n">process_packed_data</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">FHETensor</span>
+
+
+<div class="viewcode-block" id="CTArray">
+<a class="viewcode-back" href="../../../tensor.html#openfhe_numpy.tensor.ctarray.CTArray">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CTArray</span><span class="p">(</span><span class="n">FHETensor</span><span class="p">[</span><span class="n">openfhe</span><span class="o">.</span><span class="n">Ciphertext</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Encrypted tensor class for OpenFHE ciphertexts.</span>
+<span class="sd">    This class represents encrypted tensors.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; # Create and encrypt a matrix</span>
+<span class="sd">    &gt;&gt;&gt; cc, keys = gen_crypto_context(4)</span>
+<span class="sd">    &gt;&gt;&gt; matrix = np.array([[1, 2], [3, 4]])</span>
+<span class="sd">    &gt;&gt;&gt; encrypted = onp.array(cc, matrix, slots, keys.publicKey)</span>
+<span class="sd">    &gt;&gt;&gt; result = encrypted + encrypted  # or add(encrypted, encrypted)</span>
+<span class="sd">    &gt;&gt;&gt; decrypted = result.decrypt(keys.secretKey)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">tensor_priority</span> <span class="o">=</span> <span class="mi">10</span>
+
+<div class="viewcode-block" id="CTArray.decrypt">
+<a class="viewcode-back" href="../../../tensor.html#openfhe_numpy.tensor.ctarray.CTArray.decrypt">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decrypt</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">secret_key</span><span class="p">:</span> <span class="n">openfhe</span><span class="o">.</span><span class="n">PrivateKey</span><span class="p">,</span>
+        <span class="n">unpack_type</span><span class="p">:</span> <span class="n">UnpackType</span> <span class="o">=</span> <span class="n">UnpackType</span><span class="o">.</span><span class="n">ORIGINAL</span><span class="p">,</span>
+        <span class="n">new_shape</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decrypt ciphertext using given secret key with flexible formatting options.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        secret_key : openfhe.PrivateKey</span>
+<span class="sd">            Secret key used for decryption</span>
+<span class="sd">        unpack_type : UnpackType</span>
+<span class="sd">            Formatting option to apply:</span>
+<span class="sd">            - UnpackType.RAW: Return raw decrypted data without reshaping</span>
+<span class="sd">            - UnpackType.RESHAPE: Reshape to original dimensions</span>
+<span class="sd">            - UnpackType.ROUND: Reshape and round values to integers</span>
+<span class="sd">            - UnpackType.AUTO: Auto-detect best format based on data</span>
+<span class="sd">        new_shape : tuple or int, optional</span>
+<span class="sd">            Custom shape to reshape the output array to</span>
+<span class="sd">            If None, uses the tensor&#39;s original shape</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Decrypted data with requested formatting applied</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">secret_key</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Secret Key is missing!!!&quot;</span><span class="p">)</span>
+
+        <span class="n">cc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">GetCryptoContext</span><span class="p">()</span>
+        <span class="n">plaintext</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">Decrypt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">secret_key</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">plaintext</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Decryption failed&quot;</span><span class="p">)</span>
+
+        <span class="n">plaintext</span><span class="o">.</span><span class="n">SetLength</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">plaintext</span><span class="o">.</span><span class="n">GetRealPackedValue</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">unpack_type</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">unpack_type</span> <span class="o">=</span> <span class="n">UnpackType</span><span class="p">(</span><span class="n">unpack_type</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="n">unpack_type</span> <span class="o">==</span> <span class="n">UnpackType</span><span class="o">.</span><span class="n">RAW</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">result</span>
+        <span class="k">if</span> <span class="n">unpack_type</span> <span class="o">==</span> <span class="n">UnpackType</span><span class="o">.</span><span class="n">ORIGINAL</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">process_packed_data</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="CTArray.serialize">
+<a class="viewcode-back" href="../../../tensor.html#openfhe_numpy.tensor.ctarray.CTArray.serialize">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Serialize ciphertext and metadata to dictionary.&quot;&quot;&quot;</span>
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">openfhe</span><span class="o">.</span><span class="n">Serialize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+            <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Failed to serialize Ciphertext&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
+            <span class="s2">&quot;original_shape&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_shape</span><span class="p">,</span>
+            <span class="s2">&quot;batch_size&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span>
+            <span class="s2">&quot;ncols&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ncols</span><span class="p">,</span>
+            <span class="s2">&quot;order&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">,</span>
+            <span class="s2">&quot;ciphertext&quot;</span><span class="p">:</span> <span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span><span class="p">(),</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="CTArray.deserialize">
+<a class="viewcode-back" href="../../../tensor.html#openfhe_numpy.tensor.ctarray.CTArray.deserialize">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;CTArray&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Deserialize from dictionary back to CTArray.&quot;&quot;&quot;</span>
+        <span class="n">required_keys</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;ciphertext&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;original_shape&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;batch_size&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;ncols&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;order&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">required_keys</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">:</span>
+                <span class="n">ONP_ERROR</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Missing required key &#39;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">&#39; in serialized object&quot;</span><span class="p">)</span>
+
+        <span class="n">stream</span> <span class="o">=</span> <span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="nb">bytes</span><span class="o">.</span><span class="n">fromhex</span><span class="p">(</span><span class="n">obj</span><span class="p">[</span><span class="s2">&quot;ciphertext&quot;</span><span class="p">]))</span>
+        <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">openfhe</span><span class="o">.</span><span class="n">Ciphertext</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">openfhe</span><span class="o">.</span><span class="n">Deserialize</span><span class="p">(</span><span class="n">ciphertext</span><span class="p">,</span> <span class="n">stream</span><span class="p">):</span>
+            <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Failed to deserialize ciphertext&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">ciphertext</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="n">obj</span><span class="p">[</span><span class="s2">&quot;original_shape&quot;</span><span class="p">]),</span>
+            <span class="n">obj</span><span class="p">[</span><span class="s2">&quot;batch_size&quot;</span><span class="p">],</span>
+            <span class="n">obj</span><span class="p">[</span><span class="s2">&quot;ncols&quot;</span><span class="p">],</span>
+            <span class="n">obj</span><span class="p">[</span><span class="s2">&quot;order&quot;</span><span class="p">],</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;CTArray(metadata=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">metadata</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sum</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;CTArray&quot;</span><span class="p">:</span>
+        <span class="c1"># if self._order == utils.ArrayEncodingType.ROW_MAJOR:</span>
+        <span class="k">pass</span>
+
+    <span class="c1"># def _add(self, other) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;Element-wise addition with packing compatibility.&quot;&quot;&quot;</span>
+    <span class="c1">#     other = self.ensure_compatible_packing(other)</span>
+
+    <span class="c1">#     if self.shape != other.shape:</span>
+    <span class="c1">#         ONP_ERROR(&quot;Shape does not match for element-wise addition&quot;)</span>
+    <span class="c1">#     crypto_context = self.data.GetCryptoContext()</span>
+    <span class="c1">#     ciphertext = crypto_context.EvalAdd(self.data, other.data)</span>
+    <span class="c1">#     return self.clone(ciphertext)</span>
+
+    <span class="c1"># def _add_scalar(self, scalar) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;Add scalar value to all elements.&quot;&quot;&quot;</span>
+    <span class="c1">#     crypto_context = self.data.GetCryptoContext()</span>
+
+    <span class="c1">#     # Create plaintext encoding of scalar</span>
+    <span class="c1">#     plaintext = crypto_context.MakeCKKSPackedPlaintext([scalar] * self.batch_size)</span>
+
+    <span class="c1">#     # Perform addition</span>
+    <span class="c1">#     result = crypto_context.EvalAdd(self.data, plaintext)</span>
+    <span class="c1">#     return self.clone(result)</span>
+
+    <span class="c1"># # Add these methods for consistency with _add_scalar:</span>
+
+    <span class="c1"># def _sub_scalar(self, scalar) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;Subtract scalar value from all elements.&quot;&quot;&quot;</span>
+    <span class="c1">#     # Implementation</span>
+
+    <span class="c1"># def _sub(self, other) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     if self.shape != other.shape:</span>
+    <span class="c1">#         ONP_ERROR(&quot;Shape does not match for element-wise subtraction&quot;)</span>
+    <span class="c1">#     crypto_context = self.data.GetCryptoContext()</span>
+    <span class="c1">#     ciphertext = crypto_context.EvalSub(self.data, other.data)</span>
+    <span class="c1">#     return self.clone(ciphertext)</span>
+
+    <span class="c1"># def _multiply(self, other) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     if self.shape != other.shape:</span>
+    <span class="c1">#         ONP_ERROR(f&quot;Shape mismatch for multiplication: {self.shape} vs {other.shape}&quot;)</span>
+
+    <span class="c1">#     crypto_context = self.data.GetCryptoContext()</span>
+    <span class="c1">#     ciphertext = crypto_context.EvalMul(self.data, other.data)</span>
+    <span class="c1">#     return self.clone(ciphertext)</span>
+
+    <span class="c1"># def _multiply_scalar(self, scalar) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;Multiply all elements by scalar.&quot;&quot;&quot;</span>
+    <span class="c1">#     # Implementation</span>
+
+    <span class="c1"># def _matvec(self, other, sumkey) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     crypto_context = self.data.GetCryptoContext()</span>
+
+    <span class="c1">#     if not isinstance(other, FHETensor):</span>
+    <span class="c1">#         ONP_ERROR(&quot;NOT_IMPLEMENTED&quot;)</span>
+
+    <span class="c1">#     if self.ndim == 1 and other.ndim == 2:</span>
+    <span class="c1">#         tensor_matrix = other.clone()</span>
+    <span class="c1">#         tensor_vector = self.clone()</span>
+    <span class="c1">#     elif self.ndim == 2 and other.ndim == 1:</span>
+    <span class="c1">#         tensor_matrix = self.clone()</span>
+    <span class="c1">#         tensor_vector = other.clone()</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         ONP_ERROR(&quot;NOT_IMPLEMENTED&quot;)</span>
+    <span class="c1">#     if tensor_matrix.original_shape[1] != tensor_vector.original_shape[0]:</span>
+    <span class="c1">#         ONP_ERROR(</span>
+    <span class="c1">#             f&quot;Matrix dimension [{tensor_matrix.original_shape}] mismatch with vector dimension [{tensor_vector.shape}]&quot;</span>
+    <span class="c1">#         )</span>
+    <span class="c1">#     if (</span>
+    <span class="c1">#         tensor_matrix.order == ArrayEncodingType.ROW_MAJOR</span>
+    <span class="c1">#         and tensor_vector.order == ArrayEncodingType.COL_MAJOR</span>
+    <span class="c1">#     ):</span>
+    <span class="c1">#         ciphertext = EvalMultMatVec(</span>
+    <span class="c1">#             sumkey,</span>
+    <span class="c1">#             MatVecEncoding.MM_CRC,</span>
+    <span class="c1">#             tensor_matrix.ncols,</span>
+    <span class="c1">#             tensor_vector.data,</span>
+    <span class="c1">#             tensor_matrix.data,</span>
+    <span class="c1">#         )</span>
+    <span class="c1">#         return CTArray(</span>
+    <span class="c1">#             ciphertext,</span>
+    <span class="c1">#             (tensor_matrix.original_shape[0], 1),</span>
+    <span class="c1">#             tensor_matrix.batch_size,</span>
+    <span class="c1">#             tensor_matrix.ncols,</span>
+    <span class="c1">#             ArrayEncodingType.COL_MAJOR,</span>
+    <span class="c1">#         )</span>
+
+    <span class="c1">#     elif (</span>
+    <span class="c1">#         tensor_matrix.order == ArrayEncodingType.COL_MAJOR</span>
+    <span class="c1">#         and tensor_vector.order == ArrayEncodingType.ROW_MAJOR</span>
+    <span class="c1">#     ):</span>
+    <span class="c1">#         ct_product = EvalMultMatVec(</span>
+    <span class="c1">#             crypto_context,</span>
+    <span class="c1">#             sumkey,</span>
+    <span class="c1">#             MatVecEncoding.MM_RCR,</span>
+    <span class="c1">#             tensor_matrix.ncols,</span>
+    <span class="c1">#             tensor_vector.data,</span>
+    <span class="c1">#             tensor_matrix.data,</span>
+    <span class="c1">#         )</span>
+    <span class="c1">#         return CTArray(</span>
+    <span class="c1">#             ct_product,</span>
+    <span class="c1">#             (tensor_matrix.original_shape[0], 1),</span>
+    <span class="c1">#             tensor_matrix.batch_size,</span>
+    <span class="c1">#             tensor_matrix.ncols,</span>
+    <span class="c1">#             ArrayEncodingType.ROW_MAJOR,</span>
+    <span class="c1">#         )</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         ONP_ERROR(</span>
+    <span class="c1">#             &quot;Encoding styles of matrix and vector must be complementary (ROW_MAJOR/COL_MAJOR or vice versa).&quot;</span>
+    <span class="c1">#         )</span>
+
+    <span class="c1"># def _matmul(self, other: &quot;CTArray&quot;) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     if self.shape != other.shape:</span>
+    <span class="c1">#         if isinstance(other, FHETensor):</span>
+    <span class="c1">#             if other.ndim == 1:</span>
+    <span class="c1">#                 return self._matvec(other, self.ncols)</span>
+    <span class="c1">#             return self.clone(EvalMatMulSquare(self.data, other.data, self.ncols))</span>
+
+    <span class="c1">#     else:</span>
+    <span class="c1">#         ONP_ERROR(</span>
+    <span class="c1">#             f&quot;Matrix dimension mismatch for multiplication: {self.shape} and {other.shape}&quot;</span>
+    <span class="c1">#         )</span>
+
+    <span class="c1"># def _dot(self, other: &quot;CTArray&quot;) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     if self.ndim == 1 and other.ndim == 1:</span>
+    <span class="c1">#         crypto_context = self.data.GetCryptoContext()</span>
+    <span class="c1">#         ciphertext = crypto_context.EvalInnerProduct(self.data, other.data, self.ncols)</span>
+    <span class="c1">#         return self.clone(ciphertext)</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         return self._matmul(other)</span>
+
+    <span class="c1"># def _pow(self, exp: int) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;Exponentiate a matrix to power k using homomorphic multiplication.&quot;&quot;&quot;</span>
+    <span class="c1">#     if not isinstance(exp, int):</span>
+    <span class="c1">#         ONP_ERROR(f&quot;Exponent must be integer, got {type(exp).__name__}&quot;)</span>
+
+    <span class="c1">#     if exp &lt; 0:</span>
+    <span class="c1">#         ONP_ERROR(&quot;Negative exponent not supported in homomorphic encryption&quot;)</span>
+
+    <span class="c1">#     if exp == 0:</span>
+    <span class="c1">#         # return algebra.eye(self))</span>
+    <span class="c1">#         pass</span>
+
+    <span class="c1">#     if exp == 1:</span>
+    <span class="c1">#         return self.clone()</span>
+
+    <span class="c1">#     # Binary exponentiation implementation</span>
+    <span class="c1">#     base = self.clone()</span>
+    <span class="c1">#     result = None</span>
+
+    <span class="c1">#     while exp:</span>
+    <span class="c1">#         if exp &amp; 1:</span>
+    <span class="c1">#             result = base if result is None else base @ result</span>
+    <span class="c1">#         base = base @ base</span>
+    <span class="c1">#         exp &gt;&gt;= 1</span>
+    <span class="c1">#     return result</span>
+
+    <span class="c1"># def _sum(self, axis=0) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     Compute the cumulative sum of tensor elements along a given axis.</span>
+
+    <span class="c1">#     Parameters</span>
+    <span class="c1">#     ----------</span>
+    <span class="c1">#     axis : int, optional</span>
+    <span class="c1">#         Axis along which the cumulative sum is computed. Default is 0.</span>
+
+    <span class="c1">#     Returns</span>
+    <span class="c1">#     -------</span>
+    <span class="c1">#     CTArray</span>
+    <span class="c1">#         A new tensor with cumulative sums along the specified axis.</span>
+    <span class="c1">#     &quot;&quot;&quot;</span>
+    <span class="c1">#     if axis == 0:</span>
+    <span class="c1">#         ciphertext = _onp_cpp.EvalSumCumRows(</span>
+    <span class="c1">#             self.data, self.ncols, self.original_shape[1]</span>
+    <span class="c1">#         )</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         ciphertext = _onp_cpp.EvalSumCumCols(self.data, self.ncols)</span>
+    <span class="c1">#     return self.clone(ciphertext)</span>
+
+    <span class="c1"># def _reduce(self, axis=0) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     if axis == 0:</span>
+    <span class="c1">#         ciphertext = _onp_cpp.EvalReduceCumRows(</span>
+    <span class="c1">#             self.data, self.ncols, self.original_shape[1]</span>
+    <span class="c1">#         )</span>
+    <span class="c1">#     else:</span>
+    <span class="c1">#         ciphertext = _onp_cpp.EvalReduceCumCols(self.data, self.ncols)</span>
+    <span class="c1">#     return self.clone(ciphertext)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_transpose</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;CTArray&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transpose the encrypted matrix.&quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.matlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">next_power_of_two</span>
+
+        <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">_onp_cpp</span><span class="o">.</span><span class="n">EvalTranspose</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ncols</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">original_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">ncols</span> <span class="o">=</span> <span class="n">next_power_of_two</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">CTArray</span><span class="p">(</span><span class="n">ciphertext</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">ncols</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">)</span></div>
+
+
+    <span class="c1"># def _trace(self) -&gt; &quot;CTArray&quot;:</span>
+    <span class="c1">#     &quot;&quot;&quot;Sum along the main diagonal of a 2-D array:&quot;&quot;&quot;</span>
+    <span class="c1">#     ONP_ERROR(&quot;Trace operation not implemented for CTArray.&quot;)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

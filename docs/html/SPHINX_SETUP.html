@@ -1,0 +1,203 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenFHE-Numpy Sphinx Documentation Setup &mdash; OpenFHE-Numpy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Foundation enums" href="enum.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            OpenFHE-Numpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Interface</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">OpenFHE-Numpy Sphinx Documentation Setup</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#sphinx-environment">Sphinx Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#documentation-structure">Documentation Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#organization-navigation">Organization &amp; Navigation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration-features">Configuration Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-documentation">Building Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#viewing-documentation">Viewing Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rebuilding-after-changes">Rebuilding After Changes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#troubleshooting-best-practices">Troubleshooting &amp; Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#updating-structure">Updating Structure</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">OpenFHE-Numpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">OpenFHE-Numpy Sphinx Documentation Setup</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/SPHINX_SETUP.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="openfhe-numpy-sphinx-documentation-setup">
+<h1>OpenFHE-Numpy Sphinx Documentation Setup<a class="headerlink" href="#openfhe-numpy-sphinx-documentation-setup" title="Link to this heading"></a></h1>
+<p>This document summarizes the Sphinx documentation setup for the OpenFHE-Numpy project, including environment, structure, build steps, and troubleshooting.</p>
+<section id="sphinx-environment">
+<h2>Sphinx Environment<a class="headerlink" href="#sphinx-environment" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Sphinx</strong>: 8.2.3</p></li>
+<li><p><strong>Theme</strong>: sphinx-rtd-theme (3.0.2)</p></li>
+<li><p><strong>Extensions</strong>: sphinx-autodoc-typehints (2.4.4), napoleon, viewcode, intersphinx, myst-parser (Markdown support)</p></li>
+<li><p><strong>NumPy</strong>: For intersphinx linking</p></li>
+</ul>
+</section>
+<section id="documentation-structure">
+<h2>Documentation Structure<a class="headerlink" href="#documentation-structure" title="Link to this heading"></a></h2>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>docs/
+    conf.py            # Sphinx configuration
+    index.rst          # Main documentation page (with toctree)
+    installation.rst   # Installation instructions
+    example.rst        # Example usage
+    api.rst            # API page (with toctree for modules)
+    tensor.rst         # Tensor API documentation
+    constructor.rst    # Constructors API documentation
+    matrix_arithmetic.rst # Matrix arithmetic API documentation
+    enum.rst           # Enum API documentation
+    SPHINX_SETUP.md    # This setup guide
+    _build/html/       # Generated HTML output
+    Makefile           # Build commands
+</pre></div>
+</div>
+</section>
+<section id="organization-navigation">
+<h2>Organization &amp; Navigation<a class="headerlink" href="#organization-navigation" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">index.rst</span></code> contains the main toctree, referencing all top-level docs: installation, example, api, SPHINX_SETUP.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">api.rst</span></code> serves as the API reference landing page, with its own toctree for API modules (tensor, constructor, matrix_arithmetic, enum).</p></li>
+<li><p>All referenced <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files should exist and be listed in the correct order for navigation.</p></li>
+</ul>
+</section>
+<section id="configuration-features">
+<h2>Configuration Features<a class="headerlink" href="#configuration-features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Extensions</strong>: autodoc, napoleon, viewcode, intersphinx, sphinx_autodoc_typehints, myst-parser</p></li>
+<li><p><strong>Theme</strong>: Read the Docs theme for consistent styling</p></li>
+<li><p><strong>NumPy-style docstrings</strong>: Supported via napoleon</p></li>
+<li><p><strong>Quick start</strong>: Usage examples and code snippets</p></li>
+<li><p><strong>API reference</strong>: Documents all modules and classes</p></li>
+</ul>
+</section>
+<section id="building-documentation">
+<h2>Building Documentation<a class="headerlink" href="#building-documentation" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>docs
+<span class="nb">source</span><span class="w"> </span>../venv/bin/activate
+make<span class="w"> </span>clean
+make<span class="w"> </span>html
+</pre></div>
+</div>
+</section>
+<section id="viewing-documentation">
+<h2>Viewing Documentation<a class="headerlink" href="#viewing-documentation" title="Link to this heading"></a></h2>
+<p>Open <code class="docutils literal notranslate"><span class="pre">docs/_build/html/index.html</span></code> in a web browser, or run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>-d<span class="w"> </span>_build/html
+</pre></div>
+</div>
+</section>
+<section id="rebuilding-after-changes">
+<h2>Rebuilding After Changes<a class="headerlink" href="#rebuilding-after-changes" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>clean<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>html
+</pre></div>
+</div>
+</section>
+<section id="troubleshooting-best-practices">
+<h2>Troubleshooting &amp; Best Practices<a class="headerlink" href="#troubleshooting-best-practices" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Ensure all referenced <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files exist and are included in the correct toctree.</p></li>
+<li><p>If you see import errors for C++ extensions, verify the extension is built and installed in the active Python environment.</p></li>
+<li><p>For docstring formatting issues, use NumPy-style and check indentation.</p></li>
+<li><p>To resolve Sphinx warnings (e.g., missing <code class="docutils literal notranslate"><span class="pre">_static</span></code>), create the required directories or update <code class="docutils literal notranslate"><span class="pre">conf.py</span></code>.</p></li>
+<li><p>Always activate the correct virtual environment before building docs.</p></li>
+</ul>
+</section>
+<section id="updating-structure">
+<h2>Updating Structure<a class="headerlink" href="#updating-structure" title="Link to this heading"></a></h2>
+<p>To add new API modules, create a new <code class="docutils literal notranslate"><span class="pre">.rst</span></code> file and add it to the <code class="docutils literal notranslate"><span class="pre">api.rst</span></code> toctree. Update <code class="docutils literal notranslate"><span class="pre">index.rst</span></code> if you want it to appear in the main navigation.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="enum.html" class="btn btn-neutral float-left" title="Foundation enums" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

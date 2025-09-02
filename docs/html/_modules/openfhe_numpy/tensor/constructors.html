@@ -1,0 +1,319 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>openfhe_numpy.tensor.constructors &mdash; OpenFHE-Numpy 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            OpenFHE-Numpy
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../example.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../SPHINX_SETUP.html">OpenFHE-Numpy Sphinx Documentation Setup</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">OpenFHE-Numpy</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">openfhe_numpy.tensor.constructors</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for openfhe_numpy.tensor.constructors</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Third-party imports</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">openfhe</span>
+
+
+<span class="c1"># Local imports</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy._onp_cpp</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.log</span><span class="w"> </span><span class="kn">import</span> <span class="n">ONP_ERROR</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.packing</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="c1"># _get_shape,</span>
+    <span class="n">_pack_matrix_col_wise</span><span class="p">,</span>
+    <span class="n">_pack_matrix_row_wise</span><span class="p">,</span>
+    <span class="n">_pack_vector_row_wise</span><span class="p">,</span>
+    <span class="n">_pack_vector_col_wise</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.typecheck</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.utils.matlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_power_of_two</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.tensor.ctarray</span><span class="w"> </span><span class="kn">import</span> <span class="n">CTArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.tensor.ptarray</span><span class="w"> </span><span class="kn">import</span> <span class="n">PTArray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">openfhe_numpy.tensor.tensor</span><span class="w"> </span><span class="kn">import</span> <span class="n">FHETensor</span>
+
+
+<span class="c1"># TODO: constructor for block matrix</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_block_dimensions</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">slots</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+    <span class="k">pass</span>
+
+
+<span class="c1"># @validate_call</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_pack_array</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="n">Number</span> <span class="o">|</span> <span class="nb">list</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">ROW_MAJOR</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;repeat&quot;</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Helper function to flatten a scalar, vector, or matrix into a 1D array and fill all slots by either padding with zeros or duplicating the array contents.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    data : list | tuple | np.ndarray | int</span>
+<span class="sd">    batch_size : int</span>
+<span class="sd">        The number of available plaintext slots</span>
+<span class="sd">    order : int, optional</span>
+<span class="sd">        The packing/encoding style, by default ArrayEncodingType.ROW_MAJOR</span>
+<span class="sd">    repeats : int, optional</span>
+<span class="sd">        The number of repetitions.</span>
+<span class="sd">        When repeats = -1, the the array content is duplicated all avaialble slots. Ortherwise, it will repeats n time. when repeats = 1, means only repeat 1 times,</span>
+<span class="sd">        Example: batch_size = 32, encoding type is row-major, repeats</span>
+<span class="sd">        Case 1: repeats  = -1</span>
+<span class="sd">        [[1 2 3], [4 5 6]] -&gt; 1 2 3 0 4 5 6 0 | 1 2 3 0 4 5 6 0 | 1 2 3 0 4 5 6 0 | 1 2 3 0 4 5 6 0</span>
+<span class="sd">        [[1], [2], [3]] -&gt; 1 1 1 1 | 2 2 2 2 | 3 3 3 3 | 0 0 0 0</span>
+<span class="sd">        [1 2 3] -&gt; 1 2 3 0 1 2 3 0 | 1 2 3 0 1 2 3 0 | 1 2 3 0 1 2 3 0 | 1 2 3 0 1 2 3 0</span>
+<span class="sd">        [1] -&gt; 1 0 0 0 | 1 0 0 0 | 1 0 0 0 | 1 0 0 0 | 1 0 0 0 | 1 0 0 0 | 1 0 0 0 | 1 0 0 0</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    _type_</span>
+<span class="sd">        _description_</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">batch_size</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;The batch size cannot be negative.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_power_of_two</span><span class="p">(</span><span class="n">batch_size</span><span class="p">):</span>
+        <span class="n">ONP_ERROR</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Batch size [</span><span class="si">{</span><span class="n">batch_size</span><span class="si">}</span><span class="s2">] must be a power of two&quot;</span><span class="p">)</span>
+
+    <span class="c1"># should follow numpy standards to avoid confusion</span>
+    <span class="c1"># org_rows, org_cols, ndim = _get_shape(data)</span>
+
+    <span class="k">if</span> <span class="n">is_numeric_scalar</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;zero&quot;</span><span class="p">:</span>
+            <span class="n">packed_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+            <span class="n">packed_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;repeat&quot;</span><span class="p">:</span>
+            <span class="n">packed_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ONP_ERROR</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid padding mode: &#39;</span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">&#39;. Valid options are &#39;zero&#39; or &#39;repeat&#39;.&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">is_numeric_arraylike</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">data</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">_ravel_matrix</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">data</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">_ravel_vector</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Not support dimension [</span><span class="si">{ndim}</span><span class="s2">]&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Input is not numeric&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="n">packed_data</span><span class="p">,</span>
+        <span class="s2">&quot;original_shape&quot;</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+        <span class="s2">&quot;ndim&quot;</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">ndim</span><span class="p">,</span>
+        <span class="s2">&quot;batch_size&quot;</span><span class="p">:</span> <span class="n">batch_size</span><span class="p">,</span>
+        <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="n">shape</span><span class="p">,</span>
+        <span class="s2">&quot;order&quot;</span><span class="p">:</span> <span class="n">order</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="array">
+<a class="viewcode-back" href="../../../constructor.html#openfhe_numpy.tensor.constructors.array">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">array</span><span class="p">(</span>
+    <span class="n">cc</span><span class="p">:</span> <span class="n">openfhe</span><span class="o">.</span><span class="n">CryptoContext</span><span class="p">,</span>
+    <span class="n">data</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">ROW_MAJOR</span><span class="p">,</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DataType</span><span class="o">.</span><span class="n">CIPHERTEXT</span><span class="p">,</span>
+    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;repeat&quot;</span><span class="p">,</span>
+    <span class="n">package</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{},</span>
+    <span class="n">public_key</span><span class="p">:</span> <span class="n">openfhe</span><span class="o">.</span><span class="n">PublicKey</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FHETensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Construct either a ciphertext or plaintext (CTArray/PTArray) from raw input data.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    cc : CryptoContext</span>
+<span class="sd">        The OpenFHE CryptoContext.</span>
+<span class="sd">    data : matrix/vector/int</span>
+<span class="sd">    batch_size : int</span>
+<span class="sd">        Number of total plaintext batch_size.</span>
+<span class="sd">    order : int</span>
+<span class="sd">        Encoding order: ArrayEncodingType.ROW_MAJOR or COL_MAJOR.</span>
+<span class="sd">    type : str</span>
+<span class="sd">        DataType.CIPHERTEXT or PLAINTEXT.</span>
+<span class="sd">    public_key : optional</span>
+<span class="sd">        Public key needed for encryption if the output is encrypted</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">        - A matrix has a dimension of m x n (m rows x n cols)</span>
+<span class="sd">        - A vector is considered as n x 1 matrix</span>
+<span class="sd">        - A number is considered as a vector with duplicated entries: [1 1 1 1]</span>
+<span class="sd">    -------</span>
+<span class="sd">    FHETensor Object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">package</span> <span class="o">==</span> <span class="p">{}:</span>
+        <span class="n">package</span> <span class="o">=</span> <span class="n">_pack_array</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">packed_data</span> <span class="o">=</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+    <span class="n">ndim</span> <span class="o">=</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;ndim&quot;</span><span class="p">]</span>
+    <span class="n">batch_size</span> <span class="o">=</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;batch_size&quot;</span><span class="p">]</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;shape&quot;</span><span class="p">]</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;order&quot;</span><span class="p">]</span>
+    <span class="n">plaintext</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">MakeCKKSPackedPlaintext</span><span class="p">(</span><span class="n">packed_data</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">packed_data</span><span class="p">[:</span><span class="mi">64</span><span class="p">])</span>
+    <span class="k">if</span> <span class="nb">type</span> <span class="o">==</span> <span class="n">DataType</span><span class="o">.</span><span class="n">PLAINTEXT</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">PTArray</span><span class="p">(</span><span class="n">plaintext</span><span class="p">,</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;original_shape&quot;</span><span class="p">],</span> <span class="n">ndim</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">public_key</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Public key must be provided for ciphertext encoding.&quot;</span><span class="p">)</span>
+
+        <span class="n">ciphertext</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">Encrypt</span><span class="p">(</span><span class="n">public_key</span><span class="p">,</span> <span class="n">plaintext</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">CTArray</span><span class="p">(</span><span class="n">ciphertext</span><span class="p">,</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;original_shape&quot;</span><span class="p">],</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">result</span><span class="o">.</span><span class="n">set_shape</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">set_batch_size</span><span class="p">(</span><span class="n">batch_size</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ravel_matrix</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">ROW_MAJOR</span><span class="p">,</span> <span class="n">pad_to_pow2</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;repeat&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Encode a 2D matrix into a packed array.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Plaintext</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="n">ROW_MAJOR</span><span class="p">:</span>
+        <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">_pack_matrix_row_wise</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">pad_to_pow2</span><span class="p">,</span> <span class="n">mode</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">order</span> <span class="o">==</span> <span class="n">COL_MAJOR</span><span class="p">:</span>
+        <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">_pack_matrix_col_wise</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">pad_to_pow2</span><span class="p">,</span> <span class="n">mode</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unsupported encoding order&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ravel_vector</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">ROW_MAJOR</span><span class="p">,</span> <span class="n">pad_to_pow2</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">tile</span><span class="o">=</span><span class="s2">&quot;repeats&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Encode a 1D vector into a packed array.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    data : list</span>
+<span class="sd">    repeats : int</span>
+<span class="sd">        Number of repeats.</span>
+<span class="sd">    order : ArrayEncodingType</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Plaintext</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">target_cols</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="s2">&quot;target_cols&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;target_cols&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;target_cols&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">target_cols</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_cols&quot;</span><span class="p">)</span>
+
+    <span class="n">pad_value</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pad_value&quot;</span><span class="p">,</span> <span class="s2">&quot;repeat&quot;</span><span class="p">)</span>
+    <span class="n">expand</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;expand&quot;</span><span class="p">,</span> <span class="s2">&quot;repeat&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="n">ROW_MAJOR</span><span class="p">:</span>
+        <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">_pack_vector_row_wise</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">target_cols</span><span class="p">,</span> <span class="n">expand</span><span class="p">,</span> <span class="n">tile</span><span class="p">,</span> <span class="n">pad_to_pow2</span><span class="p">,</span> <span class="n">pad_value</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">order</span> <span class="o">==</span> <span class="n">COL_MAJOR</span><span class="p">:</span>
+        <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span> <span class="o">=</span> <span class="n">_pack_vector_col_wise</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">target_cols</span><span class="p">,</span> <span class="n">expand</span><span class="p">,</span> <span class="n">tile</span><span class="p">,</span> <span class="n">pad_to_pow2</span><span class="p">,</span> <span class="n">pad_value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ONP_ERROR</span><span class="p">(</span><span class="s2">&quot;Unsupported encoding order&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">packed_data</span><span class="p">,</span> <span class="n">shape</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
