@@ -180,7 +180,7 @@ OpenFHE-NumPy currently supports the following operations:
 | `sum`       | Sum along axis              | `onp.sum(a, axis)`              |
 
 ## Current Limitations
-In the current version, the OpenFHE-NumPy package supports operations on a single ciphertext vector, where each encrypted array variable (which has type CTArray or PTArray) contains only a single encoding vector.
+In the current version, the OpenFHE-NumPy package supports operations on single-ciphertext vectors/matrices, where each encrypted array variable (which has type CTArray or PTArray) contains only a single encoding vector.
 
 For example, we can consider a matrix:
 ```
