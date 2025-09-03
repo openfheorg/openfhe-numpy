@@ -16,7 +16,7 @@ To run tests, you should run them from inside the tests directory so that Python
 ### Run All Tests
 
 ```bash
-cd tests/python
+cd tests
 python3 -m unittest discover -v
 ```
 
@@ -24,12 +24,12 @@ python3 -m unittest discover -v
 ### Run a Single Test File
 
 ```bash
-cd tests/python
-python3 -m unittest python.test_matrix_addition
+cd tests
+python3 -m unittest python.test_matrix_sum
 ```
 or
 ```bash
- python3 tests/python/test_matrix_addition.py
+ python3 tests/python/test_matrix_sum.py
 ```
 
 
