@@ -25,7 +25,7 @@ python3 -m unittest discover -v
 
 ```bash
 cd tests
-python3 -m unittest python.test_matrix_sum
+python3 -m unittest test_matrix_sum
 ```
 or
 ```bash
