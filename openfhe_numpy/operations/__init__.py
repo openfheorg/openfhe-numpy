@@ -50,6 +50,7 @@ from .matrix_api import (
     cumulative_reduce,
     sum,
     roll,
+    mean,
 )
 
 # Import crypto context utilities
@@ -79,6 +80,7 @@ __all__ = [
     "cumulative_reduce",
     "sum",
     "roll",
+    "mean",
     # Key generation utilities
     "sum_row_keys",
     "sum_col_keys",

@@ -26,13 +26,13 @@ def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
     onp.gen_sum_key(keys.secretKey)
 
     # Perform homomorphic total sum
-    ctm_result = onp.sum(ctm_x)
+    ctm_result = onp.mean(ctm_x)
 
     # Perform decryption
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
-    validate_and_print_results(result, np.sum(matrix), "Total Sum")
+    validate_and_print_results(result, np.mean(matrix), "Total Sum")
 
 
 def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
@@ -48,13 +48,13 @@ def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
         raise ValueError("Invalid order.")
 
     # Perform homomorphic row sum
-    ctm_result = onp.sum(ctm_x, axis=0)
+    ctm_result = onp.mean(ctm_x, axis=0)
 
     # Perform decryption
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
-    validate_and_print_results(result, np.sum(matrix, axis=0), "Row Sum")
+    validate_and_print_results(result, np.mean(matrix, axis=0), "Row Sum")
 
 
 def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
@@ -69,20 +69,27 @@ def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
         raise ValueError("Invalid order.")
 
     # Perform homomorphic column sum
-    ctm_result = onp.sum(ctm_x, axis=1)
+    ctm_result = onp.mean(ctm_x, axis=1)
 
     # Perform decryption
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
-    validate_and_print_results(result, np.sum(matrix, axis=1), "Column Sum")
+    validate_and_print_results(result, np.mean(matrix, axis=1), "Column Sum")
 
 
 def main():
     ### Run a demonstration of homomorphic matrix sum using OpenFHE-NumPy ###
 
     # Setup CKKS parameters
+    # The multiplicative depth is 2, since computing the average requires one multiplication.
     params = CCParamsCKKSRNS()
+    params.SetMultiplicativeDepth(2)
+    params.SetScalingModSize(59)
+    params.SetFirstModSize(60)
+    params.SetScalingTechnique(FIXEDAUTO)
+    params.SetKeySwitchTechnique(HYBRID)
+    params.SetSecretKeyDist(UNIFORM_TERNARY)
 
     # Generate crypto context
     crypto_context = GenCryptoContext(params)
@@ -97,7 +104,7 @@ def main():
 
     # Get system parameters
     ring_dim = crypto_context.GetRingDimension()
-    batch_size = params.GetBatchSize() if params.GetBatchSize() else ring_dim // 2
+    batch_size = ring_dim // 2
 
     print("\nCrypto Info:")
     print(f"  - Used slots: {batch_size}")
@@ -105,9 +112,9 @@ def main():
 
     # Sample input matrix - using a simple matrix for demonstration
     matrix = [
-        [2.0, -3.0],
-        [0.5, 0.25],
-        [-1.125, 1.875],
+        [1, 2],
+        [3, 4],
+        [5, 6],
     ]
 
     print(f"\nInput Matrix:\n{matrix}")

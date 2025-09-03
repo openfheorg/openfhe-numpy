@@ -1,12 +1,8 @@
 # tests/test_vector_ops.py
 
 import numpy as np
-from openfhe import *
 import openfhe_numpy as onp
-
-from core.test_framework import MainUnittest
-from core.test_utils import generate_random_array
-from core.test_crypto_context import load_ckks_params, gen_crypto_context
+from core import *
 
 
 def fhe_vector_op(params, data, op_name):
@@ -16,13 +12,10 @@ def fhe_vector_op(params, data, op_name):
     - data: list, either [A, B] or [A, scalar] or [A]
     - op_name: one of "add", "sub", "transpose", "mul", "scalar_mul", "dot", "sum"
     """
-
-    cc, keys = gen_crypto_context(params)
-    cc.EvalMultKeyGen(keys.secretKey)
-    cc.EvalSumKeyGen(keys.secretKey)
-
     A = np.array(data[0])
-    batch_size = params["ringDim"] // 2
+
+    cc, keys, p = params
+    batch_size = p["ringDim"] // 2
 
     # encrypt A
     ctv_a = onp.array(
@@ -76,6 +69,14 @@ def fhe_vector_op(params, data, op_name):
 class TestVectorOperations(MainUnittest):
     """Dynamically parameterized tests for all FHE vector ops."""
 
+    context = {}
+    ckks_params = load_ckks_params()
+    for i, p in enumerate(ckks_params):
+        cc, keys = gen_crypto_context(p)
+        cc.EvalMultKeyGen(keys.secretKey)
+        cc.EvalSumKeyGen(keys.secretKey)
+        context[i] = (cc, keys, p)
+
     @classmethod
     def _generate_test_cases(cls):
         ops = [
@@ -88,13 +89,13 @@ class TestVectorOperations(MainUnittest):
             ("sum", lambda A: np.sum(A)),
         ]
 
-        ckks_params = load_ckks_params()
         sizes = [5, 8, 16]
         scalar = 7.0
         test_id = 1
 
-        for op_name, np_fn in ops:
-            for params in ckks_params:
+        for i in range(len(cls.ckks_params)):
+            cc, keys, params = cls.context[i]
+            for op_name, np_fn in ops:
                 for size in sizes:
                     A = generate_random_array(rows=size, cols=1)
                     # prepare data & expected
@@ -113,7 +114,7 @@ class TestVectorOperations(MainUnittest):
                     cls.generate_test_case(
                         func=lambda p, d, op=op_name: fhe_vector_op(p, d, op),
                         test_name=name,
-                        params=params,
+                        params=cls.context[i],
                         input_data=data,
                         expected=expected,
                         compare_fn=onp.check_equality,

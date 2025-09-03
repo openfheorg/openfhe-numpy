@@ -11,24 +11,25 @@ Our tests use a custom framework built on top of Python's `unittest`
 
 ## Running Tests
 
+To run tests, you should run them from inside the tests directory so that Python does not mistake the local openfhe_numpy folder for the installed package.
+
 ### Run All Tests
 
-To discover and run all tests:
-
-
 ```bash
-python3 -m unittest discover -s tests 
+cd tests/python
+python3 -m unittest discover -v
 ```
 
 
 ### Run a Single Test File
 
 ```bash
-python3 -m unittest tests.test_matrix_addition
+cd tests/python
+python3 -m unittest python.test_matrix_addition
 ```
 or
 ```bash
- python3 tests/test_matrix_addition.py
+ python3 tests/python/test_matrix_addition.py
 ```
 
 
@@ -44,7 +45,7 @@ Test results are written to log files and displayed on the console:
   - Actual result
   - Error details
 
-## Customizing Test Runs
+## Unittest Quick Guide
 
 * **Verbose Output**: Add `-v` for detailed information:
   ```bash

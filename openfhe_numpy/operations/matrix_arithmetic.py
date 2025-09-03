@@ -523,9 +523,9 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             ONPNotSupportedError(f"Not support the current encoding [{order}]")
 
         if keepdims:
-            shape, padded_shape = (rows, 1), (nrows, ncols)
+            shape, padded_shape = (rows, 1), x.shape
         else:
-            shape, padded_shape = (rows,), (nrows, ncols)
+            shape, padded_shape = (rows,), x.shape
 
     else:
         ONPValueError(f"Invalid axis [{axis}]")
@@ -559,22 +559,21 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
 # ------------------------------------------------------------------------------
 
 
-@register_tensor_function("mean", [("CTArray", "int", "bool")])
+@register_tensor_function("mean", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")])
 def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     cc = x.data.GetCryptoContext()
-    nrows, ncols = x.shape
-    n = nrows * ncols
+    nrows, ncols = x.original_shape
     sum_x = sum_ct(x, axis, keepdims)
     if axis is None:
-        res = cc.EvalMul(1.0 / n, sum_x)
+        ct_mean = cc.EvalMult(sum_x.data, 1.0 / (nrows * ncols))
     elif axis == 0:  # sum over rows
-        res = cc.EvalMul(1.0 / nrows, sum_x)
+        ct_mean = cc.EvalMult(sum_x.data, 1.0 / nrows)
     elif axis == 1:  # sum over cols
-        res = cc.EvalMul(1.0 / ncols, sum_x)
+        ct_mean = cc.EvalMult(sum_x.data, 1.0 / ncols)
     else:
         ONPDimensionError(f"The dimension is invalid axis = {axis}")
 
-    return CTArray(res, sum_x.shape, sum_x.padded_shape, sum_x.batch_size)
+    return CTArray(ct_mean, sum_x.original_shape, sum_x.batch_size, sum_x.shape, sum_x.order)
 
 
 # ------------------------------------------------------------------------------

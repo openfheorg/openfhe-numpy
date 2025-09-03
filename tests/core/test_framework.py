@@ -105,7 +105,6 @@ def log_test_failure(
     expected: Any,
     result: Any,
 ):
-
     msg = (
         f"FAIL: {test_id}\n"
         f"    Error: {err_msg}\n"
@@ -125,7 +124,6 @@ def log_test_error(
     expected: Any,
     result: Any,
 ):
-
     msg = (
         f"ERROR: {test_id}\n"
         f"    Exception: {err}\n"
@@ -153,6 +151,9 @@ class LoggingTestResult(unittest.TextTestResult):
     def addError(self, test, err):
         super().addError(test, err)
 
+    def stopTest(self, test: unittest.TestCase) -> None:
+        return super().stopTest(test)
+
 
 # ===============================
 # Base Test Class
@@ -164,6 +165,30 @@ class MainUnittest(unittest.TestCase):
         if hasattr(cls, "_generate_test_cases"):
             cls._generate_test_cases()
             cls._tests_generated = True
+
+    def tearDown(self):
+        """Clean up resources after each test"""
+        import gc
+
+        gc.collect()
+
+        # Clear OpenFHE specific objects if they exist in the test
+        crypto_objects = ["cc", "keys", "params", "context", "keypair", "tensor"]
+        for obj in crypto_objects:
+            if hasattr(self, obj):
+                setattr(self, obj, None)
+                delattr(self, obj)
+
+        # Clear any large objects in the test instance
+        for attr in list(self.__dict__.keys()):
+            if not attr.startswith("_"):
+                setattr(self, attr, None)
+                delattr(self, attr)
+
+        # Force another collection after crypto cleanup
+        gc.collect()
+
+        super().tearDown()
 
     @classmethod
     def setUpClass(cls):

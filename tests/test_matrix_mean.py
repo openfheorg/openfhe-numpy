@@ -1,11 +1,7 @@
 import numpy as np
-from openfhe import *
 import openfhe_numpy as onp
 
-from core.test_framework import MainUnittest
-from core.test_utils import generate_random_array, suppress_stdout
-from core.test_crypto_context import load_ckks_params, gen_crypto_context
-
+from core import *
 
 """
 Note: Mean operations may require sufficient multiplicative depth
@@ -46,25 +42,35 @@ def fhe_matrix_mean(params, data, axis=None, order=onp.ROW_MAJOR):
         )
 
         # Generate appropriate keys based on axis
-        if axis is None:  # Total mean
-            cc.EvalSumKeyGen(keys.secretKey)
-        elif axis == 0:  # Row mean (mean along rows)
-            if order == onp.ROW_MAJOR:
-                onp.sum_row_keys(keys.secretKey, ctm_x.ncols, ctm_x.batch_size)
-            elif order == onp.COL_MAJOR:
-                onp.sum_col_keys(keys.secretKey, ctm_x.nrows)
+        if axis is None:  # Total sum
+            onp.gen_sum_key(keys.secretKey)
+
+        elif axis == 0:  # Row sum (sum along rows)
+            if ctm_x.order == onp.ROW_MAJOR:
+                ctm_x.extra["rowkey"] = onp.sum_row_keys(
+                    keys.secretKey, ctm_x.ncols, ctm_x.batch_size
+                )
+            elif ctm_x.order == onp.COL_MAJOR:
+                ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.nrows)
+
             else:
                 raise ValueError("Invalid order.")
-        elif axis == 1:  # Column mean (mean along columns)
-            if order == onp.ROW_MAJOR:
-                onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
-            elif order == onp.COL_MAJOR:
-                onp.sum_row_keys(keys.secretKey, ctm_x.nrows, ctm_x.batch_size)
+        elif axis == 1:  # Column sum (sum along columns)
+            if ctm_x.order == onp.ROW_MAJOR:
+                ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
+            elif ctm_x.order == onp.COL_MAJOR:
+                ctm_x.extra["rowkey"] = onp.sum_row_keys(
+                    keys.secretKey, ctm_x.nrows, ctm_x.batch_size
+                )
             else:
                 raise ValueError("Invalid order.")
 
-        # Perform mean operation
-        ctm_result = onp.mean(ctm_x, axis)
+        # Perform sum operation
+        if axis is None:
+            ctm_result = onp.mean(ctm_x)  # Total sum without axis parameter
+        else:
+            assert isinstance(axis, int), f"axis should be int but got {axis!r}"
+            ctm_result = onp.mean(ctm_x, axis)  # Sum along specified axis
 
         # Decrypt result
         result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
