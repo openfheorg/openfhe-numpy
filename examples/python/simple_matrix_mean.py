@@ -18,7 +18,7 @@ def validate_and_print_results(computed, expected, operation_name):
     return is_match, error
 
 
-def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
+def run_total_mean_example(crypto_context, keys, ctm_x, matrix):
     ### Run homomorphic total sum example ###
 
     # Generate rotation keys for total sum operations
@@ -32,10 +32,10 @@ def run_total_sum_example(crypto_context, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
-    validate_and_print_results(result, np.mean(matrix), "Total Sum")
+    validate_and_print_results(result, np.mean(matrix), "Total Mean")
 
 
-def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
+def run_row_mean_example(crypto_context, keys, ctm_x, matrix):
     ### Run homomorphic row sum example ###
 
     # Generate rotation keys for row sum operations
@@ -54,10 +54,10 @@ def run_row_sum_example(crypto_context, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
-    validate_and_print_results(result, np.mean(matrix, axis=0), "Row Sum")
+    validate_and_print_results(result, np.mean(matrix, axis=0), "Row Mean")
 
 
-def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
+def run_column_mean_example(crypto_context, keys, ctm_x, matrix):
     ### Run homomorphic column sum example ###
 
     # Generate rotation keys for column sum operations.
@@ -75,7 +75,7 @@ def run_column_sum_example(crypto_context, keys, ctm_x, matrix):
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
 
     # Validate and print results
-    validate_and_print_results(result, np.mean(matrix, axis=1), "Column Sum")
+    validate_and_print_results(result, np.mean(matrix, axis=1), "Column Mean")
 
 
 def main():
@@ -138,9 +138,9 @@ def main():
     )
 
     # Run sum examples
-    run_total_sum_example(crypto_context, keys, ctm_x, matrix)
-    run_row_sum_example(crypto_context, keys, ctm_x, matrix)
-    run_column_sum_example(crypto_context, keys, ctm_x, matrix)
+    run_total_mean_example(crypto_context, keys, ctm_x, matrix)
+    run_row_mean_example(crypto_context, keys, ctm_x, matrix)
+    run_column_mean_example(crypto_context, keys, ctm_x, matrix)
 
 
 if __name__ == "__main__":

@@ -346,34 +346,6 @@ def pow_block_ct(a, exp):
 # ------------------------------------------------------------------------------
 # Cumulative Sum Operations
 # ------------------------------------------------------------------------------
-# def _cumulative_sum_ct(x, axis=0, keepdims=True):
-#     """
-#     Compute the cumulative sum of tensor elements along a given axis.
-
-#     Parameters
-#     ----------
-#     tensor : CTArray
-#         Input encrypted x.
-#     axis : int, optional
-#         Axis along which the cumulative sum is computed. Default is 0.
-#     keepdims : bool, optional
-#         Whether to keep the dimensions of the original x. Default is True.
-
-#     Returns
-#     -------
-#     CTArray
-#         A new tensor with cumulative sums along the specified axis.
-#     """
-
-#     if axis not in (0, 1):
-#         ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
-#     if axis == 0:
-#         ciphertext = EvalSumCumRows(
-#             x.data, x.ncols, x.original_shape[1]
-#         )
-#     else:
-#         ciphertext = EvalSumCumCols(x.data, x.ncols)
-#     return x.clone(ciphertext)
 
 
 @register_tensor_function(
@@ -498,34 +470,38 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
             ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], x.batch_size * 4)
-            padded_shape = (nrows, ncols)
+            padded_shape = x.shape
             order = ArrayEncodingType.COL_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
             ct_sum = cc.EvalSumCols(fhe_data, nrows, x.extra["colkey"])
+            padded_shape = (ncols, nrows)
             order = ArrayEncodingType.ROW_MAJOR
+
         else:
             ONPNotSupportedError(f"Not support the current encoding [{order}] ")
 
         if keepdims:
-            shape, padded_shape = (cols, 1), (ncols, nrows)
+            shape = (cols, 1)
         else:
-            shape, padded_shape = (cols,), (ncols, nrows)
+            shape = (cols,)
 
     elif axis == 1:
         # Sum across each column of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
             ct_sum = cc.EvalSumCols(fhe_data, ncols, x.extra["colkey"])
+            padded_shape = x.shape
             order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
             ct_sum = cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], x.batch_size * 4)
+            padded_shape = (ncols, nrows)
             order = ArrayEncodingType.COL_MAJOR
         else:
             ONPNotSupportedError(f"Not support the current encoding [{order}]")
 
         if keepdims:
-            shape, padded_shape = (rows, 1), x.shape
+            shape = (rows, 1)
         else:
-            shape, padded_shape = (rows,), x.shape
+            shape = (rows,)
 
     else:
         ONPValueError(f"Invalid axis [{axis}]")
