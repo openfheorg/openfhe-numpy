@@ -68,7 +68,7 @@ ERROR_DIR.mkdir(exist_ok=True, parents=True)
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-# File handlers
+
 for level, path in (
     (logging.INFO, LOG_DIR / "results.log"),
     (logging.ERROR, ERROR_DIR / "errors.log"),
@@ -77,7 +77,7 @@ for level, path in (
     fh.setLevel(level)
     fh.setFormatter(logging.Formatter(LOG_FORMAT))
     logger.addHandler(fh)
-# Console handler
+
 ch = logging.StreamHandler(sys.stdout)
 ch.setLevel(logging.INFO)
 ch.setFormatter(logging.Formatter(LOG_FORMAT))
@@ -105,7 +105,7 @@ def log_test_failure(
     expected: Any,
     result: Any,
 ):
-    """Log assertion failures with full context in a multi-line, indented format."""
+
     msg = (
         f"FAIL: {test_id}\n"
         f"    Error: {err_msg}\n"
@@ -125,7 +125,7 @@ def log_test_error(
     expected: Any,
     result: Any,
 ):
-    """Log unexpected exceptions with full context in a multi-line, indented format."""
+
     msg = (
         f"ERROR: {test_id}\n"
         f"    Exception: {err}\n"

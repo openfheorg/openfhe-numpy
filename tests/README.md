@@ -15,20 +15,12 @@ Our tests use a custom framework built on top of Python's `unittest`
 
 To discover and run all tests:
 
-```bash
-python3 -m tests
-```
-
-With unittest:
 
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests 
 ```
 
-With summary:
-```bash
-python3 tests/test_matrix_addition.py
-```
+
 ### Run a Single Test File
 
 ```bash

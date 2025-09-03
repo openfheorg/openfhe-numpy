@@ -85,7 +85,7 @@ class TestMatrixMean(MainUnittest):
         ]
 
         # Add ordering options
-        orders = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COLUMN_MAJOR)]
+        orders = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COL_MAJOR)]
 
         ckks_param_list = load_ckks_params()
         matrix_sizes = [2, 3, 4]  # Smaller sizes for mean operations

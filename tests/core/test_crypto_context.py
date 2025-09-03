@@ -31,7 +31,6 @@
 
 """
 Crypto context and parameter loading for OpenFHE-NumPy tests.
-Suppress_stdout has been moved to utils.py.
 """
 
 import os
@@ -65,7 +64,7 @@ MODULE_DIR: Path = Path(__file__).parent.resolve()
 TEST_DIR: Path = Path(__file__).parent.parent.resolve()
 PARAMS_CSV: Path = TEST_DIR / "crypto_params" / "ckks_params_auto.csv"
 
-# print("PARAMS_CSV = ", PARAMS_CSV)
+
 # ===============================
 # CSV Field Converters
 # ===============================
