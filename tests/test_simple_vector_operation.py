@@ -1,6 +1,7 @@
 # tests/test_vector_ops.py
 
 import numpy as np
+from openfhe import *
 import openfhe_numpy as onp
 from core import *
 
