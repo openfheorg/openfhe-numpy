@@ -1,7 +1,7 @@
 # OpenFHE-NumPy
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-[![Python Versions](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
+[![Python Versions](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.4.0%2B-green)](https://github.com/openfheorg/openfhe-development)
 
 OpenFHE-NumPy is a NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax.
