@@ -47,7 +47,7 @@ openfhe-numpy/
 
 - **C++ compiler**: Supporting C++17 standard
 - **CMake**: Version 3.16 or newer
-- **Python**: Version 3.8 or newer
+- **Python**: Version 3.10 or newer
 - **NumPy**: Any version
 - **OpenFHE**: Any version
 - **OpenFHE Python**: Any version
@@ -88,7 +88,7 @@ pip install openfhe_numpy==<openfhe_package_version>
 
 Once installed, any python example at https://github.com/openfheorg/openfhe-numpy/tree/main/examples/python can be executed.
 
-Note that Ubuntu LTS 20.04, 22.04, and 24.04 are currently supported. `pip uninstall` can be used to uninstall the openfhe package.
+Note that Ubuntu LTS 22.04 and 24.04 are currently supported. `pip uninstall` can be used to uninstall the openfhe package.
 
 
 ## Running Tests
