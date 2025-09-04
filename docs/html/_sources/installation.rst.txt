@@ -6,8 +6,8 @@ OpenFHE-Numpy requires the OpenFHE library to be installed first.
 Prerequisites
 -------------
 
-- Python 3.8+
-- OpenFHE library (version 1.3.1+)
+- Python 3.10+
+- OpenFHE library (version 1.4.0+)
 - NumPy
 - CMake (for building from source)
 
