@@ -1,6 +1,5 @@
 import numpy as np
 from openfhe import *
-
 import openfhe_numpy as onp
 
 
@@ -138,27 +137,6 @@ def main():
     # Run accumulation examples
     run_row_accumulation_example(cc, keys, ctm_x, matrix)
     run_column_accumulation_example(cc, keys, ctm_x, matrix)
-
-
-# Expected:
-# [[1 3 1 1]
-#  [3 5 3 3]
-#  [6 8 6 6]]
-
-# Decrypted Result:
-# [[1. 3. 1. 1.]
-#  [3. 5. 3. 3.]
-#  [6. 8. 6. 6.]]
-
-# Expected:
-# [[ 1  4  5  6]
-#  [ 2  4  6  8]
-#  [ 3  6  9 12]]
-
-# Decrypted Result:
-# [[ 1.  4.  5.  6.]
-#  [ 2.  4.  6.  8.]
-#  [ 3.  6.  9. 12.]]
 
 
 if __name__ == "__main__":

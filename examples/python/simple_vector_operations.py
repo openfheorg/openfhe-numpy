@@ -38,7 +38,7 @@ def main():
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
-    onp.gen_rotation_keys(keys.secretKey, [1, 2, 3, 4, 5, 6, 7])
+    onp.gen_rotation_keys(keys.secretKey, [-7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7])
 
     ring_dim = cc.GetRingDimension()
     batch_size = ring_dim // 2
@@ -113,9 +113,7 @@ def main():
     onp.gen_transpose_keys(keys.secretKey, ctv_a)
     ctv_a_T = onp.transpose(ctv_a)
     res_T = ctv_a_T.decrypt(keys.secretKey, unpack_type="original")
-    validate_and_print_results(
-        res_T, np.transpose(vector_a), f"Tranpose \n{vector_a}"
-    )
+    validate_and_print_results(res_T, np.transpose(vector_a), f"Tranpose \n{vector_a}")
 
     # 4) Elementwise multiplication
     ctv_mul = ctv_a * ctv_b
@@ -128,9 +126,7 @@ def main():
 
     # 5) Elementwise multiplication
     ctv_mul_scalar = ctv_a * 7
-    res_mul_scalar = ctv_mul_scalar.decrypt(
-        keys.secretKey, unpack_type="original"
-    )
+    res_mul_scalar = ctv_mul_scalar.decrypt(keys.secretKey, unpack_type="original")
     validate_and_print_results(
         res_mul_scalar,
         np.multiply(vector_a, 7),
@@ -140,9 +136,7 @@ def main():
     # 6) Inner product
     # We can use onp.dot(ctv_a, ctv_b) as well
     ctv_inner = ctv_a @ ctv_b
-    res_inner_decrypted = ctv_inner.decrypt(
-        keys.secretKey, unpack_type="original"
-    )
+    res_inner_decrypted = ctv_inner.decrypt(keys.secretKey, unpack_type="original")
     validate_and_print_results(
         res_inner_decrypted,
         np.dot(vector_a, vector_b),
@@ -157,11 +151,9 @@ def main():
     )
 
     # 8) Rotation.
-    for shift in range(1, 8):
+    for shift in range(-7, 8):
         ctv_c_rotated = onp.roll(ctv_c, shift)
-        res_rotation = ctv_c_rotated.decrypt(
-            keys.secretKey, unpack_type="original"
-        )
+        res_rotation = ctv_c_rotated.decrypt(keys.secretKey, unpack_type="original")
         validate_and_print_results(
             res_rotation,
             np.roll(vector_c, shift),
