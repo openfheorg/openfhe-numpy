@@ -46,6 +46,7 @@ import openfhe_numpy as onp
 from .test_utils import suppress_stdout
 # from .test_crypto_context import get_cached_crypto_context
 
+VERBOSE_MODE = True
 # ===============================
 # Paths and Directories
 # ===============================
@@ -87,14 +88,20 @@ logger.addHandler(ch)
 # ===============================
 # Logging Helpers
 # ===============================
-def configure_logging():
+def configure_logging(verbose=False):
     """Ensure log directories exist."""
+
+    """Configure logging with optional quiet mode."""
+    global VERBOSE_MODE
+    VERBOSE_MODE = verbose
+
     for d in (LOG_DIR, ERROR_DIR):
         d.mkdir(exist_ok=True, parents=True)
 
 
 def log_test_success(test_id: str):
-    logger.info(f"PASS: {test_id}")
+    if VERBOSE_MODE:
+        logger.info(f"PASS: {test_id}")
 
 
 def log_test_failure(
@@ -172,22 +179,13 @@ class MainUnittest(unittest.TestCase):
 
         gc.collect()
 
-        # Clear OpenFHE specific objects if they exist in the test
-        crypto_objects = ["cc", "keys", "params", "context", "keypair", "tensor"]
-        for obj in crypto_objects:
-            if hasattr(self, obj):
-                setattr(self, obj, None)
-                delattr(self, obj)
+        import gc
 
-        # Clear any large objects in the test instance
-        for attr in list(self.__dict__.keys()):
-            if not attr.startswith("_"):
-                setattr(self, attr, None)
-                delattr(self, attr)
-
-        # Force another collection after crypto cleanup
+        for name in ("cc", "keys", "params", "context", "keypair", "tensor"):
+            if hasattr(self, name):
+                setattr(self, name, None)
         gc.collect()
-
+        super().tearDown()
         super().tearDown()
 
     @classmethod
@@ -198,11 +196,11 @@ class MainUnittest(unittest.TestCase):
             cls._tests_generated = True
 
     @classmethod
-    def run_test_summary(cls, name: str = "", debug: bool = False) -> int:
+    def run_test_summary(cls, name: str = "", verbose: bool = False) -> int:
         print(f"Running {name} tests...")
         start = datetime.now()
         runner = unittest.TextTestRunner(
-            verbosity=2 if debug else 1,
+            verbosity=2 if verbose else 1,
             resultclass=LoggingTestResult,
         )
         result = runner.run(unittest.defaultTestLoader.loadTestsFromTestCase(cls))
@@ -237,8 +235,6 @@ class MainUnittest(unittest.TestCase):
 
         def test_method(self):
             result = None
-            # change later
-            # new_params = get_cached_crypto_context(orig_params)
             try:
                 with suppress_stdout(not debug):
                     result = func(orig_params, input_data)
@@ -261,11 +257,3 @@ class MainUnittest(unittest.TestCase):
 
         setattr(cls, f"test_{test_name}", test_method)
         return test_method  # Return the created method for chaining
-
-
-# ===============================
-# CLI Entry
-# ===============================
-configure_logging()
-if __name__ == "__main__":
-    sys.exit(MainUnittest.run_test_summary("All", debug="-v" in sys.argv))
