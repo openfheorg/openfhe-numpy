@@ -17,19 +17,19 @@ To run tests, you should run them from inside the tests directory so that Python
 
 ```bash
 cd tests
-python3 -m unittest discover -v
+python3 -m python_tests
 ```
 
 
 ### Run a Single Test File
 
 ```bash
-cd tests
+cd tests/python_tests
 python3 -m unittest test_matrix_sum
 ```
 or
 ```bash
- python3 tests/python/test_matrix_sum.py
+ python3 tests/python_tests/test_matrix_sum.py
 ```
 
 
