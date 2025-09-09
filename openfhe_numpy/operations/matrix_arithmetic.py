@@ -234,7 +234,7 @@ def _eval_matvec_ct(lhs, rhs):
                 ct_prod,
                 (lhs.original_shape[0],),
                 lhs.batch_size,
-                (lhs.shape[0], lhs.shape[1]),
+                (lhs.shape[1], lhs.shape[0]),
                 ArrayEncodingType.COL_MAJOR,
             )
         else:
