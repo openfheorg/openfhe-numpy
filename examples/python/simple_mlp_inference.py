@@ -1,6 +1,19 @@
+# Simple Multi-Layer Perceptron (MLP) with a 2-4-1 architecture: 
+# 2 inputs, 4 hidden neurons, and 1 output neuron.
+# 
+# This code performs a forward pass (inference) to demonstrate 
+# the network's operation. In this scenario, both the input data and 
+# the model's weights are encrypted. The purpose is to show how to 
+# perform secure inference using OpenFHE-Numpy, where the computations 
+# are done on encrypted data.
+
 import numpy as np
 from openfhe import *
 import openfhe_numpy as onp
+import time
+
+# In this example, square matrix max dimension is 4
+SQUARE_MATRIX_DIM = 4
 
 def validate_and_print_results(computed, expected, operation_name):
     ### Helper function to validate and print results ###
@@ -47,7 +60,7 @@ def np_forward_pass(X, W1, b1, W2, b2):
         np.ndarray: The predicted probabilities for each sample.
     """
     
-    print(f"Evaluating NP Forward Pass Started ... \n")
+    print(f"Evaluating NP Forward Pass Started ...")
     
     # Hidden Layer
     # Z1 = W1 * X + b1
@@ -154,7 +167,7 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
     # Hidden Layer
     # Z1 = W1 * X + b1
     
-    X_square_zero_padded = make_square_power_of_2(X, 4)
+    X_square_zero_padded = make_square_power_of_2(X, SQUARE_MATRIX_DIM)
     onp_ct_X = onp.array(
         cc=cc,
         data=X_square_zero_padded,
@@ -186,8 +199,6 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
         mode="tile",
         public_key=keys.publicKey,
     )
-    
-    onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, onp_ct_X.ncols)
      
     onp_ct_Z1 = onp_ct_X @ onp_ct_W1 + onp_ct_b1
 
@@ -212,7 +223,7 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
         mode="tile",
         public_key=keys.publicKey,
     )
-    b2_square_zero_padded = make_square_power_of_2(b2, 4)
+    b2_square_zero_padded = make_square_power_of_2(b2, SQUARE_MATRIX_DIM)
     onp_ct_b2 = onp.array(
         cc=cc,
         data=b2_square_zero_padded,
@@ -232,7 +243,7 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
     
     # mask out any unnecessary results around the borders of the output array
     mask = [1]
-    mask_square_zero_padded = make_square_power_of_2(mask, 4)
+    mask_square_zero_padded = make_square_power_of_2(mask, SQUARE_MATRIX_DIM)
     onp_pt_mask = onp.array(
         cc=cc,
         data=mask_square_zero_padded,
@@ -261,9 +272,9 @@ if __name__ == '__main__':
     b1 = np.array([0.1, 0.2, 0.3, 0.4])
 
     # Weights and biases for the output layer
-    W2 = np.array([[-0.5], 
-                   [0.8], 
-                   [-0.4], 
+    W2 = np.array([[-0.5],
+                   [0.8],
+                   [-0.4],
                    [0.6]])
     b2 = np.array([-0.3])
 
@@ -276,7 +287,7 @@ if __name__ == '__main__':
     print(f"Input data:\n{X_test}\n")
 
     np_probabilities = np_forward_pass(X_test, W1, b1, W2, b2)
-    print(f"NP Predicted Probabilities:\n{np_probabilities.flatten()}")
+    print(f"NP Predicted Probability:\n{np_probabilities.flatten()}")
     
     # openfhe-numpy implementation
     # Cryptographic setup for OpenFHE
@@ -298,14 +309,19 @@ if __name__ == '__main__':
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
+    onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, SQUARE_MATRIX_DIM)
 
     ring_dim = cc.GetRingDimension()
     batch_size = cc.GetBatchSize()
     print(f"\nCKKS ring dimension: {ring_dim}")
     print(f"Available slots: {batch_size}")
     
+    start_time = time.time()
     onp_probabilities = onp_forward_pass(X_test, W1, b1, W2, b2, cc, keys, batch_size)
-    print(f"ONP Predicted Probabilities:\n{onp_probabilities.flatten()}")
+    print(f"ONP Predicted Probability:\n{onp_probabilities.flatten()}")
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"\nonp_forward_pass took {elapsed_time:.4f} seconds.")
     
     validate_and_print_results(onp_probabilities[0][0], np_probabilities[0][0], "MLP")
     
