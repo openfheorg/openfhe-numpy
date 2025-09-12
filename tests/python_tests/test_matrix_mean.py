@@ -1,7 +1,7 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from core import *
+from .core import *
 
 """
 Note: Mean operations may require sufficient multiplicative depth
@@ -133,4 +133,4 @@ class TestMatrixMean(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixMean.run_test_summary("Matrix Mean", debug=True)
+    TestMatrixMean.run_test_summary("Matrix Mean", verbose=True)

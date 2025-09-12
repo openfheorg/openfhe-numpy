@@ -1,7 +1,7 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from core import *
+from .core import *
 
 
 def fhe_matrix_vector_product_case1(params, data):
@@ -161,4 +161,4 @@ class TestMatrixVectorProduct(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixVectorProduct.run_test_summary("Matrix-Vector Product", debug=True)
+    TestMatrixVectorProduct.run_test_summary("Matrix-Vector Product", verbose=True)

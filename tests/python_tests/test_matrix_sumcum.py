@@ -1,7 +1,7 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from core import *
+from .core import *
 
 
 def fhe_matrix_cumulative_sum(params, data, axis=0, order=onp.ROW_MAJOR):
@@ -110,4 +110,4 @@ class TestMatrixcumulative_sum(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixcumulative_sum.run_test_summary("Matrix Cumulative Sum", debug=True)
+    TestMatrixcumulative_sum.run_test_summary("Matrix Cumulative Sum", verbose=True)

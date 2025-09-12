@@ -2,7 +2,7 @@
 
 import numpy as np
 import openfhe_numpy as onp
-from core import *
+from .core import *
 
 
 def fhe_vector_op(params, data, op_name):
@@ -124,4 +124,4 @@ class TestVectorOperations(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestVectorOperations.run_test_summary("Vector Ops", debug=True)
+    TestVectorOperations.run_test_summary("Vector Ops", verbose=True)

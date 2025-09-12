@@ -1,7 +1,7 @@
 import numpy as np
 import openfhe_numpy as onp
 
-from core import *
+from .core import *
 
 ###
 # Note: Column-/row-wise cumulative sum may require deeper multiplicative
@@ -129,4 +129,4 @@ class TestMatrixSum(MainUnittest):
 
 
 if __name__ == "__main__":
-    TestMatrixSum.run_test_summary("Matrix Sum", debug=True)
+    TestMatrixSum.run_test_summary("Matrix Sum", verbose=True)
