@@ -2,6 +2,8 @@
 
 This document explains how to run and view tests for the OpenFHE-NumPy project.
 Our tests use a custom framework built on top of Python's `unittest`
+with additional customizations designed to improve debugging and
+provide summary results.
 
 ## Prerequisites
 
@@ -25,11 +27,11 @@ python3 -m python_tests
 
 ```bash
 cd tests/python_tests
-python3 -m unittest test_matrix_sum
+python3 -m test_matrix_sum
 ```
 or
 ```bash
- python3 tests/python_tests/test_matrix_sum.py
+python3 tests/python_tests/test_matrix_sum.py
 ```
 
 
@@ -45,19 +47,15 @@ Test results are written to log files and displayed on the console:
   - Actual result
   - Error details
 
-## Unittest Quick Guide
-
-* **Verbose Output**: Add `-v` for detailed information:
-  ```bash
-  python3 -m unittest discover -s tests -v
+## Guidelines for Writing Tests
+Here is some remark when designing tests :
+- First, import the core module which contains the necessary test utilities:
+  ```python
+  from core import *
   ```
+- Use the function **`run_test_summary`** to execute the test suite.
+This will output a concise summary for each test class
 
-* **Stop on First Failure**: Use `--failfast`:
-  ```bash
-  python3 -m unittest discover -s tests --failfast
-  ```
-
-* **Pattern Filtering**: Run tests matching a pattern:
-  ```bash
-  python3 -m unittest discover -s tests -p "test_matrix_*.py"
-  ```
+- The test framework compares two arrays for equality using `np.testing.assert_allclose`.
+  This function checks whether two arrays (or array-like objects) are element-wise equal within a certain tolerance.
+  The tolerance values are defined in `core/config.py` by default.

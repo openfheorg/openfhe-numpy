@@ -1,163 +1,148 @@
 import numpy as np
 import openfhe_numpy as onp
-
-from .core import *
-
-
-def fhe_matrix_vector_product_case1(params, data):
-    """
-    Execute matrix-vector product with FHE - Case 1:
-    - Matrix: row-major
-    - Vector: column-major
-    - Result: row-major
-    """
-
-    total_slots = params["ringDim"] // 2
-
-    with suppress_stdout(False):
-        # Generate crypto context
-        cc, keys = gen_crypto_context(params)
-
-        # Extract input data
-        matrix = np.array(data[0])
-        vector = np.array(data[1])
-
-        # Encrypt matrix in row-major format
-        ctm_matrix = onp.array(
-            cc=cc,
-            data=matrix,
-            batch_size=total_slots,
-            order=onp.ROW_MAJOR,
-            fhe_type="C",
-            mode="tile",
-            public_key=keys.publicKey,
-        )
-
-        # Generate column sum keys
-        ctm_matrix.extra["colkey"] = onp.sum_col_keys(keys.secretKey)
-
-        # Encrypt vector in column-major format
-        ctv_vector = onp.array(
-            cc=cc,
-            data=vector,
-            batch_size=total_slots,
-            order=onp.COL_MAJOR,
-            fhe_type="C",
-            mode="tile",
-            public_key=keys.publicKey,
-        )
-
-        # Perform matrix-vector multiplication
-        ctv_result = ctm_matrix @ ctv_vector
-
-        # Decrypt result
-        result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
-
-    return result
-
-
-def fhe_matrix_vector_product_case2(params, data):
-    """
-    Execute matrix-vector product with FHE - Case 2:
-    - Matrix: column-major
-    - Vector: row-major
-    - Result: column-major
-    """
-    params_copy = params.copy()
-    total_slots = params_copy["ringDim"] // 2
-
-    with suppress_stdout(False):
-        # Generate crypto context
-        cc, keys = gen_crypto_context(params_copy)
-
-        # Extract input data
-        matrix = np.array(data[0])
-        vector = np.array(data[1])
-
-        # Encrypt matrix in column-major format
-        ctm_matrix = onp.array(
-            cc=cc,
-            data=matrix,
-            batch_size=total_slots,
-            order=onp.COL_MAJOR,
-            fhe_type="C",
-            mode="zero",
-            public_key=keys.publicKey,
-        )
-
-        # Encrypt vector in row-major format
-        ctv_vector = onp.array(
-            cc=cc,
-            data=vector,
-            batch_size=total_slots,
-            order=onp.ROW_MAJOR,
-            fhe_type="C",
-            mode="zero",
-            target_cols=ctm_matrix.nrows,  # Important for row-major vector
-            public_key=keys.publicKey,
-        )
-
-        # Generate row sum keys
-        ctm_matrix.extra["rowkey"] = onp.sum_row_keys(
-            keys.secretKey, ctm_matrix.nrows, ctm_matrix.batch_size
-        )
-
-        # Perform matrix-vector multiplication
-        ctv_result = ctm_matrix @ ctv_vector
-
-        # Decrypt result
-        result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
-
-    return result
+from core import *
 
 
 class TestMatrixVectorProduct(MainUnittest):
     """Test class for matrix-vector product operations."""
 
-    @classmethod
-    def _generate_test_cases(cls):
-        """Generate test cases for matrix-vector product."""
-        # Define the two test cases
-        operations = [
-            ("case1_rowmajor_colmajor", fhe_matrix_vector_product_case1),
-            ("case2_colmajor_rowmajor", fhe_matrix_vector_product_case2),
-        ]
+    sizes = [2, 3, 4, 8]
 
-        ckks_param_list = load_ckks_params()
-        matrix_sizes = [2, 3, 4, 8]
-        test_counter = 1
+    def test_mat_vec_prod_rowmajor_colmajor(self):
+        """
+        Test matrix (row-major) vector (col-major) product:
+        - Matrix: row-major, tile mode
+        - Vector: column-major, tile mode
+        - Result: row-major
+        """
+        ckks_params = load_ckks_params()
 
-        for op_name, func in operations:
-            for param in ckks_param_list:
-                for size in matrix_sizes:
-                    # Skip large sizes for small ring dimensions
-                    if size > 4 and param["ringDim"] < 8192:
-                        continue
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
 
-                    # Generate random test data
-                    A = generate_random_array(size)
-                    b = generate_random_array(size, 1)  # 1D vector
+            batch_size = p["ringDim"] // 2
 
-                    # Calculate expected result directly
-                    expected = np.dot(A, b)
+            for size in self.sizes:
+                # Skip large sizes for small ring dimensions
+                if size > 4 and p["ringDim"] < 8192:
+                    continue
+                if size > batch_size:
+                    continue
 
-                    # Create test name with descriptive format
-                    test_name = (
-                        f"matvec_{op_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
+                # Generate test data
+                A = generate_random_array(rows=size, cols=size)  # Square matrix
+                b = generate_random_array(rows=size, cols=1).flatten()  # Column vector
+                expected = np.dot(A, b)
+
+                with self.subTest(case="rowmajor_colmajor", size=size, ringDim=p["ringDim"]):
+                    # Encrypt matrix in row-major, tile mode
+                    ctm_matrix = onp.array(
+                        cc=cc,
+                        data=A,
+                        batch_size=batch_size,
+                        order=onp.ROW_MAJOR,
+                        fhe_type="C",
+                        mode="tile",
+                        public_key=keys.publicKey,
                     )
 
-                    # Generate the test case
-                    cls.generate_test_case(
-                        func=func,
-                        test_name=test_name,
-                        params=param,
-                        input_data=[A, b],
+                    # Generate column sum keys for matrix
+                    ctm_matrix.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_matrix.ncols)
+
+                    # Encrypt vector in column-major, tile mode
+                    ctv_vector = onp.array(
+                        cc=cc,
+                        data=b,
+                        batch_size=batch_size,
+                        order=onp.COL_MAJOR,
+                        fhe_type="C",
+                        mode="tile",
+                        public_key=keys.publicKey,
+                    )
+
+                    # Perform matrix-vector multiplication
+                    ctv_result = ctm_matrix @ ctv_vector
+
+                    # Decrypt and compare
+                    result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
+                    self.assertArrayClose(
+                        params={"case": "rowmajor_colmajor", "size": size, "ringDim": p["ringDim"]},
+                        input_data={"A": A, "b": b},
+                        actual=result,
                         expected=expected,
-                        compare_fn=onp.check_equality,
-                        debug=True,
                     )
 
-                    test_counter += 1
+    def test_mat_vec_prod_colmajor_rowmajor(self):
+        """
+        Test matrix (column-major) vector (row-major) product:
+        - Matrix: column-major, zero mode
+        - Vector: row-major, zero mode
+        - Result: column-major
+        """
+        ckks_params = load_ckks_params()
+
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
+
+            batch_size = p["ringDim"] // 2
+
+            for size in self.sizes:
+                # Skip large sizes for small ring dimensions
+                if size > 4 and p["ringDim"] < 8192:
+                    continue
+                if size > batch_size:
+                    continue
+
+                # Generate test data
+                A = generate_random_array(rows=size, cols=size)  # Square matrix
+                b = generate_random_array(rows=size, cols=1).flatten()  # Column vector
+                expected = np.dot(A, b)
+
+                with self.subTest(case="colmajor_rowmajor", size=size, ringDim=p["ringDim"]):
+                    # Encrypt matrix in column-major, zero mode
+                    ctm_matrix = onp.array(
+                        cc=cc,
+                        data=A,
+                        batch_size=batch_size,
+                        order=onp.COL_MAJOR,
+                        fhe_type="C",
+                        mode="zero",
+                        public_key=keys.publicKey,
+                    )
+
+                    # Encrypt vector in row-major, zero mode
+                    ctv_vector = onp.array(
+                        cc=cc,
+                        data=b,
+                        batch_size=batch_size,
+                        order=onp.ROW_MAJOR,
+                        fhe_type="C",
+                        mode="zero",
+                        target_cols=ctm_matrix.nrows,  # Important for row-major vector
+                        public_key=keys.publicKey,
+                    )
+
+                    # Generate row sum keys for matrix
+                    ctm_matrix.extra["rowkey"] = onp.sum_row_keys(
+                        keys.secretKey, ctm_matrix.nrows, ctm_matrix.batch_size
+                    )
+
+                    # Perform matrix-vector multiplication
+                    ctv_result = ctm_matrix @ ctv_vector
+
+                    # Decrypt and compare
+                    result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
+
+                    self.assertArrayClose(
+                        params={"case": "colmajor_rowmajor", "size": size, "ringDim": p["ringDim"]},
+                        input_data={"A": A, "b": b},
+                        actual=result,
+                        expected=expected,
+                    )
 
 
 if __name__ == "__main__":

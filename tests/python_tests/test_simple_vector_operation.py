@@ -1,127 +1,127 @@
 # tests/test_vector_ops.py
-
 import numpy as np
 import openfhe_numpy as onp
-from .core import *
+from core import *
 
 
-def fhe_vector_op(params, data, op_name):
-    """
-    Generic runner for FHE vector operations.
-    - params: CKKS params dict
-    - data: list, either [A, B] or [A, scalar] or [A]
-    - op_name: one of "add", "sub", "transpose", "mul", "scalar_mul", "dot", "sum"
-    """
-    A = np.array(data[0])
+class TestVectorSimpleOperations(MainUnittest):
+    sizes = [5, 8, 16]
 
-    cc, keys, p = params
-    batch_size = p["ringDim"] // 2
-
-    # encrypt A
-    ctv_a = onp.array(
-        cc=cc,
-        data=A,
-        batch_size=batch_size,
-        order=onp.ROW_MAJOR,
-        fhe_type="C",
-        mode="zero",
-        public_key=keys.publicKey,
-    )
-
-    # optionally encrypt B
-    if op_name in ("add", "sub", "mul", "dot"):
-        B = np.array(data[1])
-        ctv_b = onp.array(
-            cc=cc,
-            data=B,
-            batch_size=batch_size,
-            order=onp.ROW_MAJOR,
-            fhe_type="C",
-            mode="zero",
-            public_key=keys.publicKey,
-        )
-
-    # dispatch
-    if op_name == "add":
-        ctv_res = onp.add(ctv_a, ctv_b)
-    elif op_name == "sub":
-        ctv_res = onp.subtract(ctv_a, ctv_b)
-    elif op_name == "transpose":
-        onp.gen_transpose_keys(keys.secretKey, ctv_a)
-        ctv_res = onp.transpose(ctv_a)
-    elif op_name == "mul":
-        ctv_res = onp.multiply(ctv_a, ctv_b)
-    elif op_name == "scalar_mul":
-        scalar = data[1]
-        ctv_res = ctv_a * scalar
-    elif op_name == "dot":
-        # ctv_res = ctv_a @ ctv_b
-        ctv_res = onp.dot(ctv_a, ctv_b)
-    elif op_name == "sum":
-        ctv_res = onp.sum(ctv_a)
-    else:
-        raise ValueError(f"Unknown op: {op_name}")
-
-    # decrypt
-    return ctv_res.decrypt(keys.secretKey, unpack_type="original")
-
-
-class TestVectorOperations(MainUnittest):
-    """Dynamically parameterized tests for all FHE vector ops."""
-
-    context = {}
-    ckks_params = load_ckks_params()
-    for i, p in enumerate(ckks_params):
-        cc, keys = gen_crypto_context(p)
-        cc.EvalMultKeyGen(keys.secretKey)
-        cc.EvalSumKeyGen(keys.secretKey)
-        context[i] = (cc, keys, p)
-
-    @classmethod
-    def _generate_test_cases(cls):
+    def test_unary_operations(self):
         ops = [
-            ("add", lambda A, B: A + B),
-            ("sub", lambda A, B: A - B),
-            ("mul", lambda A, B: A * B),
-            ("dot", lambda A, B: np.dot(A, B)),
-            ("transpose", lambda A: A.T),
-            ("scalar_mul", lambda A, s: A * s),
-            ("sum", lambda A: np.sum(A)),
+            ("transpose", lambda x: x.T, lambda a: a.T),
+            ("scalar_mul", lambda x, s: x * s, lambda a, s: a * s),
+            ("sum", lambda x: np.sum(x), lambda a: onp.sum(a)),
         ]
 
-        sizes = [5, 8, 16]
-        scalar = 7.0
-        test_id = 1
+        ckks_params = load_ckks_params()
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
 
-        for i in range(len(cls.ckks_params)):
-            cc, keys, params = cls.context[i]
-            for op_name, np_fn in ops:
-                for size in sizes:
+            batch_size = p["ringDim"] // 2
+            scalar = 7.2  # used by scalar_mul
+
+            for tag, np_fn, fhe_fn in ops:
+                for size in self.sizes:
                     A = generate_random_array(rows=size, cols=1)
-                    # prepare data & expected
-                    if op_name in ("add", "sub", "mul", "dot"):
-                        B = generate_random_array(rows=size, cols=1)
-                        expected = np_fn(A, B)
-                        data = [A, B]
-                    elif op_name == "scalar_mul":
-                        expected = np_fn(A, scalar)
-                        data = [A, scalar]
-                    else:  # transpose or sum
-                        expected = np_fn(A)
-                        data = [A]
 
-                    name = f"{op_name}_{test_id:03d}_ring_{params['ringDim']}_n{size}"
-                    cls.generate_test_case(
-                        func=lambda p, d, op=op_name: fhe_vector_op(p, d, op),
-                        test_name=name,
-                        params=cls.context[i],
-                        input_data=data,
-                        expected=expected,
-                        compare_fn=onp.check_equality,
-                        debug=False,
-                    )
-                    test_id += 1
+                    with self.subTest(tag=tag, size=size, ringDim=p["ringDim"]):
+                        # encrypt A
+                        ctv_a = onp.array(
+                            cc=cc,
+                            data=A,
+                            batch_size=batch_size,
+                            order=onp.ROW_MAJOR,
+                            fhe_type="C",
+                            mode="zero",
+                            public_key=keys.publicKey,
+                        )
+
+                        # run encrypted op
+                        if tag == "scalar_mul":
+                            expected = np_fn(A, scalar)
+                            ctv_res = fhe_fn(ctv_a, scalar)
+                        else:
+                            expected = np_fn(A)
+                            ctv_res = fhe_fn(ctv_a)
+
+                        # decrypt and compare
+                        result = ctv_res.decrypt(keys.secretKey, unpack_type="original")
+
+                        self.assertArrayClose(
+                            params={
+                                "case": "vector_unary_op_" + tag,
+                                "size": size,
+                                "ringDim": p["ringDim"],
+                                "order": onp.ROW_MAJOR,
+                            },
+                            input_data={"A": A},
+                            actual=result,
+                            expected=expected,
+                        )
+
+    def test_binary_operations(self):
+        # Only binary ops here.
+        ops = [
+            ("add", lambda x, y: x + y, lambda a, b: onp.add(a, b)),
+            ("sub", lambda x, y: x - y, lambda a, b: onp.subtract(a, b)),
+            ("mul", lambda x, y: x * y, lambda a, b: onp.multiply(a, b)),
+            ("dot", lambda x, y: np.dot(A, B), lambda a, b: onp.dot(a, b)),
+        ]
+
+        ckks_params = load_ckks_params()
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
+
+            batch_size = p["ringDim"] // 2
+
+            for tag, np_fn, fhe_fn in ops:
+                for size in self.sizes:
+                    A = generate_random_array(rows=size, cols=1)
+                    B = generate_random_array(rows=size, cols=1)
+                    expected = np_fn(A, B)
+
+                    with self.subTest(tag=tag, size=size, ringDim=p["ringDim"]):
+                        ctv_a = onp.array(
+                            cc=cc,
+                            data=A,
+                            batch_size=batch_size,
+                            order=onp.ROW_MAJOR,
+                            fhe_type="C",
+                            mode="zero",
+                            public_key=keys.publicKey,
+                        )
+                        ctv_b = onp.array(
+                            cc=cc,
+                            data=B,
+                            batch_size=batch_size,
+                            order=onp.ROW_MAJOR,
+                            fhe_type="C",
+                            mode="zero",
+                            public_key=keys.publicKey,
+                        )
+
+                        ctv_res = fhe_fn(ctv_a, ctv_b)
+
+                        result = ctv_res.decrypt(keys.secretKey, unpack_type="original")
+
+                        self.assertArrayClose(
+                            params={
+                                "case": "vector_binary_op_" + tag,
+                                "size": size,
+                                "ringDim": p["ringDim"],
+                                "order": onp.ROW_MAJOR,
+                            },
+                            input_data={"A": A, "B": B},
+                            actual=result,
+                            expected=expected,
+                        )
 
 
+# In test_simple_vector_operation.py
 if __name__ == "__main__":
-    TestVectorOperations.run_test_summary("Vector Ops", verbose=True)
+    TestVectorSimpleOperations.run_test_summary("Vector Operations", verbose=True)

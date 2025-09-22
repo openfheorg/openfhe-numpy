@@ -1,7 +1,6 @@
 import numpy as np
 import openfhe_numpy as onp
-
-from .core import *
+from core import *
 
 ###
 # Note: Column-/row-wise cumulative sum may require deeper multiplicative
@@ -10,122 +9,182 @@ from .core import *
 ###
 
 
-def fhe_matrix_sum(params, data, axis=None, order=onp.ROW_MAJOR):
-    """
-    Generic matrix sum operation.
-    - params: CKKS parameters dictionary
-    - data: list containing the input matrix
-    - axis: None for total sum, 0 for row-wise, 1 for column-wise sum
-    - order: ROW_MAJOR or COLUMN_MAJOR ordering
-    """
-    params_copy = params.copy()
-    matrix = np.array(data[0])
-
-    with suppress_stdout(False):
-        # Generate crypto context
-        cc, keys = gen_crypto_context(params_copy)
-        total_slots = params_copy["ringDim"] // 2
-
-        # Encrypt matrix
-        ctm_x = onp.array(
-            cc=cc,
-            data=matrix,
-            batch_size=total_slots,
-            order=order,
-            fhe_type="C",
-            mode="zero",
-            public_key=keys.publicKey,
-        )
-
-        # Generate appropriate keys based on axis
-        if axis is None:  # Total sum
-            onp.gen_sum_key(keys.secretKey)
-
-        elif axis == 0:  # Row sum (sum along rows)
-            if ctm_x.order == onp.ROW_MAJOR:
-                ctm_x.extra["rowkey"] = onp.sum_row_keys(
-                    keys.secretKey, ctm_x.ncols, ctm_x.batch_size
-                )
-            elif ctm_x.order == onp.COL_MAJOR:
-                ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.nrows)
-
-            else:
-                raise ValueError("Invalid order.")
-        elif axis == 1:  # Column sum (sum along columns)
-            if ctm_x.order == onp.ROW_MAJOR:
-                ctm_x.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm_x.ncols)
-            elif ctm_x.order == onp.COL_MAJOR:
-                ctm_x.extra["rowkey"] = onp.sum_row_keys(
-                    keys.secretKey, ctm_x.nrows, ctm_x.batch_size
-                )
-            else:
-                raise ValueError("Invalid order.")
-
-        # Perform sum operation
-        if axis is None:
-            ctm_result = onp.sum(ctm_x)  # Total sum without axis parameter
-        else:
-            assert isinstance(axis, int), f"axis should be int but got {axis!r}"
-            ctm_result = onp.sum(ctm_x, axis)  # Sum along specified axis
-
-        # Decrypt result
-        result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
-
-    return result
-
-
 class TestMatrixSum(MainUnittest):
     """Test class for matrix sum operations."""
 
-    @classmethod
-    def _generate_test_cases(cls):
-        """Generate test cases for matrix sum operations."""
-        operations = [
-            ("total", None, lambda A: np.sum(A)),  # Total sum
-            ("rows", 0, lambda A: np.sum(A, axis=0)),  # Row sum
-            ("cols", 1, lambda A: np.sum(A, axis=1)),  # Column sum
-        ]
+    sizes = [2, 3, 8, 16]
+    orders = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COL_MAJOR)]
 
-        # Add ordering options
-        orders = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COL_MAJOR)]
+    def test_total_sum(self):
+        """Test total matrix sum (all elements)"""
 
-        ckks_param_list = load_ckks_params()
-        matrix_sizes = [2, 3, 8, 16]
-        test_counter = 1
+        ckks_params = load_ckks_params()
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
 
-        for op_name, axis, np_fn in operations:
-            for order_name, order_value in orders:
-                for param in ckks_param_list:
-                    for size in matrix_sizes:
-                        # Skip large matrices for total sum tests
-                        if op_name == "total" and size > 3:
-                            continue
+            batch_size = p["ringDim"] // 2
 
-                        # Generate random test matrix
-                        A = generate_random_array(size)
+            for order_name, order_value in self.orders:
+                for size in self.sizes:
+                    # Skip large matrices for total sum tests
+                    if size > 3:
+                        continue
 
-                        # Calculate expected result directly
-                        expected = np_fn(A)
+                    if size > batch_size:
+                        continue
 
-                        # Create test name with descriptive format
-                        test_name = f"sum_{op_name}_{order_name}_{test_counter:03d}_ring_{param['ringDim']}_size_{size}"
+                    A = generate_random_array(rows=size, cols=size)
+                    expected = np.sum(A)  # Total sum
 
-                        # Create a closure to capture the current axis and ordering values
-                        def func(current_axis, current_order):
-                            return lambda p, d: fhe_matrix_sum(p, d, current_axis, current_order)
-
-                        # Generate the test case
-                        cls.generate_test_case(
-                            func=func(axis, order_value),
-                            test_name=test_name,
-                            params=param,
-                            input_data=[A],
-                            expected=expected,
-                            compare_fn=onp.check_equality,
-                            debug=True,
+                    with self.subTest(order=order_name, size=size, ringDim=p["ringDim"]):
+                        # Encrypt matrix
+                        ctm_matrix = onp.array(
+                            cc=cc,
+                            data=A,
+                            batch_size=batch_size,
+                            order=order_value,
+                            fhe_type="C",
+                            mode="zero",
+                            public_key=keys.publicKey,
                         )
 
-                        test_counter += 1
+                        # Generate key for total sum
+                        onp.gen_sum_key(keys.secretKey)
+
+                        # Perform total sum
+                        ctm_result = onp.sum(ctm_matrix)  # No axis parameter for total sum
+
+                        # Decrypt and compare
+                        result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
+                        self.assertArrayClose(
+                            params={
+                                "case": "total_mean",
+                                "size": size,
+                                "ringDim": p["ringDim"],
+                                "order": order_value,
+                            },
+                            input_data={"A": A},
+                            actual=result,
+                            expected=expected,
+                        )
+
+    def test_row_sum(self):
+        """Test row-wise sum (axis=0)"""
+
+        ckks_params = load_ckks_params()
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
+
+            batch_size = p["ringDim"] // 2
+
+            for order_name, order_value in self.orders:
+                for size in self.sizes:
+                    if size > batch_size:
+                        continue
+
+                    A = generate_random_array(rows=size, cols=size)
+                    expected = np.sum(A, axis=0)  # Row-wise sum
+
+                    with self.subTest(order=order_name, size=size, ringDim=p["ringDim"]):
+                        # Encrypt matrix
+                        ctm_matrix = onp.array(
+                            cc=cc,
+                            data=A,
+                            batch_size=batch_size,
+                            order=order_value,
+                            fhe_type="C",
+                            mode="zero",
+                            public_key=keys.publicKey,
+                        )
+
+                        # Generate appropriate keys for row sum
+                        if order_value == onp.ROW_MAJOR:
+                            ctm_matrix.extra["rowkey"] = onp.sum_row_keys(
+                                keys.secretKey, ctm_matrix.ncols, ctm_matrix.batch_size
+                            )
+                        else:  # COL_MAJOR
+                            ctm_matrix.extra["colkey"] = onp.sum_col_keys(
+                                keys.secretKey, ctm_matrix.nrows
+                            )
+
+                        # Perform row sum
+                        ctm_result = onp.sum(ctm_matrix, axis=0)
+
+                        # Decrypt and compare
+                        result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
+                        self.assertArrayClose(
+                            params={
+                                "case": "row_mean",
+                                "size": size,
+                                "ringDim": p["ringDim"],
+                                "order": order_value,
+                            },
+                            input_data={"A": A},
+                            actual=result,
+                            expected=expected,
+                        )
+
+    def test_col_sum(self):
+        """Test column-wise sum (axis=1)"""
+
+        ckks_params = load_ckks_params()
+        for _, p in enumerate(ckks_params):
+            cc, keys = gen_crypto_context(p)
+            cc.EvalMultKeyGen(keys.secretKey)
+            cc.EvalSumKeyGen(keys.secretKey)
+
+            batch_size = p["ringDim"] // 2
+
+            for order_name, order_value in self.orders:
+                for size in self.sizes:
+                    if size > batch_size:
+                        continue
+
+                    A = generate_random_array(rows=size, cols=size)
+                    expected = np.sum(A, axis=1)  # Column-wise sum
+
+                    with self.subTest(order=order_name, size=size, ringDim=p["ringDim"]):
+                        # Encrypt matrix
+                        ctm_matrix = onp.array(
+                            cc=cc,
+                            data=A,
+                            batch_size=batch_size,
+                            order=order_value,
+                            fhe_type="C",
+                            mode="zero",
+                            public_key=keys.publicKey,
+                        )
+
+                        # Generate appropriate keys for column sum
+                        if order_value == onp.ROW_MAJOR:
+                            ctm_matrix.extra["colkey"] = onp.sum_col_keys(
+                                keys.secretKey, ctm_matrix.ncols
+                            )
+                        else:  # COL_MAJOR
+                            ctm_matrix.extra["rowkey"] = onp.sum_row_keys(
+                                keys.secretKey, ctm_matrix.nrows, ctm_matrix.batch_size
+                            )
+
+                        # Perform column sum
+                        ctm_result = onp.sum(ctm_matrix, axis=1)
+
+                        # Decrypt and compare
+                        result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
+                        self.assertArrayClose(
+                            params={
+                                "case": "col_mean",
+                                "size": size,
+                                "ringDim": p["ringDim"],
+                                "order": order_value,
+                            },
+                            input_data={"A": A},
+                            actual=result,
+                            expected=expected,
+                        )
 
 
 if __name__ == "__main__":
