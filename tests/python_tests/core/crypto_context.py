@@ -33,7 +33,6 @@
 Crypto context and parameter loading for OpenFHE-NumPy tests.
 """
 
-import os
 import csv
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -55,7 +54,7 @@ from openfhe import (
     HEStd_NotSet,
 )
 
-from .test_utils import suppress_stdout
+from .utils import suppress_stdout
 
 # ===============================
 # Paths and CSV
