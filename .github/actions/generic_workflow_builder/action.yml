@@ -39,115 +39,90 @@ runs:
         # pwd
         echo "======> step ${{ inputs.module_name }}_cleanup"
 
-        BUILD_DIR="$PWD/build"
-        echo "BUILD_DIR=$BUILD_DIR"
-        echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
-        if [ -d "$BUILD_DIR" ]; then
-          rm -Rf $BUILD_DIR;
+        ### TODO: ============>>> UNINSTALL openfhe and openfhe-numpy or simply delete the local virtual python environment !!!!!!!!!!!!!!!!!!!!
+
+        ONP_PACKAGER_DIR="$PWD/openfhe-numpy-packager"
+        echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR"
+        echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR" >> $GITHUB_ENV
+        if [ -d "$ONP_PACKAGER_DIR" ]; then
+          rm -Rf $ONP_PACKAGER_DIR;
         fi
 
-        OPENFHE_DIR="$PWD/openfhe-development"
-        echo "OPENFHE_DIR=$OPENFHE_DIR"
-        echo "OPENFHE_DIR=$OPENFHE_DIR" >> $GITHUB_ENV
-        if [ -d "$OPENFHE_DIR" ]; then
-          rm -Rf $OPENFHE_DIR;
-        fi
+        # INSTALL_DIR="$PWD/install"
+        # echo "INSTALL_DIR=$INSTALL_DIR"
+        # echo "INSTALL_DIR=$INSTALL_DIR" >> $GITHUB_ENV
+        # if [ -d "$INSTALL_DIR" ]; then
+        #   rm -Rf $INSTALL_DIR;
+        # fi
 
-        INSTALL_DIR="$PWD/install"
-        echo "INSTALL_DIR=$INSTALL_DIR"
-        echo "INSTALL_DIR=$INSTALL_DIR" >> $GITHUB_ENV
-        if [ -d "$INSTALL_DIR" ]; then
-          rm -Rf $INSTALL_DIR;
-        fi
+    # #####################################################################################
+    # - name: '${{ inputs.module_name }}_set_environment'
+    #   shell: bash
+    #   run: |
+    #     # pwd
+    #     echo "======> step ${{ inputs.module_name }}_set_environment"
+
+    #     #################################################################################
+    #     # we can not install "pybind11[global]" and pytest on an AWS instance directly.
+    #     # It is strongly recommended to use a virtual environment for that: https://pip.pypa.io/warnings/venv
+    #     # so, we will have to use a virtual environment then...
+    #     #################################################################################
+    #     ### 1. create a virtual environment if it doesn't exist
+    #     if [ ! -d "openfhe-python-env" ]; then
+    #         python3 -m venv openfhe-python-env
+    #     fi
+
+    #     ### 2. activate the virtual environment
+    #     source openfhe-python-env/bin/activate
+
+    #     ### 3. install "pybind11[global]"
+    #     pip install "pybind11[global]"
+
+    #     ### 4. install pytest if it is not installed
+    #     if ! command -v pytest &> /dev/null; then
+    #         pip install pytest
+    #     fi
 
     #####################################################################################
-    - name: '${{ inputs.module_name }}_build_openfhe_development'
+    - name: '${{ inputs.module_name }}_build_openfhe_numpy'
       shell: bash
       run: |
         # pwd
-        echo "======> step ${{ inputs.module_name }}_build_openfhe_development"
-        
-        echo "$OPENFHE_DIR"
-        cmake_args="${{inputs.cmake_args_openfhe_lib}} -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} -DCMAKE_PREFIX_PATH=${INSTALL_DIR}"
-        echo ${cmake_args}
+        echo "======> step ${{ inputs.module_name }}_build_openfhe_numpy"
 
-        git clone https://github.com/openfheorg/openfhe-development.git
-        cd $OPENFHE_DIR
-        git checkout ${{inputs.openfhe_development_branch}}
+        git clone https://github.com/openfheorg/openfhe-numpy-packager.git
+        cd $ONP_PACKAGER_DIR
 
-        cmake -S . -B build ${cmake_args}
+        # update ci-vars.sh:
+        sed -i \
+            -e "s/^OPENFHE_TAG=.*/OPENFHE_TAG=${{inputs.openfhe_development_branch}}/" \
+            -e "s/^OPENFHE_PYTHON_TAG=.*/OPENFHE_PYTHON_TAG=${{inputs.openfhe_python_branch}}/" \
+            -e "s/^OPENFHE_NUMPY_TAG=.*/OPENFHE_NUMPY_TAG=${{inputs.openfhe_numpy_branch}}/" \
+            ./ci-vars.sh
 
-        cd build
-        make -j $[$(nproc) / 2]
-        make install
+        pip install ./build/dist/*.whl
     #####################################################################################
-    - name: '${{ inputs.module_name }}_set_environment'
-      shell: bash
-      run: |
-        # pwd
-        echo "======> step ${{ inputs.module_name }}_set_environment"
+    # - name: '${{ inputs.module_name }}_tests'
+    #   shell: bash
+    #   run: |
+    #     # pwd
+    #     echo "======> step ${{ inputs.module_name }}_tests"
 
-        #################################################################################
-        # we can not install "pybind11[global]" and pytest on an AWS instance directly.
-        # It is strongly recommended to use a virtual environment for that: https://pip.pypa.io/warnings/venv
-        # so, we will have to use a virtual environment then...
-        #################################################################################
-        ### 1. create a virtual environment if it doesn't exist
-        if [ ! -d "openfhe-python-env" ]; then
-            python3 -m venv openfhe-python-env
-        fi
+    #     ### activate the virtual environment
+    #     source openfhe-python-env/bin/activate
 
-        ### 2. activate the virtual environment
-        source openfhe-python-env/bin/activate
+    #     ### set LD_LIBRARY_PATH and PYTHONPATH
+    #     export LD_LIBRARY_PATH=${INSTALL_DIR}/lib
+    #     export PYTHONPATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}:${PYTHONPATH}
+    #     echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
+    #     echo "PYTHONPATH=${PYTHONPATH}"
 
-        ### 3. install "pybind11[global]"
-        pip install "pybind11[global]"
+    #     cd tests
+    #     pytest *.py
 
-        ### 4. install pytest if it is not installed
-        if ! command -v pytest &> /dev/null; then
-            pip install pytest
-        fi
-
-    #####################################################################################
-    - name: '${{ inputs.module_name }}_build_openfhe_python'
-      shell: bash
-      run: |
-        # pwd
-        echo "======> step ${{ inputs.module_name }}_build_openfhe_python"
-
-        ### activate the virtual environment
-        source openfhe-python-env/bin/activate
-
-        cmake_args="${{inputs.cmake_args_openfhe_lib}} -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} -DCMAKE_PREFIX_PATH=${INSTALL_DIR}"
-        echo ${cmake_args}
-
-        cmake -S . -B build ${cmake_args}
-
-        cd build
-        make -j $[$(nproc) / 2]
-        sudo make install
-    #####################################################################################
-    - name: '${{ inputs.module_name }}_tests'
-      shell: bash
-      run: |
-        # pwd
-        echo "======> step ${{ inputs.module_name }}_tests"
-
-        ### activate the virtual environment
-        source openfhe-python-env/bin/activate
-
-        ### set LD_LIBRARY_PATH and PYTHONPATH
-        export LD_LIBRARY_PATH=${INSTALL_DIR}/lib
-        export PYTHONPATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}:${PYTHONPATH}
-        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
-        echo "PYTHONPATH=${PYTHONPATH}"
-
-        cd tests
-        pytest *.py
-
-        ### deactivate the virtual environment
-        deactivate
-    #####################################################################################
+    #     ### deactivate the virtual environment
+    #     deactivate
+    # #####################################################################################
     # - name: '${{ inputs.module_name }}_final_cleanup'
     #   shell: bash
     #   run: |
