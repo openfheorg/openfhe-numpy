@@ -1,4 +1,4 @@
-# ==================================================================================
+# ==============================================================================
 #  BSD 2-Clause License
 #
 #  Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
@@ -27,31 +27,17 @@
 #  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 #  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# ==================================================================================
+# =============================================================================
 
-import os
-import contextlib
+
 import numpy as np
 
 
-# ===============================
-# Utility: Suppress stdout
-# ===============================
-@contextlib.contextmanager
-def suppress_stdout(enabled: bool = True):
-    if not enabled:
-        yield
-    else:
-        with (
-            open(os.devnull, "w") as devnull,
-            contextlib.redirect_stdout(devnull),
-        ):
-            yield
-
-
 def generate_random_array(rows, cols=None, low=0, high=10, seed=None):
-    """Generate random array with given shape and range."""
+    """Generate random array; returns a 1D vector if cols is None or 1."""
     rng = np.random.default_rng(seed)
     if cols is None:
-        cols = rows
-    return rng.uniform(low, high, size=(rows, cols) if cols > 1 else rows)
+        size = rows  # 1D vector
+    else:
+        size = (rows, cols)  # 2D matrix
+    return rng.uniform(low, high, size=size)
