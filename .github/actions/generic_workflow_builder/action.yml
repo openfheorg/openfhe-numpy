@@ -30,7 +30,6 @@ runs:
         module_name=${{inputs.module_name}}
         openfhe_development_branch=${{inputs.openfhe_development_branch}}
         openfhe_python_branch=${{inputs.openfhe_python_branch}}
-        cmake_args_openfhe_lib=${{inputs.cmake_args_openfhe_lib}}
         "
     #####################################################################################
     - name: '${{ inputs.module_name }}_cleanup'
@@ -47,13 +46,6 @@ runs:
         if [ -d "$ONP_PACKAGER_DIR" ]; then
           rm -Rf $ONP_PACKAGER_DIR;
         fi
-
-        # INSTALL_DIR="$PWD/install"
-        # echo "INSTALL_DIR=$INSTALL_DIR"
-        # echo "INSTALL_DIR=$INSTALL_DIR" >> $GITHUB_ENV
-        # if [ -d "$INSTALL_DIR" ]; then
-        #   rm -Rf $INSTALL_DIR;
-        # fi
 
     # #####################################################################################
     # - name: '${{ inputs.module_name }}_set_environment'
@@ -100,7 +92,11 @@ runs:
             -e "s/^OPENFHE_NUMPY_TAG=.*/OPENFHE_NUMPY_TAG=${{inputs.openfhe_numpy_branch}}/" \
             ./ci-vars.sh
 
-        pip install ./build/dist/*.whl
+        echo "=== ci-vars.sh ==="
+        cat ./ci-vars.sh
+        echo "==================="
+
+        # pip install ./build/dist/*.whl
     #####################################################################################
     # - name: '${{ inputs.module_name }}_tests'
     #   shell: bash
