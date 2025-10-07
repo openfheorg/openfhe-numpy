@@ -16,9 +16,6 @@ on:
         description: 'Compiler type'
         type: string
         required: true
-      native_backend:
-        description: 'Size of NativeInteger'
-        type: string
       openfhe_development_branch:
         description: 'openfhe-development branch'
         type: string
@@ -36,7 +33,6 @@ jobs:
   init:
     runs-on: ${{ inputs.runner }}
     outputs:
-      integer_size: ${{ steps.int_size.outputs.integer_size }}
       compiler: ${{ steps.compiler.outputs.compiler_args }}
       openmp_flag: ${{ steps.openmp.outputs.openmp_flag }}
     steps:
@@ -46,29 +42,10 @@ jobs:
           echo "===================== INPUT ======================="
           echo "runner                     : ${{ inputs.runner }}"
           echo "compiler                   : ${{ inputs.compiler }}"
-          echo "native_backend             : ${{ inputs.native_backend }}"
           echo "openfhe_development_branch : ${{ inputs.openfhe_development_branch }}"
           echo "openfhe_python_branch      : ${{ inputs.openfhe_python_branch }}"
           echo "cmake_args_map_openfhe_lib : ${{ inputs.cmake_args_map_openfhe_lib }}"
           echo "==================================================="
-
-      - name: Get NativeInteger size for matrix
-        id: int_size
-        run: |
-          input_value="${{ inputs.native_backend }}"
-          if [ "$input_value" == "32" ]; then
-            echo "integer_size=['32']"
-            echo "integer_size=['32']" >> $GITHUB_OUTPUT
-          elif [ "$input_value" == "64" ]; then
-            echo "integer_size=['64']"
-            echo "integer_size=['64']" >> $GITHUB_OUTPUT
-          elif [ "$input_value" == "128" ]; then
-            echo "integer_size=['128']"
-            echo "integer_size=['128']" >> $GITHUB_OUTPUT
-          else
-            echo "integer_size=['32', '64', '128']"
-            echo "integer_size=['32', '64', '128']" >> $GITHUB_OUTPUT
-          fi
 
       - name: Get compiler as args for cmake
         id: compiler
@@ -88,10 +65,6 @@ jobs:
   #
   ###############################################
   default:
-    strategy:
-      matrix:
-        integer_size: ${{ fromJson(needs.init.outputs.integer_size) }}
-
     needs: init
     runs-on: ${{ inputs.runner }}
     steps:
@@ -104,7 +77,7 @@ jobs:
         echo "module_name: ${{ github.job }}"
         echo "openfhe_development_branch: ${{ inputs.openfhe_development_branch }}"
         echo "openfhe_python_branch: ${{ inputs.openfhe_python_branch }}"
-        # echo "cmake_args_openfhe_lib:  ${{ needs.init.outputs.compiler }} ${{ fromJson(inputs.cmake_args_map_openfhe_lib)[github.job] }} -DNATIVE_SIZE=${{ matrix.integer_size }} ${{ needs.init.outputs.openmp_flag }}"
+        # echo "cmake_args_openfhe_lib:  ${{ needs.init.outputs.compiler }} ${{ fromJson(inputs.cmake_args_map_openfhe_lib)[github.job] }} ${{ needs.init.outputs.openmp_flag }}"
 
     - name: ${{ github.job }}
       uses: openfheorg/openfhe-numpy/.github/actions/generic_workflow_builder@github-ci
@@ -112,5 +85,5 @@ jobs:
         module_name: ${{ github.job }}
         openfhe_development_branch: ${{ inputs.openfhe_development_branch }}
         openfhe_python_branch: ${{ inputs.openfhe_python_branch }}
-        cmake_args_openfhe_lib: "${{ needs.init.outputs.compiler }} ${{ fromJson(inputs.cmake_args_map_openfhe_lib)[github.job] }} -DNATIVE_SIZE=${{ matrix.integer_size }} ${{ needs.init.outputs.openmp_flag }}"
+        cmake_args_openfhe_lib: "${{ needs.init.outputs.compiler }} ${{ fromJson(inputs.cmake_args_map_openfhe_lib)[github.job] }} ${{ needs.init.outputs.openmp_flag }}"
 

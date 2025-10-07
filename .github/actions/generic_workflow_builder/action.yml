@@ -30,6 +30,7 @@ runs:
         module_name=${{inputs.module_name}}
         openfhe_development_branch=${{inputs.openfhe_development_branch}}
         openfhe_python_branch=${{inputs.openfhe_python_branch}}
+        openfhe_numpy_branch=${{github.ref_name}}
         "
     #####################################################################################
     - name: '${{ inputs.module_name }}_cleanup'
@@ -38,13 +39,22 @@ runs:
         # pwd
         echo "======> step ${{ inputs.module_name }}_cleanup"
 
-        ### TODO: ============>>> UNINSTALL openfhe and openfhe-numpy or simply delete the local virtual python environment !!!!!!!!!!!!!!!!!!!!
+        #### TODO: ============>>> UNINSTALL openfhe and openfhe-numpy or simply delete (?) the local virtual python environment !!!!!!!!!!!!!!!!!!!!
 
         ONP_PACKAGER_DIR="$PWD/openfhe-numpy-packager"
         echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR"
         echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR" >> $GITHUB_ENV
         if [ -d "$ONP_PACKAGER_DIR" ]; then
           rm -Rf $ONP_PACKAGER_DIR;
+        fi
+
+        #### TODO: check if this is needed. We should use the one in $ONP_PACKAGER_DIR only
+
+        ONP_BUILD_ENV_DIR="$PWD/env_for_openfhe_numpy_wheel"
+        echo "ONP_BUILD_ENV_DIR=$ONP_BUILD_ENV_DIR"
+        echo "ONP_BUILD_ENV_DIR=$ONP_BUILD_ENV_DIR" >> $GITHUB_ENV
+        if [ -d "$ONP_BUILD_ENV_DIR" ]; then
+          rm -Rf $ONP_BUILD_ENV_DIR;
         fi
 
     # #####################################################################################
@@ -89,12 +99,14 @@ runs:
         sed -i \
             -e "s/^OPENFHE_TAG=.*/OPENFHE_TAG=${{inputs.openfhe_development_branch}}/" \
             -e "s/^OPENFHE_PYTHON_TAG=.*/OPENFHE_PYTHON_TAG=${{inputs.openfhe_python_branch}}/" \
-            -e "s/^OPENFHE_NUMPY_TAG=.*/OPENFHE_NUMPY_TAG=${{inputs.openfhe_numpy_branch}}/" \
+            -e "s/^OPENFHE_NUMPY_TAG=.*/OPENFHE_NUMPY_TAG=${{github.ref_name}}/" \
             ./ci-vars.sh
 
         echo "=== ci-vars.sh ==="
         cat ./ci-vars.sh
         echo "==================="
+
+        ./build_openfhe_numpy_wheel.sh
 
         # pip install ./build/dist/*.whl
     #####################################################################################
