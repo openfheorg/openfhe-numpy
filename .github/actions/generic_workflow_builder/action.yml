@@ -49,11 +49,6 @@ runs:
           rm -Rf $ONP_PACKAGER_DIR;
         fi
 
-        ### openfhe_numpy location
-        ONP_DIR="$PWD/openfhe-numpy"
-        echo "ONP_DIR=$ONP_DIR"
-        echo "ONP_DIR=$ONP_DIR" >> $GITHUB_ENV
- 
     #####################################################################################
     - name: '${{ inputs.module_name }}_build_openfhe_numpy'
       shell: bash
@@ -84,6 +79,10 @@ runs:
         # pwd
         echo "======> step ${{ inputs.module_name }}_tests"
 
+        ### save openfhe_numpy location before we start the process
+        ONP_DIR="$PWD"
+        # echo "ONP_DIR=$ONP_DIR"
+ 
         cd $ONP_PACKAGER_DIR
 
         ### activate the virtual environment
@@ -92,10 +91,9 @@ runs:
         ### install the wheel
         pip install ./build/dist/*.whl
 
-        echo "====== pip list|grep openfhe ======"
-        installed_libs=`pip list|grep openfhe`
-        echo $installed_libs
-        echo "==================================="
+        echo "====== Currently installed OPENFHE packages ======"
+        pip list|grep openfhe
+        echo "=================================================="
 
         ### run tests from the main openfhe_numpy location
         cd $ONP_DIR/tests
