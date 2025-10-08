@@ -15,18 +15,13 @@ on:
         type: string
         required: true
         default: 'CLANG-18'
-      native_backend:
-        description: 'Size of NativeInteger'
-        type: string
-        required: true
-        default: '64'
       openfhe_development_branch:
-        description: 'openfhe-development branch'
+        description: 'openfhe-development branch/tag'
         type: string
         required: true
         default: 'main'
       openfhe_python_branch:
-        description: 'openfhe_python_branch'
+        description: 'openfhe_python branch/tag'
         type: string
         required: true
         default: 'main'
@@ -43,23 +38,13 @@ on:
         - 'CLANG-18'
         required: true
         default: 'CLANG-18'
-      native_backend:
-        description: 'Size of NativeInteger'
-        type: choice
-        options:
-        - '32'
-        - '64'
-        - '128'
-        - 'all'
-        required: true
-        default: '64'
       openfhe_development_branch:
-        description: 'openfhe-development branch'
+        description: 'openfhe-development branch/tag'
         type: string
         required: true
         default: 'main'
       openfhe_python_branch:
-        description: 'openfhe_python_branch'
+        description: 'openfhe_python branch/tag'
         type: string
         required: true
         default: 'main'
@@ -73,11 +58,10 @@ jobs:
     with:
       runner: ${{ vars.RUNNER }}
       compiler: "${{ inputs.compiler }}"
-      native_backend: "${{ inputs.native_backend }}"
       openfhe_development_branch: "${{ inputs.openfhe_development_branch }}"
       openfhe_python_branch: "${{ inputs.openfhe_python_branch }}"
       cmake_args_map_openfhe_lib: '{
-                  "default"           : "-DBUILD_BENCHMARKS=OFF -DBUILD_UNITTESTS=OFF -DBUILD_EXAMPLES=OFF",
+                  "default"           : "NONE FOR NOW",
                 }'
       
 
