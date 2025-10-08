@@ -41,6 +41,7 @@ runs:
 
         #### TODO: ============>>> UNINSTALL openfhe and openfhe-numpy or simply delete (?) the local virtual python environment !!!!!!!!!!!!!!!!!!!!
 
+        ### openfhe_numpy_packager location
         ONP_PACKAGER_DIR="$PWD/openfhe-numpy-packager"
         echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR"
         echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR" >> $GITHUB_ENV
@@ -48,43 +49,11 @@ runs:
           rm -Rf $ONP_PACKAGER_DIR;
         fi
 
-        #### TODO: check if this is needed. We should use the one in $ONP_PACKAGER_DIR only
-
-        ONP_BUILD_ENV_DIR="$PWD/env_for_openfhe_numpy_wheel"
-        echo "ONP_BUILD_ENV_DIR=$ONP_BUILD_ENV_DIR"
-        echo "ONP_BUILD_ENV_DIR=$ONP_BUILD_ENV_DIR" >> $GITHUB_ENV
-        if [ -d "$ONP_BUILD_ENV_DIR" ]; then
-          rm -Rf $ONP_BUILD_ENV_DIR;
-        fi
-
-    # #####################################################################################
-    # - name: '${{ inputs.module_name }}_set_environment'
-    #   shell: bash
-    #   run: |
-    #     # pwd
-    #     echo "======> step ${{ inputs.module_name }}_set_environment"
-
-    #     #################################################################################
-    #     # we can not install "pybind11[global]" and pytest on an AWS instance directly.
-    #     # It is strongly recommended to use a virtual environment for that: https://pip.pypa.io/warnings/venv
-    #     # so, we will have to use a virtual environment then...
-    #     #################################################################################
-    #     ### 1. create a virtual environment if it doesn't exist
-    #     if [ ! -d "openfhe-python-env" ]; then
-    #         python3 -m venv openfhe-python-env
-    #     fi
-
-    #     ### 2. activate the virtual environment
-    #     source openfhe-python-env/bin/activate
-
-    #     ### 3. install "pybind11[global]"
-    #     pip install "pybind11[global]"
-
-    #     ### 4. install pytest if it is not installed
-    #     if ! command -v pytest &> /dev/null; then
-    #         pip install pytest
-    #     fi
-
+        ### openfhe_numpy location
+        ONP_DIR="$PWD/openfhe-numpy"
+        echo "ONP_DIR=$ONP_DIR"
+        echo "ONP_DIR=$ONP_DIR" >> $GITHUB_ENV
+ 
     #####################################################################################
     - name: '${{ inputs.module_name }}_build_openfhe_numpy'
       shell: bash
@@ -102,39 +71,42 @@ runs:
             -e "s/^OPENFHE_NUMPY_TAG=.*/OPENFHE_NUMPY_TAG=${{github.ref_name}}/" \
             ./ci-vars.sh
 
-        echo "=== ci-vars.sh ==="
+        echo "====== ci-vars.sh ======"
         cat ./ci-vars.sh
-        echo "==================="
+        echo "========================"
 
         ./build_openfhe_numpy_wheel.sh
 
-        # pip install ./build/dist/*.whl
     #####################################################################################
-    # - name: '${{ inputs.module_name }}_tests'
-    #   shell: bash
-    #   run: |
-    #     # pwd
-    #     echo "======> step ${{ inputs.module_name }}_tests"
+    - name: '${{ inputs.module_name }}_tests'
+      shell: bash
+      run: |
+        # pwd
+        echo "======> step ${{ inputs.module_name }}_tests"
 
-    #     ### activate the virtual environment
-    #     source openfhe-python-env/bin/activate
+        cd $ONP_PACKAGER_DIR
 
-    #     ### set LD_LIBRARY_PATH and PYTHONPATH
-    #     export LD_LIBRARY_PATH=${INSTALL_DIR}/lib
-    #     export PYTHONPATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}:${PYTHONPATH}
-    #     echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}"
-    #     echo "PYTHONPATH=${PYTHONPATH}"
+        ### activate the virtual environment
+        source ./scripts/get-env.sh
 
-    #     cd tests
-    #     pytest *.py
+        ### install the wheel
+        pip install ./build/dist/*.whl
 
-    #     ### deactivate the virtual environment
-    #     deactivate
+        echo "====== pip list|grep openfhe ======"
+        installed_libs=`pip list|grep openfhe`
+        echo $installed_libs
+        echo "==================================="
+
+        ### run tests from the main openfhe_numpy location
+        cd $ONP_DIR/tests
+        python3 run_tests.py
+
+        ### deactivate the virtual environment
+        deactivate
+
     # #####################################################################################
     # - name: '${{ inputs.module_name }}_final_cleanup'
     #   shell: bash
     #   run: |
     #     pwd
-    #     rm -rf ${BUILD_DIR}
-    #     rm -rf ${OPENFHE_DIR}
-    #     rm -rf ${INSTALL_DIR}
+    #     rm -rf ${ONP_PACKAGER_DIR}
