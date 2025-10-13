@@ -24,10 +24,6 @@ on:
         description: 'openfhe_python_branch'
         type: string
         required: true
-      cmake_args_map_openfhe_lib:
-        description: 'Cmake args by job name (json string)'
-        type: string
-        required: true
           
 jobs:
   init:
@@ -44,7 +40,6 @@ jobs:
           echo "compiler                   : ${{ inputs.compiler }}"
           echo "openfhe_development_branch : ${{ inputs.openfhe_development_branch }}"
           echo "openfhe_python_branch      : ${{ inputs.openfhe_python_branch }}"
-          echo "cmake_args_map_openfhe_lib : ${{ inputs.cmake_args_map_openfhe_lib }}"
           echo "==================================================="
 
       - name: Get compiler as args for cmake
@@ -73,11 +68,11 @@ jobs:
 
     - name: Print parameters passed to .github/actions
       run: |
-        echo "runs-on:     ${{ inputs.runner }}"
-        echo "module_name: ${{ github.job }}"
-        echo "openfhe_development_branch: ${{ inputs.openfhe_development_branch }}"
-        echo "openfhe_python_branch: ${{ inputs.openfhe_python_branch }}"
-        # echo "cmake_args_openfhe_lib:  ${{ needs.init.outputs.compiler }} ${{ fromJson(inputs.cmake_args_map_openfhe_lib)[github.job] }} ${{ needs.init.outputs.openmp_flag }}"
+        echo "runs-on                    : ${{ inputs.runner }}"
+        echo "module_name                : ${{ github.job }}"
+        echo "compiler                   : ${{ inputs.compiler }}"
+        echo "openfhe_development_branch : ${{ inputs.openfhe_development_branch }}"
+        echo "openfhe_python_branch      : ${{ inputs.openfhe_python_branch }}"
 
     - name: ${{ github.job }}
       uses: openfheorg/openfhe-numpy/.github/actions/generic_workflow_builder@github-ci
@@ -85,5 +80,5 @@ jobs:
         module_name: ${{ github.job }}
         openfhe_development_branch: ${{ inputs.openfhe_development_branch }}
         openfhe_python_branch: ${{ inputs.openfhe_python_branch }}
-        cmake_args_openfhe_lib: "${{ needs.init.outputs.compiler }} ${{ fromJson(inputs.cmake_args_map_openfhe_lib)[github.job] }} ${{ needs.init.outputs.openmp_flag }}"
+        cmake_args_openfhe_lib: "${{ needs.init.outputs.compiler }}"
 

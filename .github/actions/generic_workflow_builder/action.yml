@@ -31,6 +31,7 @@ runs:
         openfhe_development_branch=${{inputs.openfhe_development_branch}}
         openfhe_python_branch=${{inputs.openfhe_python_branch}}
         openfhe_numpy_branch=${{github.ref_name}}
+        cmake_args_openfhe_lib=${{inputs.cmake_args_openfhe_lib}}
         "
     #####################################################################################
     - name: '${{ inputs.module_name }}_cleanup'
@@ -39,9 +40,10 @@ runs:
         # pwd
         echo "======> step ${{ inputs.module_name }}_cleanup"
 
-        #### TODO: ============>>> UNINSTALL openfhe and openfhe-numpy or simply delete (?) the local virtual python environment !!!!!!!!!!!!!!!!!!!!
+        #### Uninstall openfhe and openfhe-numpy by simply deleting $ONP_PACKAGER_DIR along with
+        #### the local virtual python environment which has openfhe and openfhe-numpy installed
 
-        ### openfhe_numpy_packager location
+        ### openfhe-numpy-packager location
         ONP_PACKAGER_DIR="$PWD/openfhe-numpy-packager"
         echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR"
         echo "ONP_PACKAGER_DIR=$ONP_PACKAGER_DIR" >> $GITHUB_ENV
@@ -61,9 +63,10 @@ runs:
 
         # update ci-vars.sh:
         sed -i \
-            -e "s/^OPENFHE_TAG=.*/OPENFHE_TAG=${{inputs.openfhe_development_branch}}/" \
-            -e "s/^OPENFHE_PYTHON_TAG=.*/OPENFHE_PYTHON_TAG=${{inputs.openfhe_python_branch}}/" \
-            -e "s/^OPENFHE_NUMPY_TAG=.*/OPENFHE_NUMPY_TAG=${{github.ref_name}}/" \
+            -e "s|^OPENFHE_TAG=.*|OPENFHE_TAG=${{inputs.openfhe_development_branch}}|"           \
+            -e "s|^OPENFHE_PYTHON_TAG=.*|OPENFHE_PYTHON_TAG=${{inputs.openfhe_python_branch}}|"  \
+            -e "s|^OPENFHE_NUMPY_TAG=.*|OPENFHE_NUMPY_TAG=${{github.ref_name}}|"                 \
+            -e "s|^ADDL_CMAKE_FLAGS=.*|ADDL_CMAKE_FLAGS=\"${{inputs.cmake_args_openfhe_lib}}\"|" \
             ./ci-vars.sh
 
         echo "====== ci-vars.sh ======"
