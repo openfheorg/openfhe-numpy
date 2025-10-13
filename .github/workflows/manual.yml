@@ -49,9 +49,8 @@ on:
         required: true
         default: 'main'
 
-# cmake_args_map_openfhe_lib holds job specific additional cmake options. As we are testing openfhe-numpy here
-# and not openfhe-development or openfhe_python, we do not link unittest, benchmarks, etc. for openfhe-development or openfhe_python.
-# compiler flags, native_backend flag and OpenMP flag are set in generic_workflow.yml
+# As we are testing openfhe-numpy here, and not openfhe-development or openfhe_python, we do not need
+# additional cmake options besides the compiler
 jobs:
   call:
     uses: openfheorg/openfhe-numpy/.github/workflows/generic_workflow.yml@github-ci
@@ -60,8 +59,5 @@ jobs:
       compiler: "${{ inputs.compiler }}"
       openfhe_development_branch: "${{ inputs.openfhe_development_branch }}"
       openfhe_python_branch: "${{ inputs.openfhe_python_branch }}"
-      cmake_args_map_openfhe_lib: '{
-                  "default"           : "NONE FOR NOW",
-                }'
       
 
