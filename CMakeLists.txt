@@ -45,6 +45,8 @@ include_directories(${OpenFHE_INCLUDE}/pke)
 include_directories(${OpenFHE_INCLUDE}/binfhe)
 
 set(CMAKE_EXE_LINKER_FLAGS ${OpenFHE_EXE_LINKER_FLAGS})
+set(CMAKE_CXX_FLAGS ${OpenFHE_CXX_FLAGS})
+
 link_libraries(${OpenFHE_SHARED_LIBRARIES})
 
 set(OpenFHE_Numpy_SOURCE "${CMAKE_SOURCE_DIR}/openfhe_numpy/cpp/lib")
