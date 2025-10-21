@@ -4,7 +4,7 @@ import os
 project = "OpenFHE-Numpy"
 author = "Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy"
 copyright = f"2025, {author}"
-version = release = "1.4.0.4"
+version = release = "1.4.2.0"
 language = "en"
 
 extensions = [
