@@ -20,9 +20,9 @@ using namespace lbcrypto;
  */
 CryptoContext<DCRTPoly> GenerateCryptoContext(uint32_t multDepth, uint32_t batchSize = 0) {
     // Create parameter object with security level
-    uint32_t ptModulus           = 0;
+    // uint32_t ptModulus           = 0;
     uint32_t digitSize           = 0;
-    uint32_t standardDeviation   = 3.19;
+    float standardDeviation   = 3.19;
     SecretKeyDist secretKeyDist  = UNIFORM_TERNARY;
     uint32_t maxRelinSkDeg       = 2;
     KeySwitchTechnique ksTech    = HYBRID;
