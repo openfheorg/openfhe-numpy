@@ -185,8 +185,8 @@ std::vector<DCRTPoly> PackVecRowWise(const std::vector<DCRTPoly>& v, std::size_t
         OPENFHE_THROW("num_slots % block_size");
 
     // Calculate blocks and available space
-    uint32_t total_blocks = num_slots / block_size;
-    uint32_t free_slots   = num_slots - n * block_size;
+    // uint32_t total_blocks = num_slots / block_size;
+    // uint32_t free_slots   = num_slots - n * block_size;
 
     // Create and fill packed vector
     std::vector<DCRTPoly> packed;
@@ -236,7 +236,7 @@ std::vector<T> PackVecColWise(const std::vector<T>& v, std::size_t block_size, s
     std::vector<T> packed(num_slots, 0);
 
     std::size_t total_blocks = num_slots / block_size;
-    std::size_t free_slots   = num_slots - n * total_blocks;
+    // std::size_t free_slots   = num_slots - n * total_blocks;
 
     // Pack the vector column-wise
     std::size_t k = 0;  // index into vector to write

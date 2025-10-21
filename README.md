@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-BSD%202--Clause-blue.svg)](https://opensource.org/licenses/BSD-2-Clause)
 [![Python Versions](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.4.0%2B-green)](https://github.com/openfheorg/openfhe-development)
+[![OpenFHE Version](https://img.shields.io/badge/OpenFHE-1.4.2%2B-green)](https://github.com/openfheorg/openfhe-development)
 
 OpenFHE-NumPy is a NumPy-like API for homomorphic encryption operations, built on top of OpenFHE. This library enables data scientists and machine learning practitioners to perform computations on encrypted data using familiar NumPy syntax.
 
@@ -54,7 +54,7 @@ openfhe-numpy/
 
 ### Installing from Source
 Before building, make sure you have the following dependencies installed:
-- [OpenFHE 1.4.0+](https://github.com/openfheorg/openfhe-development) by following the instructions in [OpenFHE Documentation](https://openfhe-development.readthedocs.io/en/latest/sphinx_rsts/intro/installation/installation.html)
+- [OpenFHE 1.4.2+](https://github.com/openfheorg/openfhe-development) by following the instructions in [OpenFHE Documentation](https://openfhe-development.readthedocs.io/en/latest/sphinx_rsts/intro/installation/installation.html)
 - [OpenFHE Python Bindings](https://github.com/openfheorg/openfhe-python) by following the instructions in [OpenFHE Python Documentation](https://openfheorg.github.io/openfhe-python/html/index.html)
 
 We recommend following OpenFHE C++ and OpenFHE Python installation instructions first (which covers Linux, Windows and MacOS) and then getting back to this repo. If the some package cannot be found when running a Python example (occurs only for some environments), check the `PYTHONPATH` (OpenFHE Python) environment variable and the `LD_LIBRARY_PATH` (OpenFHE libraries). This ensures that the packages can be correctly located and imported.

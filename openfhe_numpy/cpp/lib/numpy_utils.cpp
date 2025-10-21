@@ -48,21 +48,23 @@ Compute diagonals for the permutation matrix Sigma.
 B[i,j] = A[i, i +j]
 */
 std::vector<double> GenSigmaDiag(uint32_t numCols, int32_t k) {
-    int32_t n = numCols * numCols;
+    // the cast below is necessary as we don't want to mix signed and unsigned integers in calculations
+    int32_t nCols = static_cast<int32_t>(numCols);
+    int32_t n = nCols * nCols;
     std::vector<double> diag(n, 0);
 
     if (k >= 0) {
         for (int32_t i = 0; i < n; i++) {
-            int32_t tmp = i - numCols * k;
-            if ((0 <= tmp) && (tmp < numCols - k)) {
+            int32_t tmp = i - nCols * k;
+            if ((0 <= tmp) && (tmp < nCols - k)) {
                 diag[i] = 1;
             }
         }
     }
     else {
         for (int32_t i = 0; i < n; i++) {
-            int32_t tmp = i - (numCols + k) * numCols;
-            if ((-k <= tmp) && (tmp < numCols)) {
+            int32_t tmp = i - (nCols + k) * nCols;
+            if ((-k <= tmp) && (tmp < nCols)) {
                 diag[i] = 1;
             }
         }
