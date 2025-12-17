@@ -1,6 +1,13 @@
 # conf.py
 import os
+import sys
 
+this_dir = os.path.dirname(__file__)
+repo_root = os.path.abspath(os.path.join(this_dir, ".."))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+
+# -- Project information -----------------------------------------------------
 project = "OpenFHE-Numpy"
 author = "Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy"
 copyright = f"2025, {author}"
