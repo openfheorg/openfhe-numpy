@@ -1,4 +1,6 @@
 # Sphinx documentation dependencies for OpenFHE-NumPy
+numpy>=1.26
+openfhe>=1.4.2
 sphinx>=7,<9
 myst-parser>=0.18.0
 sphinx-rtd-theme
