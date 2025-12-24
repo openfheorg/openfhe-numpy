@@ -53,7 +53,7 @@ from openfhe_numpy.utils.errors import (
     ONPDimensionError,
 )
 from openfhe_numpy.utils.typecheck import is_numeric_scalar
-from openfhe_numpy import (
+from openfhe_numpy.openfhe_numpy import (
     ArrayEncodingType,
     EvalMatMulSquare,
     EvalReduceCumRows,
