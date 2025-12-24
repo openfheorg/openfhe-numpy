@@ -25,7 +25,16 @@ extensions = [
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "**/.venv*",
+    "docs/scripts/.venv-docs/**",
+    "scripts/.venv-docs/**",
+    "**/site-packages/**",
+    "**/*.dist-info/**",
+]
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = []
