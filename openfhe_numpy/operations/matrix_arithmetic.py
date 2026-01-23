@@ -264,20 +264,20 @@ def _eval_matvec_ct(lhs, rhs):
 
 def _matmul_ct(lhs, rhs):
     """Internal function to evaluate matrix multiplication."""
-    if lhs.is_encrypted and rhs.is_encrypted:
-        # same size: matrix x matrix
-        if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
-            return lhs.clone(EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
+    # if lhs.is_encrypted and rhs.is_encrypted:
+    # same size: matrix x matrix
+    if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
+        return lhs.clone(EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
 
         # matrix x vector
-        elif rhs.ndim == 1:
-            return _eval_matvec_ct(lhs, rhs)
-        else:
-            ONPIncompatibleShape(
-                lhs.original_shape,
-                rhs.original_shape,
-                "Matrix dimension mismatch for multiplication",
-            )
+    elif rhs.ndim == 1:
+        return _eval_matvec_ct(lhs, rhs)
+    else:
+        ONPIncompatibleShape(
+            lhs.original_shape,
+            rhs.original_shape,
+            "Matrix dimension mismatch for multiplication",
+        )
 
 
 @register_tensor_function("matmul", [("CTArray", "CTArray")])
