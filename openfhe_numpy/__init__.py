@@ -1,4 +1,4 @@
-import os
+# import os
 
 # import from the cpp backend
 from .openfhe_numpy import *

@@ -340,10 +340,19 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     def __add__(self, other):
         return self.__tensor_function__("add", (self, other))
 
+    def __radd__(self, other):
+        return self.__tensor_function__("add", (self, other))
+
     def __sub__(self, other):
         return self.__tensor_function__("subtract", (self, other))
 
+    def __rsub__(self, other):
+        return self.__tensor_function__("subtract", (other, self))
+
     def __mul__(self, other):
+        return self.__tensor_function__("multiply", (self, other))
+
+    def __rmul__(self, other):
         return self.__tensor_function__("multiply", (self, other))
 
     def __matmul__(self, other):
