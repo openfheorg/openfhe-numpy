@@ -39,6 +39,8 @@ ArrayNumeric = Union[np.ndarray, List[Number]]
 def is_numeric_scalar(x) -> bool:
     if isinstance(x, (int, float, complex, bool, np.generic)):
         return True
+    if isinstance(x, np.ndarray) and x.shape == ():
+        return True
     return np.isscalar(x) and isinstance(x, Number)
 
 
