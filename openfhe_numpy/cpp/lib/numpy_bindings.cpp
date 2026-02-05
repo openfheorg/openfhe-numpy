@@ -29,6 +29,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==================================================================================
 #include <pybind11/pybind11.h>
+
 #include "numpy_enc_matrix.h"
 
 using namespace openfhe_numpy;
@@ -45,9 +46,6 @@ void bind_privatekey(py::module& m);
 
 PYBIND11_MODULE(openfhe_numpy, m) {
     m.doc() = "OpenFHE-Numpy C++ extension";
-
-    // Version info comes from CMake-generated config.h
-    // m.attr("__version__")     = OPENFHE_NUMPY_VERSION;
     m.attr("__author__")      = "OpenFHE-Numpy Team";
     m.attr("__description__") = "Python bindings for OpenFHE-Numpy homomorphic operations";
     m.attr("__license__")     = "MIT";
@@ -122,7 +120,7 @@ void bind_matrix_funcs(py::module& m) {
 
     // EvalLinTransKeyGen
     m.def("EvalLinTransKeyGen",
-        [](PrivateKey<DCRTPoly>& secretKey, int32_t numCols, LinTransType type, int32_t numRepeats) {
+        [](PrivateKey<DCRTPoly>& secretKey, uint32_t numCols, LinTransType type, uint32_t numRepeats) {
             EvalLinTransKeyGen(secretKey, numCols, type, numRepeats);
         },
         py::arg("secretKey"),
@@ -131,89 +129,118 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("numRepeats") = 0);
 
     m.def("EvalSumCumRowsKeyGen",
-        [](PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
+        [](PrivateKey<DCRTPoly>& secretKey, uint32_t numCols) {
             EvalSumCumRowsKeyGen(secretKey, numCols);
         },
         py::arg("secretKey"),
         py::arg("numCols"));
 
     m.def("EvalSumCumColsKeyGen",
-        [](PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
+        [](PrivateKey<DCRTPoly>& secretKey, uint32_t numCols) {
             EvalSumCumColsKeyGen(secretKey, numCols);
         },
         py::arg("secretKey"),
         py::arg("numCols"));
 
     m.def("EvalLinTransSigma",
-        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransSigma),
+        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalLinTransSigma),
         py::arg("secretKey"),
         py::arg("ciphertext"),
         py::arg("numCols"));
 
     m.def("EvalLinTransSigma",
-        static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransSigma),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalLinTransSigma),
         py::arg("ciphertext"),
         py::arg("numCols"));
 
     m.def("EvalLinTransTau",
-        static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransTau),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalLinTransTau),
         py::arg("ctVector"),
         py::arg("numCols"));
 
     m.def("EvalLinTransTau",
-        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t)>(&EvalLinTransTau),
+        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalLinTransTau),
         py::arg("secretKey"),
         py::arg("ciphertext"),
         py::arg("numCols"));
 
 
     m.def("EvalLinTransPhi",
-        static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPhi),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t, uint32_t)>(&EvalLinTransPhi),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
 
     m.def("EvalLinTransPhi",
-        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPhi),
+        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, ConstCiphertext<DCRTPoly>&, uint32_t, uint32_t)>(&EvalLinTransPhi),
         py::arg("secretKey"),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
 
     m.def("EvalLinTransPsi",
-        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPsi),
+        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, ConstCiphertext<DCRTPoly>&, uint32_t, uint32_t)>(&EvalLinTransPsi),
         py::arg("secretKey"),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
 
     m.def("EvalLinTransPsi",
-        static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t, int32_t)>(&EvalLinTransPsi),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t, uint32_t)>(&EvalLinTransPsi),
         py::arg("ctVector"),
         py::arg("numCols"),
         py::arg("numRepeats"));
 
     m.def("EvalMatMulSquare",
-        [](const Ciphertext<DCRTPoly>& matrix_a, const Ciphertext<DCRTPoly>& matrixB, int32_t numCols) {
-            return EvalMatMulSquare(matrix_a, matrixB, numCols);
+        [](ConstCiphertext<DCRTPoly>& matrixA, ConstCiphertext<DCRTPoly>& matrixB, uint32_t numCols)
+        {
+            return EvalMatMulSquare(matrixA, matrixB, numCols);
         },
-        py::arg("matrix_a"),
+        py::arg("matrixA"),
+        py::arg("matrixB"),
+        py::arg("numCols"));
+
+     m.def("EvalMatMulSquare",
+        [](ConstPlaintext& matrixA, ConstCiphertext<DCRTPoly>& matrixB, uint32_t numCols)
+        {
+            return EvalMatMulSquare(matrixA, matrixB, numCols);
+        },
+        py::arg("matrixA"),
+        py::arg("matrixB"),
+        py::arg("numCols"));
+
+     m.def("EvalMatMulSquare",
+        [](ConstCiphertext<DCRTPoly>& matrixA, ConstPlaintext& matrixB, uint32_t numCols)
+        {
+            return EvalMatMulSquare(matrixA, matrixB, numCols);
+        },
+        py::arg("matrixA"),
+        py::arg("matrixB"),
+        py::arg("numCols"));
+
+
+    m.def("EvalMatMulSquare",
+        [](ConstCiphertext<DCRTPoly>& matrixA, const std::vector<double>& matrixB, uint32_t numCols)
+        {
+            return EvalMatMulSquare(matrixA, matrixB, numCols);
+        },
+        py::arg("matrixA"),
         py::arg("matrixB"),
         py::arg("numCols"));
 
     m.def("EvalTranspose",
-        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, const Ciphertext<DCRTPoly>&, int32_t)>(&EvalTranspose),
+        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalTranspose),
         py::arg("secretKey"),
         py::arg("ciphertext"),
         py::arg("numCols"));
 
     m.def("EvalTranspose",
-        static_cast<Ciphertext<DCRTPoly>(*)(const Ciphertext<DCRTPoly>&, int32_t)>(&EvalTranspose),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalTranspose),
         py::arg("ciphertext"),
         py::arg("numCols"));
 
     m.def("EvalSquareMatMultRotateKeyGen",
-        [](PrivateKey<DCRTPoly>& secretKey, int32_t numCols) {
+        [](PrivateKey<DCRTPoly>& secretKey, uint32_t numCols) {
             EvalSquareMatMultRotateKeyGen(secretKey, numCols);
         },
         py::arg("secretKey"),
@@ -221,7 +248,7 @@ void bind_matrix_funcs(py::module& m) {
 
     m.def("EvalMultMatVec",
         [](std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>>& evalKeys, MatVecEncoding encodeType,
-        int32_t numCols, const Ciphertext<DCRTPoly>& ctVector, const Ciphertext<DCRTPoly>& ctMatrix) {
+        uint32_t numCols, ConstCiphertext<DCRTPoly>& ctVector, ConstCiphertext<DCRTPoly>& ctMatrix) {
             return EvalMultMatVec(evalKeys, encodeType, numCols, ctVector, ctMatrix);
         },
         py::arg("evalKeys"),
@@ -231,7 +258,7 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("ctMatrix"));
 
     m.def("EvalSumCumRows",
-        [](const Ciphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t numRows, uint32_t slots) {
+        [](ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t numRows, uint32_t slots) {
             return EvalSumCumRows(ciphertext, numCols, numRows, slots);
         },
         py::arg("ciphertext"),
@@ -240,7 +267,7 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("slots") = 0);
 
     m.def("EvalSumCumCols",
-        [](const Ciphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t subringDim) {
+        [](ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t subringDim) {
             return EvalSumCumCols(ciphertext, numCols, subringDim);
         },
         py::arg("ciphertext"),
@@ -248,7 +275,7 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("subringDim") = 0);
 
     m.def("EvalReduceCumRows",
-        [](const Ciphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t numRows, uint32_t slots) {
+        [](ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t numRows, uint32_t slots) {
             return EvalReduceCumRows(ciphertext, numCols, numRows, slots);
         },
         py::arg("ciphertext"),
@@ -257,7 +284,7 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("slots")   = 0);
 
     m.def("EvalReduceCumCols",
-        [](const Ciphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t subringDim) {
+        [](ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t subringDim) {
             return EvalReduceCumCols(ciphertext, numCols, subringDim);
         },
         py::arg("ciphertext"),
@@ -270,8 +297,8 @@ void bind_ciphertext(py::module& m) {
     py::object existingModule = py::module_::import("openfhe");
     py::object pyClsObj       = existingModule.attr("Ciphertext");
     auto cls                  = py::reinterpret_borrow<py::class_<Ciphertext<DCRTPoly>>>(pyClsObj);
-    cls.def("GetEncodingType", [](const Ciphertext<DCRTPoly>& ct) { return ct->GetEncodingType(); });
-    cls.def("GetCryptoContext", [](const Ciphertext<DCRTPoly>& ct) { return ct->GetCryptoContext(); });
+    cls.def("GetEncodingType", [](ConstCiphertext<DCRTPoly>& ct) { return ct->GetEncodingType(); });
+    cls.def("GetCryptoContext", [](ConstCiphertext<DCRTPoly>& ct) { return ct->GetCryptoContext(); });
 }
 
 void bind_privatekey(py::module& m) {
