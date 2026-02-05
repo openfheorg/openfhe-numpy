@@ -48,76 +48,93 @@ using namespace lbcrypto;
 // -----------------------------------------------------------------------------
 
 namespace openfhe_numpy {
-//TODO: Change from const Ciphertext to ConstCiphertext
+//TODO: Change from ConstCiphertext to ConstCiphertext
 //TODO: using references
 
-std::size_t MulDepthAccumulation(std::size_t numRows, std::size_t numCols, bool isSumRows);
+uint32_t MulDepthAccumulation(uint32_t numRows, uint32_t numCols, bool isSumRows);
 
-void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols, LinTransType type, int32_t numRepeats = 0);
+void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols, LinTransType type, uint32_t numRepeats = 0);
 
-void EvalSquareMatMultRotateKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
+void EvalSquareMatMultRotateKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols);
 
-void EvalSumCumRowsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
+void EvalSumCumRowsKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols);
 
-void EvalSumCumColsKeyGen(PrivateKey<DCRTPoly>& secretKey, int32_t numCols);
+void EvalSumCumColsKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols);
 
 Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t, lbcrypto::EvalKey<DCRTPoly>>>& evalKeys,
                                    MatVecEncoding encodeType,
-                                   int32_t numCols,
-                                   const Ciphertext<DCRTPoly>& ctVector,
-                                   const Ciphertext<DCRTPoly>& ctMatrix);
+                                   uint32_t numCols,
+                                   ConstCiphertext<DCRTPoly>& ctVector,
+                                   ConstCiphertext<DCRTPoly>& ctMatrix);
 
 Ciphertext<DCRTPoly> EvalLinTransSigma(PrivateKey<DCRTPoly>& secretKey,
-                                      const Ciphertext<DCRTPoly>& ciphertext,
-                                      int32_t numCols);
+                                      ConstCiphertext<DCRTPoly>& ciphertext,
+                                      uint32_t numCols);
 
-Ciphertext<DCRTPoly> EvalLinTransSigma(const Ciphertext<DCRTPoly>& ciphertext, int32_t numCols);
+Ciphertext<DCRTPoly> EvalLinTransSigma(ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols);
 
-Ciphertext<DCRTPoly> EvalLinTransTau(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols);
+Ciphertext<DCRTPoly> EvalLinTransTau(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols);
 
 Ciphertext<DCRTPoly> EvalLinTransTau(PrivateKey<DCRTPoly>& secretKey,
-                                    const Ciphertext<DCRTPoly>& ciphertext,
-                                    int32_t numCols);
+                                    ConstCiphertext<DCRTPoly>& ciphertext,
+                                    uint32_t numCols);
 
-Ciphertext<DCRTPoly> EvalLinTransPhi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats);
+Ciphertext<DCRTPoly> EvalLinTransPhi(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols, uint32_t numRepeats);
 
 Ciphertext<DCRTPoly> EvalLinTransPhi(PrivateKey<DCRTPoly>& secretKey,
-                                    const Ciphertext<DCRTPoly>& ctVector,
-                                    int32_t numCols,
-                                    int32_t numRepeats);
+                                    ConstCiphertext<DCRTPoly>& ctVector,
+                                    uint32_t numCols,
+                                    uint32_t numRepeats);
 
 Ciphertext<DCRTPoly> EvalLinTransPsi(PrivateKey<DCRTPoly>& secretKey,
-                                    const Ciphertext<DCRTPoly>& ctVector,
-                                    int32_t numCols,
-                                    int32_t numRepeats);
+                                    ConstCiphertext<DCRTPoly>& ctVector,
+                                    uint32_t numCols,
+                                    uint32_t numRepeats);
 
-Ciphertext<DCRTPoly> EvalLinTransPsi(const Ciphertext<DCRTPoly>& ctVector, int32_t numCols, int32_t numRepeats);
+Ciphertext<DCRTPoly> EvalLinTransPsi(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols, uint32_t numRepeats);
 
-Ciphertext<DCRTPoly> EvalMatMulSquare(const Ciphertext<DCRTPoly>& matrix_a,
-                                     const Ciphertext<DCRTPoly>& matrixB,
-                                     int32_t numCols);
+Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& ctMatA,
+                                      ConstCiphertext<DCRTPoly>& ctMatB,
+                                      uint32_t numCols);
+
+Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& ctMatA,
+                                      ConstPlaintext& ptMatB,
+                                      uint32_t numCols);
+
+Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& ctMatA,
+                                      const std::vector<double>& rMatB,
+                                      uint32_t numCols);
+
+Ciphertext<DCRTPoly> EvalMatMulSquare(ConstPlaintext& ptMatA,
+                                      ConstCiphertext<DCRTPoly>& ctMatB,
+                                      uint32_t numCols);
+
+
+Ciphertext<DCRTPoly> EvalMatMulSquare(const std::vector<double>& rMatA,
+                                      ConstCiphertext<DCRTPoly>& ctMatB,
+                                      uint32_t numCols);
 
 Ciphertext<DCRTPoly> EvalTranspose(PrivateKey<DCRTPoly>& secretKey,
-                                  const Ciphertext<DCRTPoly>& ciphertext,
-                                  int32_t numCols);
+                                  ConstCiphertext<DCRTPoly>& ciphertext,
+                                  uint32_t numCols);
 
-Ciphertext<DCRTPoly> EvalTranspose(const Ciphertext<DCRTPoly>& ciphertext, int32_t numCols);
+Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols);
 
-Ciphertext<DCRTPoly> EvalSumCumRows(const Ciphertext<DCRTPoly>& ciphertext,
+Ciphertext<DCRTPoly> EvalSumCumRows(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t numRows = 0,
                                           uint32_t slots   = 0);
 
-Ciphertext<DCRTPoly> EvalSumCumCols(const Ciphertext<DCRTPoly>& ciphertext,
+Ciphertext<DCRTPoly> EvalSumCumCols(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t subringDim = 0);
 
-Ciphertext<DCRTPoly> EvalReduceCumRows(const Ciphertext<DCRTPoly>& ciphertext,
+Ciphertext<DCRTPoly> EvalReduceCumRows(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t numRows = 0,
                                           uint32_t slots   = 0);
 
-Ciphertext<DCRTPoly> EvalReduceCumCols(const Ciphertext<DCRTPoly>& ciphertext,
+Ciphertext<DCRTPoly> EvalReduceCumCols(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t subringDim = 0);
 }  // namespace openfhe_numpy

@@ -47,11 +47,11 @@ uint32_t NextPow2(uint32_t x) {
 Compute diagonals for the permutation matrix Sigma.
 B[i,j] = A[i, i +j]
 */
-std::vector<double> GenSigmaDiag(uint32_t numCols, int32_t k) {
+std::vector<double> GenSigmaDiag(size_t slots, size_t numCols, int32_t k) {
     // the cast below is necessary as we don't want to mix signed and unsigned integers in calculations
     int32_t nCols = static_cast<int32_t>(numCols);
     int32_t n = nCols * nCols;
-    std::vector<double> diag(n, 0);
+    std::vector<double> diag(slots, 0);
 
     if (k >= 0) {
         for (int32_t i = 0; i < n; i++) {
@@ -78,7 +78,7 @@ B[i,j] = A[i + j,i]
 u_[d.k][k + d*i] = 1 for all 0 <= i < d
 */
 
-std::vector<double> GenTauDiag(uint32_t totalSlots, uint32_t numCols, int32_t k) {
+std::vector<double> GenTauDiag(size_t totalSlots, size_t numCols, int32_t k) {
     uint32_t n = numCols * numCols;
     std::vector<double> diag(totalSlots, 0);
 
@@ -97,9 +97,9 @@ std::vector<double> GenTauDiag(uint32_t totalSlots, uint32_t numCols, int32_t k)
  *Type = 0 correspond for the k-th diagonal, and type = 1 is for the (k-d)-th
  *diagonal
  */
-std::vector<double> GenPhiDiag(uint32_t numCols, int32_t k, int type) {
+std::vector<double> GenPhiDiag(size_t slots, size_t numCols, int32_t k, int type) {
     uint32_t n = numCols * numCols;
-    std::vector<double> diag(n, 0);
+    std::vector<double> diag(slots, 0);
 
     if (type == 0) {
         for (uint32_t i = 0; i < n; i++)
@@ -120,18 +120,18 @@ std::vector<double> GenPhiDiag(uint32_t numCols, int32_t k, int type) {
  *Compute diagonals for the permutation Psi (W).
  *B[i,j] = A[i+1,j]
  */
-std::vector<double> GenPsiDiag(uint32_t numCols, int32_t k) {
-    uint32_t n = numCols * numCols;
-    std::vector<double> diag(n, 1);
+std::vector<double> GenPsiDiag(size_t slots, size_t numCols) {
+    std::vector<double> diag(slots, 0.0);  // all zeros
+    std::fill(diag.begin(),  diag.begin()+ numCols * numCols, 1);
     return diag;
 }
 
-std::vector<double> GenTransposeDiag(uint32_t totalSlots, uint32_t numCols, int32_t i) {
+std::vector<double> GenTransposeDiag(size_t totalSlots, size_t numCols, int32_t i) {
     if (static_cast<int32_t>(numCols) < i)
         OPENFHE_THROW("numCols cannot be less than the index");
 
-    uint32_t start = 0;
-    uint32_t max   = 0;
+    size_t start = 0;
+    size_t max   = 0;
     if (i < 0) {
         start = -i;
         max   = numCols;
@@ -140,11 +140,11 @@ std::vector<double> GenTransposeDiag(uint32_t totalSlots, uint32_t numCols, int3
         max = numCols - i;
     }
 
-    uint32_t n = numCols * numCols;
+    size_t n = numCols * numCols;
     std::vector<double> diag(totalSlots, 0);
-    for (uint32_t t = 0; t < totalSlots / n; ++t) {
-        for (uint32_t j = start; j < max; j++) {
-            uint32_t idx = t * n + (numCols + 1) * j + i;
+    for (size_t t = 0; t < totalSlots / n; ++t) {
+        for (size_t j = start; j < max; j++) {
+            size_t idx = t * n + (numCols + 1) * j + i;
             if (idx < totalSlots)
                 diag[idx] = 1;
         }

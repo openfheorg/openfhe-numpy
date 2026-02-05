@@ -555,23 +555,23 @@ def _extract_matrix(data, info):
 # @validate_call
 def _extract_vector(data, info):
     if info["ndim"] == 1:
-        if len(info["original_shape"]) == 1:
-            return data[: info["original_shape"][0]]
+        # if len(info["original_shape"]) == 1:
+        #     return data[: info["original_shape"][0]]
+        # else:
+        original_row = info["original_shape"][0]
+        ncols = info["shape"][1]
+        nrows = info["batch_size"] // ncols
+
+        reshaped = np.reshape(data, (nrows, ncols))
+
+        if info["order"] == ROW_MAJOR:
+            # get [original_row] elements from the first columns
+            return reshaped[:original_row, 0]
+        elif info["order"] == COL_MAJOR:
+            return reshaped[0, :original_row]
         else:
-            original_row = info["original_shape"][0]
-            ncols = info["shape"][1]
-            nrows = info["batch_size"] // ncols
-
-            reshaped = np.reshape(data, (nrows, ncols))
-
-            if info["order"] == ROW_MAJOR:
-                # get [original_row] elements from the first columns
-                return reshaped[:original_row, 0]
-            elif info["order"] == COL_MAJOR:
-                return reshaped[0, :original_row]
-            else:
-                ONP_ERROR("Order is not supported!!!")
-                return None
+            ONP_ERROR("Order is not supported!!!")
+            return None
     else:
         return data[0]
 

@@ -258,7 +258,7 @@ void print_range(const std::vector<Element>& v, std::size_t start, std::size_t e
         std::cerr << "Invalid range\n";
         return;
     }
-    
+
     for (std::size_t i = start; i < end; ++i) {
         std::cout << v[i] << (i + 1 < end ? ' ' : '\n');
     }

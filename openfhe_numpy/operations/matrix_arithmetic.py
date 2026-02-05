@@ -242,13 +242,15 @@ def multiply_block_ct_scalar(a, scalar):
 # ------------------------------------------------------------------------------
 def _eval_matvec_ct(lhs, rhs):
     """Internal function to evaluate matrix-vector multiplication."""
+    cc = rhs.data.GetCryptoContext() if rhs.dtype == "CTArray" else lhs.data.GetCryptoContext()
+
     if lhs.ndim == 2 and rhs.ndim == 1:
         if lhs.original_shape[1] != rhs.original_shape[0]:
             ONPIncompatibleShape(
                 f"Matrix dimension [{lhs.original_shape}] mismatch with vector dimension [{rhs.shape}]"
             )
+
         if lhs.order == ArrayEncodingType.ROW_MAJOR and rhs.order == ArrayEncodingType.COL_MAJOR:
-            cc = lhs.data.GetCryptoContext()
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
             ct_prod = cc.EvalSumCols(ct_mult, lhs.ncols, lhs.extra["colkey"])
             return CTArray(
@@ -260,7 +262,6 @@ def _eval_matvec_ct(lhs, rhs):
             )
 
         elif lhs.order == ArrayEncodingType.COL_MAJOR and rhs.order == ArrayEncodingType.ROW_MAJOR:
-            cc = lhs.data.GetCryptoContext()
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
             ct_prod = cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size * 4)
             return CTArray(
@@ -282,23 +283,28 @@ def _eval_matvec_ct(lhs, rhs):
 
 def _matmul_ct(lhs, rhs):
     """Internal function to evaluate matrix multiplication."""
-    if lhs.is_encrypted and rhs.is_encrypted:
-        # same size: matrix x matrix
-        if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
-            return lhs.clone(EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
+    # matrix @ matrix
+    if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
+        return CTArray(
+            EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols),
+            lhs.original_shape,
+            lhs.batch_size,
+            lhs.shape,
+            lhs.order,
+        )
 
-        # matrix x vector
-        elif rhs.ndim == 1:
-            return _eval_matvec_ct(lhs, rhs)
-        else:
-            ONPIncompatibleShape(
-                lhs.original_shape,
-                rhs.original_shape,
-                "Matrix dimension mismatch for multiplication",
-            )
+    # matrix @ vector
+    elif rhs.ndim == 1:
+        return _eval_matvec_ct(lhs, rhs)
+    else:
+        ONPIncompatibleShape(
+            lhs.original_shape, rhs.original_shape, "Matrix dimension mismatch for multiplication"
+        )
 
 
-@register_tensor_function("matmul", [("CTArray", "CTArray")])
+@register_tensor_function(
+    "matmul", [("CTArray", "CTArray"), ("CTArray", "PTArray"), ("PTArray", "CTArray")]
+)
 def matmul_ct(a, b):
     """Perform matrix multiplication between two tensors."""
     return _matmul_ct(a, b)
