@@ -129,7 +129,6 @@ def broadcast_to(x, target_shape, order=None):
                 ct_rotated = cc.EvalRotate(ct_res, -rotation)
                 ct_res = cc.EvalAdd(ct_res, ct_rotated)
                 rotation *= 2
-                print(f"rotation = {rotation}")
 
             mask = _create_masking(list(range(target_shape[0])), x.batch_size)
             pt_mask = cc.MakeCKKSPackedPlaintext(mask)
@@ -139,7 +138,7 @@ def broadcast_to(x, target_shape, order=None):
                 data=ct_res,
                 original_shape=target_shape,
                 batch_size=x.batch_size,
-                new_shape=(next_power_of_two(target_shape[0]),),
+                new_shape=(next_power_of_two(target_shape[0]), 1),
                 order=ArrayEncodingType.ROW_MAJOR,
             )
         # Scalar to Matrix

@@ -555,12 +555,12 @@ def _extract_matrix(data, info):
 # @validate_call
 def _extract_vector(data, info):
     if info["ndim"] == 1:
-        # if len(info["original_shape"]) == 1:
-        #     return data[: info["original_shape"][0]]
-        # else:
-        original_row = info["original_shape"][0]
-        ncols = info["shape"][1]
-        nrows = info["batch_size"] // ncols
+        if len(info["shape"]) == 1:
+            return data[: info["original_shape"][0]]
+        else:
+            original_row = info["original_shape"][0]
+            ncols = info["shape"][1]
+            nrows = info["batch_size"] // ncols
 
         reshaped = np.reshape(data, (nrows, ncols))
 
