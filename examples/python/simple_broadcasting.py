@@ -10,13 +10,15 @@ def validate_and_print_results(computed, expected, operation_name):
     print("*" * 60)
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{computed}")
-
-    is_match, error = onp.check_equality(computed, expected)
+s
+    is_match, error = onp.check_equality(expected, computed)
     print(f"\nMatch: {is_match}, Total Error: {error}")
-    return is_match, error
+
+    if not is_match:
+        print("\n>>> ERROR: Pattern does not match")
 
 
-def example_broadcasting():
+def example_broadcasting(order=onp.ROW_MAJOR):
     # Cryptographic setup
     mult_depth = 5
     params = CCParamsCKKSRNS()
@@ -32,7 +34,7 @@ def example_broadcasting():
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
-    onp.gen_rotation_keys(keys.secretKey, list(range(-32, 32)))
+    onp.generate_broadcast_key(keys.secretKey, (3, 5))
 
     ring_dim = cc.GetRingDimension()
     batch_size = ring_dim // 2
@@ -41,18 +43,22 @@ def example_broadcasting():
 
     scalar = 5
     vector = [10, 20, 30]
+    vector = [9.8745164, 8.72523343, 6.14485141, 5.19928817, 5.53364538]
+
+    column_vector = [[10], [20], [30]]
     matrix = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0]]
 
     print("\nInputs")
-    print("vector_a:", scalar)
-    print("vector_b:", vector)
-    print("vector_c:", matrix)
+    print("scalar:", scalar)
+    print("vector:", vector)
+    print("column_vector:", column_vector)
+    print("matrix:", matrix)
 
     cts = onp.array(
         cc=cc,
         data=scalar,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
+        order=order,
         mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
@@ -62,27 +68,17 @@ def example_broadcasting():
         cc=cc,
         data=vector,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
+        order=order,
         mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
     )
 
-    cta_rm = onp.array(
+    ctv_col = onp.array(
         cc=cc,
-        data=matrix,
+        data=column_vector,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
-        mode="zero",
-        fhe_type="C",
-        public_key=keys.publicKey,
-    )
-
-    cta_cm = onp.array(
-        cc=cc,
-        data=matrix,
-        batch_size=batch_size,
-        order=onp.COL_MAJOR,
+        order=order,
         mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
@@ -108,14 +104,23 @@ def example_broadcasting():
     # Broadcasting Vector
     ctv_mat1 = onp.broadcast_to(ctv, (5, 3), onp.ROW_MAJOR)
     res = ctv_mat1.decrypt(keys.secretKey, unpack_type="original")
-    print(f"\n Broadcast Vector -> Matrix:\n{res}")
+    print(f"\n Broadcast Vector -> Matrix (ROW_MAJOR):\n{res}")
 
     ctv_mat2 = onp.broadcast_to(ctv, (5, 3), onp.COL_MAJOR)
     res = ctv_mat2.decrypt(keys.secretKey, unpack_type="original")
-    print(f"\n Broadcast Vector -> Matrix:\n{res}")
+    print(f"\n Broadcast Vector -> Matrix (COL_MAJOR) :\n{res}")
+
+    # Broadcasting Vector Column
+    ctv_mat1 = onp.broadcast_to(ctv_col, (3, 5), onp.ROW_MAJOR)
+    res = ctv_mat1.decrypt(keys.secretKey, unpack_type="original")
+    print(f"\n Broadcast Column Vector-> Matrix (ROW_MAJOR):\n{res}")
+
+    ctv_mat2 = onp.broadcast_to(ctv_col, (3, 5), onp.COL_MAJOR)
+    res = ctv_mat2.decrypt(keys.secretKey, unpack_type="original")
+    print(f"\n Broadcast Column Vector-> Matrix (COL_MAJOR):\n{res}")
 
 
-def example_broadcasting_with_operations():
+def example_broadcasting_with_operations(ord=onp.ROW_MAJOR):
     """
     Example for scalar broadcasting
     """
@@ -134,7 +139,7 @@ def example_broadcasting_with_operations():
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
-    onp.gen_rotation_keys(keys.secretKey, list(range(-32, 32)))
+    # onp.gen_rotation_keys(keys.secretKey, list(range(-32, 32)))
 
     ring_dim = cc.GetRingDimension()
     batch_size = ring_dim // 2
@@ -142,19 +147,23 @@ def example_broadcasting_with_operations():
     print(f"Available slots:    {batch_size}")
 
     scalar = 5
-    vector = [10, 20, 30, 40, 50]
-    matrix = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0]]
+    vector = [101, 210, 310, 140, 150]
+    column_vector = [[10], [20], [30]]
+    matrix = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.1, 2.1, 3.1, 4.1, 5.1], [1.2, 2.2, 3.2, 4.2, 5.2]]
+
+    onp.generate_broadcast_key(keys.secretKey, (3, 5))
 
     print("\nInputs")
-    print("vector_a:", scalar)
-    print("vector_b:", vector)
-    print("vector_c:", matrix)
+    print("scalar:", scalar)
+    print("vector:", vector)
+    print("column_vector:", column_vector)
+    print("matrix:", matrix)
 
     cts = onp.array(
         cc=cc,
         data=scalar,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
+        order=ord,
         mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
@@ -164,7 +173,17 @@ def example_broadcasting_with_operations():
         cc=cc,
         data=vector,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
+        order=ord,
+        mode="zero",
+        fhe_type="C",
+        public_key=keys.publicKey,
+    )
+
+    ctv_col = onp.array(
+        cc=cc,
+        data=column_vector,
+        batch_size=batch_size,
+        order=ord,
         mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
@@ -174,14 +193,15 @@ def example_broadcasting_with_operations():
         cc=cc,
         data=matrix,
         batch_size=batch_size,
-        order=onp.ROW_MAJOR,
+        order=ord,
         mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
     )
 
     # Example for scalar + vector
-    ctv_add = cts + ctv
+    ctv_add = ctv + cts
+
     res_add = ctv_add.decrypt(keys.secretKey, unpack_type="original")
     validate_and_print_results(
         res_add,
@@ -205,6 +225,16 @@ def example_broadcasting_with_operations():
         f"Vector + Matrix  \n{scalar} \n{matrix}",
     )
 
+    # Example for column vector + matrix
+    ctv_add = ctm + ctv_col
+    res_add = ctv_add.decrypt(keys.secretKey, unpack_type="original")
+    validate_and_print_results(
+        res_add,
+        np.add(column_vector, matrix),
+        f"Column Vector + Matrix  \n{column_vector} \n{matrix}",
+    )
+
 
 if __name__ == "__main__":
+    # example_broadcasting()
     example_broadcasting_with_operations()

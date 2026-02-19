@@ -109,14 +109,7 @@ class MainUnittest(unittest.TestCase):
     # ---- Summary helper -----------------------------------------------------
     @classmethod
     def run_test_summary(cls, name: str = "") -> int:
-        """Run all tests in this class with optional detailed output.
-
-        Args:
-            name: Optional custom name for the test class.
-
-        Returns:
-            0 on success, 1 on failure.
-        """
+        """Run all tests in this class with optional detailed output."""
         details_enabled = os.getenv("DETAILS", "0") == "1"
         failfast_enabled = os.getenv("FAILFAST", "0") == "1"
 
@@ -126,10 +119,7 @@ class MainUnittest(unittest.TestCase):
         start = time.perf_counter()
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(cls)
 
-        # Configure the test runner with custom result handler
-        result_factory = functools.partial(
-            MainTextTestResult, debug=details_enabled
-        )
+        result_factory = functools.partial(MainTextTestResult, debug=details_enabled)
 
         runner = unittest.TextTestRunner(
             resultclass=result_factory,
@@ -146,10 +136,28 @@ class MainUnittest(unittest.TestCase):
             print("NO TESTS RAN!")
             return 1
 
+        if details_enabled:
+            if result.errors:
+                print("\n" + "." * 60, file=sys.stderr)
+                print("\n>>> ERRORS FOUND:", file=sys.stderr)
+                print("." * 60 + "\n", file=sys.stderr)
+                for test, traceback in result.errors:
+                    print(f"{test}:", file=sys.stderr)
+                    print(traceback, file=sys.stderr)
+
+            if result.failures:
+                print("\n" + "." * 60, file=sys.stderr)
+                print("\n>>> FAILURES FOUND:", file=sys.stderr)
+                print("." * 60 + "\n", file=sys.stderr)
+                for test, traceback in result.failures:
+                    print(f"{test}:", file=sys.stderr)
+                    print(traceback, file=sys.stderr)
+
         # Collect and display statistics
         total, passed, failed, errors, skipped = result.case_counts()
         st_total, st_ok, st_fail, st_err = result.subtest_counts()
 
+        # if details_enabled:
         if details_enabled:
             print("-" * 60)
             print(f"{name or cls.__name__} Summary:")
@@ -158,9 +166,7 @@ class MainUnittest(unittest.TestCase):
             print(f"  Failed:   {failed}")
             print(f"  Errors:   {errors}")
             print(f"  Skipped:  {skipped}")
-            print(
-                f"  Subtests: {st_total}  (ok={st_ok}, fail={st_fail}, error={st_err})"
-            )
+            print(f"  Subtests: {st_total}  (ok={st_ok}, fail={st_fail}, error={st_err})")
             print(f"  Duration: {duration:.2f}s")
 
             try:

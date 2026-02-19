@@ -15,6 +15,7 @@ def validate_and_print_results(computed, expected, operation_name):
     return is_match, error
 
 
+# Matrix multiplication supports only tile mode and row-major encoding.
 def run_matmul_example(cc, keys, A, B, description, fhe_type=("C", "C")):
     """Run a homomorphic matrix x matrix multiplication example."""
     print(f"\n--- {description} ---")
@@ -27,7 +28,7 @@ def run_matmul_example(cc, keys, A, B, description, fhe_type=("C", "C")):
         cc=cc,
         data=A,
         batch_size=batch_size,
-        order=onp.COL_MAJOR,
+        order=onp.ROW_MAJOR,
         fhe_type=fhe_type[0],
         mode="tile",
         public_key=keys.publicKey,
@@ -37,7 +38,7 @@ def run_matmul_example(cc, keys, A, B, description, fhe_type=("C", "C")):
         cc=cc,
         data=B,
         batch_size=batch_size,
-        order=onp.COL_MAJOR,
+        order=onp.ROW_MAJOR,
         fhe_type=fhe_type[1],
         mode="tile",
         public_key=keys.publicKey,
@@ -109,12 +110,12 @@ def main():
             [3, 6, 10, 1, 2, 8, 4, 0],
         ]
     )
-    run_matmul_example(cc, keys, A8, B8, "8x8 Matrix Product (power-of-two)")
+    run_matmul_example(cc, keys, A8, B8, "8x8 Matrix Product (power-of-two)", ("C", "C"))
 
     # Case 2: non–power-of-two (3x3)
     A3 = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
     B3 = np.array([[9, 8, 7], [6, 5, 4], [3, 2, 1]])
-    run_matmul_example(cc, keys, A3, B3, "3x3 Matrix Product (non-power-of-two)", ("C", "P"))
+    run_matmul_example(cc, keys, A3, B3, "3x3 Matrix Product (non-power-of-two)", ("C", "C"))
     run_matmul_example(cc, keys, A3, B3, "3x3 Matrix Product (non-power-of-two)", ("P", "C"))
 
 

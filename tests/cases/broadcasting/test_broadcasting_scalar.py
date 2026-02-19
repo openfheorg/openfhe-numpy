@@ -4,13 +4,10 @@ import openfhe_numpy as onp
 from core import *
 
 
-SCALAR = 1
-SIZES = [5]
-# SIZES = [5, 8, 30, 32]
-SIZES_MAT = [(5, 5)]
-# SIZES_MAT = [(5, 5), (3, 6), (15, 30), (1, 32)]
-ORDERS = [("row_major", onp.ROW_MAJOR)]
-# ORDERS = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COL_MAJOR)]
+SCALAR = 10
+SIZES_VECTOR = [5, 8, 16]
+SIZES_MAT = [(5, 5), (3, 6), (15, 13), (13, 1), (1, 14)]
+ORDERS = [("row_major", onp.ROW_MAJOR), ("col_major", onp.COL_MAJOR)]
 MODES = ["zero"]
 
 
@@ -34,12 +31,13 @@ class TestScalar(MainUnittest):
             cc.EvalSumKeyGen(keys.secretKey)
 
             for tag, np_fn, fhe_fn in ops:
-                for size in SIZES:
+                for size in SIZES_VECTOR:
                     if size > batch_size:
                         continue
 
                     # generate vector with dimension (size)
                     vector = generate_random_array(rows=size)
+                    onp.generate_broadcast_key(keys.secretKey, (size,))
 
                     for order_name, order_value in ORDERS:
                         for mode in MODES:
@@ -62,11 +60,20 @@ class TestScalar(MainUnittest):
                                         mode=mode,
                                         public_key=keys.publicKey,
                                     )
+                                    cts = onp.array(
+                                        cc=cc,
+                                        data=SCALAR,
+                                        batch_size=batch_size,
+                                        order=order_value,
+                                        mode=mode,
+                                        fhe_type="C",
+                                        public_key=keys.publicKey,
+                                    )
 
                                     onp.gen_transpose_keys(keys.secretKey, ctv)
 
                                     expected = np_fn(vector, SCALAR)
-                                    ctv_res = fhe_fn(ctv, SCALAR)
+                                    ctv_res = fhe_fn(ctv, cts)
 
                                     # decrypt and compare
                                     result = ctv_res.decrypt(keys.secretKey, unpack_type="original")
@@ -103,6 +110,7 @@ class TestScalar(MainUnittest):
 
             for tag, np_fn, fhe_fn in ops:
                 for rows, cols in SIZES_MAT:
+                    onp.generate_broadcast_key(keys.secretKey, (rows, cols))
                     if onp.next_power_of_two(rows) * onp.next_power_of_two(cols) > batch_size:
                         continue
 
@@ -130,8 +138,6 @@ class TestScalar(MainUnittest):
                                         mode=mode,
                                         public_key=keys.publicKey,
                                     )
-
-                                    onp.gen_transpose_keys(keys.secretKey, ctm)
 
                                     expected = np_fn(matrix, SCALAR)
                                     ctm_res = fhe_fn(ctm, SCALAR)

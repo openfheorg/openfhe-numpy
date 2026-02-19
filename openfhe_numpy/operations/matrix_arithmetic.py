@@ -91,7 +91,7 @@ def add_ct(a, b):
         output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
         if a.original_shape != output_shape:
             a = broadcast_to(a, output_shape, a.order)
-        if b.original_shape != output_shape:
+        else:
             b = broadcast_to(b, output_shape, b.order)
         return _eval_add(a, b)
 
@@ -188,7 +188,6 @@ def _eval_multiply(lhs, rhs):
         rhs_data = rhs.data
 
     result = crypto_context.EvalMult(lhs.data, rhs_data)
-    a = lhs.clone(result)
     return lhs.clone(result)
 
 
@@ -243,7 +242,6 @@ def multiply_block_ct_scalar(a, scalar):
 def _eval_matvec_ct(lhs, rhs):
     """Internal function to evaluate matrix-vector multiplication."""
     cc = rhs.data.GetCryptoContext() if rhs.dtype == "CTArray" else lhs.data.GetCryptoContext()
-
     if lhs.ndim == 2 and rhs.ndim == 1:
         if lhs.original_shape[1] != rhs.original_shape[0]:
             ONPIncompatibleShape(

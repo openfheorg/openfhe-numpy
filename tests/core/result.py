@@ -81,9 +81,7 @@ class MainTextTestResult(TextTestResult):
         if self.detail_mode:
             self._print_details("ERROR", test, err)
 
-    def addSubTest(
-        self, test, subtest, err: Optional[Tuple[type, Exception, Any]]
-    ) -> None:
+    def addSubTest(self, test, subtest, err: Optional[Tuple[type, Exception, Any]]) -> None:
         """Handle subtest completion and track statistics."""
         super().addSubTest(test, subtest, err)
         self.subtests_total += 1
@@ -126,9 +124,7 @@ class MainTextTestResult(TextTestResult):
 
         # Extract subtest information if available
         subtest_params = getattr(subtest, "params", None) if subtest else None
-        subtest_desc = (
-            getattr(subtest, "_subDescription", None) if subtest else None
-        )
+        subtest_desc = getattr(subtest, "_subDescription", None) if subtest else None
 
         # Print formatted error report
         print("\n" + "=" * 70)
@@ -172,9 +168,7 @@ class MainTextTestResult(TextTestResult):
             else:
                 # Show first few elements as preview
                 preview = ", ".join(map(str, value.flat[:3]))
-                return (
-                    f"{cls_name}(shape={value.shape}, preview=[{preview}, ...])"
-                )
+                return f"{cls_name}(shape={value.shape}, preview=[{preview}, ...])"
 
         # --- Fallback for all other values ---
         str_val = str(value)
@@ -197,9 +191,7 @@ class MainTextTestResult(TextTestResult):
             self.subtests_errors,
         )
 
-    def case_counts(
-        self, *, count_skips_as_fail: bool = False
-    ) -> Tuple[int, int, int, int, int]:
+    def case_counts(self, *, count_skips_as_fail: bool = False) -> Tuple[int, int, int, int, int]:
         """
         Get main test case statistics.
 

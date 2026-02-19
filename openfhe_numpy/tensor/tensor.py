@@ -149,6 +149,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         new_shape: Tuple[int, int],
         order: int = 0,
     ) -> None:
+
         if isinstance(data, PackedArrayInformation):
             self._data = data.data
             self._original_shape = data.original_shape
@@ -172,7 +173,6 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             if self._ndim > 2 or self._ndim < 0:
                 ONP_ERROR("Dimension is invalid!!!")
             self._order = order
-            # dtype in ["CTArray", "BlockCTArray"]
             self._dtype = self.__class__.__name__
             self.extra = {}
 

@@ -37,6 +37,7 @@ matrix multiplication, and other mathematical operations.
 """
 
 # Third-party imports
+import math
 import numpy as np
 from openfhe_numpy.utils.matlib import next_power_of_two
 from openfhe_numpy.tensor.ctarray import CTArray
@@ -101,9 +102,25 @@ def _duplicate_block(x, duplicate_count, block_size, pt_mask=None):
         ct_rotated = cc.EvalRotate(ct_res, -rotation)
         ct_res = cc.EvalAdd(ct_res, ct_rotated)
         rotation *= 2
-    if pt_mask != None:
+    if pt_mask is not None:
         ct_res = cc.EvalMult(pt_mask, ct_res)
     return ct_res
+
+
+def generate_broadcast_key(secret_key, target_shape):
+    if target_shape == ():
+        return
+    elif len(target_shape) == 1:
+        nmax = next_power_of_two(target_shape[0])
+    else:
+        nmax = max(next_power_of_two(target_shape[0]), next_power_of_two(target_shape[1]))
+
+    exp_max = int(math.log2(nmax * nmax) + 1)
+    power_indices = [2**i for i in range(0, exp_max)] + [-(2**i) for i in range(0, exp_max)]
+    indices = power_indices + list(range(-nmax * nmax, nmax * nmax))
+
+    cc = secret_key.GetCryptoContext()
+    cc.EvalRotateKeyGen(secret_key, indices)
 
 
 def broadcast_to(x, target_shape, order=None):
@@ -134,13 +151,14 @@ def broadcast_to(x, target_shape, order=None):
             pt_mask = cc.MakeCKKSPackedPlaintext(mask)
             ct_res = cc.EvalMult(ct_res, pt_mask)
 
-            return CTArray(
+            z = CTArray(
                 data=ct_res,
                 original_shape=target_shape,
                 batch_size=x.batch_size,
-                new_shape=(next_power_of_two(target_shape[0]), 1),
+                new_shape=(next_power_of_two(target_shape[0]),),
                 order=ArrayEncodingType.ROW_MAJOR,
             )
+            return z
         # Scalar to Matrix
         elif len(target_shape) == 2:
             nrow, ncol = target_shape[0], target_shape[1]
@@ -166,7 +184,7 @@ def broadcast_to(x, target_shape, order=None):
                     for j in range(nrow):
                         mask[i * nrow_pow_2 + j] = 1
                 pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = _duplicate_block(ct_res, ncol, next_power_of_two(nrow_pow_2))
+                ct_res = _duplicate_block(ct_res, ncol, nrow_pow_2)
                 ct_res = _duplicate_block(ct_res, nrow, 1, pt_mask)
             else:
                 raise ValueError(f"Invalid order ({order})")
@@ -231,6 +249,69 @@ def broadcast_to(x, target_shape, order=None):
                         mask[i * nrow_pow_2 + j] = 1
                 pt_mask = cc.MakeCKKSPackedPlaintext(mask)
                 ct_res = _duplicate_block(ct_res, nrow, 1, pt_mask)
+
+                return CTArray(
+                    data=ct_res,
+                    original_shape=target_shape,
+                    batch_size=x.batch_size,
+                    new_shape=(nrow_pow_2, ncol_pow_2),
+                    order=order,
+                )
+            else:
+                raise ValueError(f"Invalid order ({order})")
+
+    # Broadcasting a column vector to a matrix
+    # (m,1) + (m,n) -> (m,n)
+    # 1 -> 1111
+    # 2    2222
+    # 3    3333
+
+    elif len(x.original_shape) == 2:
+        if len(target_shape) == 2:
+            if target_shape[0] != x.original_shape[0]:
+                raise ValueError(
+                    f"Incompatible shapes: vector length {x.original_shape} "
+                    f"cannot be broadcast to target matrix shape {target_shape}. "
+                    "Only supports broadcasting from (m,1) to (m, n)."
+                )
+
+            nrow, ncol = target_shape[0], target_shape[1]
+            ncol_pow_2 = next_power_of_two(ncol)
+            nrow_pow_2 = next_power_of_two(nrow)
+
+            if order == ArrayEncodingType.COL_MAJOR:
+                mask = _create_masking(list(range(nrow)), x.batch_size)
+                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
+                ct_x_cleared = cc.EvalMult(x.data, pt_mask)
+                ct_x_duplicated = _duplicate_block(ct_x_cleared, ncol_pow_2, nrow_pow_2)
+
+                return CTArray(
+                    data=ct_x_duplicated,
+                    original_shape=target_shape,
+                    batch_size=x.batch_size,
+                    new_shape=(nrow_pow_2, ncol_pow_2),
+                    order=order,
+                )
+            elif order == ArrayEncodingType.ROW_MAJOR:
+                mask = [0] * x.batch_size
+                mask[0] = 1
+                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
+                ct_res = cc.EvalMult(x.data, pt_mask)
+
+                for i in range(1, x.original_shape[0]):
+                    mask = [0] * x.batch_size
+                    mask[i] = 1
+                    pt_mask = cc.MakeCKKSPackedPlaintext(mask)
+                    ct_scalar = cc.EvalMult(x.data, pt_mask)
+                    ct_scalar = cc.EvalRotate(ct_scalar, -(ncol_pow_2 * i - i))
+                    ct_res = cc.EvalAdd(ct_res, ct_scalar)
+
+                mask = [0] * x.batch_size
+                for i in range(nrow):
+                    for j in range(ncol):
+                        mask[i * ncol_pow_2 + j] = 1
+                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
+                ct_res = _duplicate_block(ct_res, ncol, 1, pt_mask)
 
                 return CTArray(
                     data=ct_res,
