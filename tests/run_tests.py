@@ -93,9 +93,7 @@ def _fmt_bytes(n_bytes: float) -> str:
 
 
 # --- Test Discovery -----------------------------------------------------------
-def find_tests(
-    target: Optional[str] = None, pattern: str = DEFAULT_PATTERN
-) -> List[Path]:
+def find_tests(target: Optional[str] = None, pattern: str = DEFAULT_PATTERN) -> List[Path]:
     """
     Find test files matching the given pattern.
 
@@ -123,9 +121,7 @@ def find_tests(
     if alt_path.is_file():
         return [alt_path]
 
-    print(
-        f"Error: Target '{target}' not found in {CASES_DIR} or {PROJECT_ROOT}"
-    )
+    print(f"Error: Target '{target}' not found in {CASES_DIR} or {PROJECT_ROOT}")
     sys.exit(1)
 
 
@@ -137,9 +133,7 @@ def module_from_path(pyfile: Path) -> str:
 
 
 # --- Test Execution -----------------------------------------------------------
-def _run_command(
-    cmd: List[str], timeout: int, env: Dict[str, str]
-) -> Tuple[int, float]:
+def _run_command(cmd: List[str], timeout: int, env: Dict[str, str]) -> Tuple[int, float]:
     """
     Execute a command with timeout and return results.
 
@@ -185,7 +179,9 @@ def run_test_file(
     details: bool,
     exit_first: bool,
 ) -> List[Tuple[str, int, float]]:
-    print(f"\n\n=== Running {pyfile.name} ({current}/{total}) ===")
+
+    if details:
+        print(f"\n\n=== Running {pyfile.name} ({current}/{total}) ===")
     module_name = module_from_path(pyfile)
 
     # Discover classes using your project's helper
@@ -195,13 +191,12 @@ def run_test_file(
         module = importlib.import_module(module_name)
     except Exception as e:
         print(f"[discover] Failed to import '{module_name}': {e}")
-        return []
+        return [(module_name, 1, 0)]
 
     class_names = sorted([cls.__name__ for cls in find_test_classes(module)])
+
     if details:
-        print(
-            f"Found {len(class_names)} class(es) in {module_name}: {', '.join(class_names)}"
-        )
+        print(f"Found {len(class_names)} class(es) in {module_name}: {', '.join(class_names)}")
 
     if not class_names:
         print(f"No test classes found in file (module={module_name})")
@@ -221,10 +216,10 @@ def run_test_file(
 
     # Run each test class in an isolated subprocess
     for idx, class_name in enumerate(class_names, 1):
-        print(f"\n{class_name} ({idx}/{len(class_names)})")
+        if details:
+            print(f"\n{class_name} ({idx}/{len(class_names)})")
         label = f"{pyfile.name}:{class_name}"
 
-        # IMPORTANT: use module_name here (not 'module')
         one_liner = (
             "import importlib, sys; "
             f"m = importlib.import_module('{module_name}'); "
@@ -270,8 +265,13 @@ def main() -> None:
 
     # Check if any tests were found
     print(f"Found {len(all_tests)} test files")
+    if args.details:
+        for test_file in all_tests:
+            relative_path = test_file.relative_to(CASES_DIR)
+            print(f"  {relative_path}")
+
     if not all_tests:
-        print("No test files found matching criteria")
+        SystemError("No test files found matching criteria")
         sys.exit(0)
 
     # Run all tests
@@ -292,19 +292,19 @@ def main() -> None:
         # Process results from this file
         for test_name, exit_code, duration in file_results:
             all_results.append((test_name, exit_code, duration))
-
-            if exit_code == 0:
-                print(f"{test_name}: PASSED")
-            elif exit_code == 2:
-                print(f"{test_name}: TIMED OUT")
-                timeout_count += 1
-                if args.exitfirst:
-                    break
-            else:
-                print(f"{test_name}: FAILED")
-                failed_count += 1
-                if args.exitfirst:
-                    break
+            if args.details:
+                if exit_code == 0:
+                    print(f"{test_name}: PASSED")
+                elif exit_code == 2:
+                    print(f"{test_name}: TIMED OUT")
+                    timeout_count += 1
+                    if args.exitfirst:
+                        break
+                else:
+                    print(f"{test_name}: FAILED")
+                    failed_count += 1
+                    if args.exitfirst:
+                        break
 
         # Exit early if requested and there were failures
         if args.exitfirst and (failed_count > 0 or timeout_count > 0):
@@ -333,6 +333,7 @@ def main() -> None:
                 status = "TIMEOUT"
             else:
                 status = "FAIL"
+
             print(f"  {test_name:<40} {status:<8} {duration:6.2f}s")
 
         t_end = time.perf_counter() - t_start

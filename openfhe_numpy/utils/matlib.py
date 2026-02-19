@@ -140,6 +140,9 @@ def check_equality(a, b, eps=EPSILON):
 
     error, is_equal = 0, True
 
+    if a.shape != b.shape:
+        return False, -999
+
     if np.isscalar(a) or (hasattr(a, "shape") and a.shape == ()):
         error = abs(a - b)
         return error <= eps, error

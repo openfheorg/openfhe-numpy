@@ -94,6 +94,11 @@ def demo():
     )
 
     ctv_result_rm = ctm_m_rm @ ctv_v_cm
+    print(f"dim = {ctv_result_rm.ndim}")
+    print(f"shape = {ctv_result_rm.shape}")
+    print(f"original_shape = {ctv_result_rm.original_shape}")
+
+    print(f"result.info = {ctv_result_rm.info}")
     result_rm = ctv_result_rm.decrypt(keys.secretKey, unpack_type="original")
     is_match_rm, error_rm = onp.check_equality(result_rm, expected)
 

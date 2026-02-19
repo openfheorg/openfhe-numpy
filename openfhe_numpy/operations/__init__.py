@@ -35,7 +35,7 @@ This module provides arithmetic operations and cryptographic utilities
 for working with homomorphically encrypted matrix/vector using OpenFHE.
 """
 
-from .broadcast import broadcast_to
+from .broadcast import broadcast_to, generate_broadcast_key
 from . import matrix_arithmetic
 
 # Import arithmetic operations
@@ -94,4 +94,5 @@ __all__ = [
     "gen_accumulate_cols_key",
     # broadcasting operations
     "broadcast_to",
+    "generate_broadcast_key",
 ]
