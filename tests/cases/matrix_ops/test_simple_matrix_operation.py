@@ -69,9 +69,7 @@ class TestMatrixUnaryOps(MainUnittest):
                                         expected = np_fn(A, SCALAR)
                                         ctm_res = fhe_fn(ctm_a, SCALAR)
                                     elif tag == "transpose":
-                                        onp.gen_transpose_keys(
-                                            keys.secretKey, ctm_a
-                                        )
+                                        onp.gen_transpose_keys(keys.secretKey, ctm_a)
                                         expected = np_fn(A)
                                         ctm_res = fhe_fn(ctm_a)
                                     else:  # sum
@@ -79,12 +77,8 @@ class TestMatrixUnaryOps(MainUnittest):
                                         ctm_res = fhe_fn(ctm_a)
 
                                     # decrypt and compare
-                                    result = ctm_res.decrypt(
-                                        keys.secretKey, unpack_type="original"
-                                    )
-                                    self.assertArrayClose(
-                                        actual=result, expected=expected
-                                    )
+                                    result = ctm_res.decrypt(keys.secretKey, unpack_type="original")
+                                    self.assertArrayClose(actual=result, expected=expected)
                                 except Exception as e:
                                     self._record_case(
                                         params={
@@ -161,18 +155,12 @@ class TestMatrixBinaryOps(MainUnittest):
                                         public_key=keys.publicKey,
                                     )
 
-                                    onp.EvalSquareMatMultRotateKeyGen(
-                                        keys.secretKey, ctm_a.ncols
-                                    )
+                                    onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, ctm_a.ncols)
                                     ctm_res = fhe_fn(ctm_a, ctm_b)
 
                                     # decrypt and compare
-                                    result = ctm_res.decrypt(
-                                        keys.secretKey, unpack_type="original"
-                                    )
-                                    self.assertArrayClose(
-                                        actual=result, expected=expected
-                                    )
+                                    result = ctm_res.decrypt(keys.secretKey, unpack_type="original")
+                                    self.assertArrayClose(actual=result, expected=expected)
                                 except Exception as e:
                                     self._record_case(
                                         params={

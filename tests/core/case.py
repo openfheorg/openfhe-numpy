@@ -180,15 +180,3 @@ class MainUnittest(unittest.TestCase):
             print("-" * 60)
 
         return 0 if result.wasSuccessful() else 1
-
-
-# ---- Find test classes helper ------------------------------------------------
-def find_test_classes(module):
-    """Find all classes in a module that inherit from MainUnittest."""
-    import inspect
-
-    return [
-        obj
-        for _, obj in inspect.getmembers(module, inspect.isclass)
-        if issubclass(obj, MainUnittest) and obj is not MainUnittest
-    ]

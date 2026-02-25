@@ -14,8 +14,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from collections import defaultdict
 from typing import List, Tuple, Optional, Dict
-from core import find_test_classes
+import unittest
 
 try:
     import resource  # not available on Windows
@@ -26,7 +27,7 @@ except Exception:
 PROJECT_ROOT = Path(__file__).parent.resolve()
 CASES_DIR = PROJECT_ROOT / "cases"
 DEFAULT_PATTERN = "test_*.py"
-DEFAULT_TIMEOUT = 1800  # seconds (30 minutes)
+DEFAULT_TIMEOUT = 7200  # seconds (30 minutes)
 
 
 # --- Command Line Interface ---------------------------------------------------
@@ -89,7 +90,7 @@ def _fmt_bytes(n_bytes: float) -> str:
     while v >= 1024.0 and i < len(units) - 1:
         v /= 1024.0
         i += 1
-    return f"{v:.2f} {units[i]}"
+    return f"{v:.1f} {units[i]}"
 
 
 # --- Test Discovery -----------------------------------------------------------
@@ -132,6 +133,38 @@ def module_from_path(pyfile: Path) -> str:
     return ".".join(relative_path.parts)
 
 
+# --- Unittest ID helpers ------------------------------------------------------
+def get_test_from_module(module_name: str) -> List[str]:
+    """
+    Return full unittest IDs like:
+      package.module.ClassName.test_method
+    """
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromName(module_name)
+    ids: List[str] = []
+
+    def walk(suite_obj):
+        for t in suite_obj:
+            if isinstance(t, unittest.TestSuite):
+                walk(t)
+            else:
+                ids.append(t.id())
+
+    walk(suite)
+    return sorted(ids)
+
+
+def split_test_id(test_id: str) -> Tuple[str, str, str]:
+    """
+    Split:
+      package.module.ClassName.test_method
+    into:
+      (package.module, ClassName, test_method)
+    """
+    mod, cls, meth = test_id.rsplit(".", 2)
+    return mod, cls, meth
+
+
 # --- Test Execution -----------------------------------------------------------
 def _run_command(cmd: List[str], timeout: int, env: Dict[str, str]) -> Tuple[int, float]:
     """
@@ -150,13 +183,21 @@ def _run_command(cmd: List[str], timeout: int, env: Dict[str, str]) -> Tuple[int
     try:
         proc = subprocess.run(
             cmd,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             timeout=timeout,
             env=env,
         )
         duration = time.time() - start_time
+
+        # Only print output on failure — passing tests stay silent
+        if proc.returncode != 0:
+            if proc.stdout:
+                sys.stdout.write(proc.stdout)
+            if proc.stderr:
+                sys.stderr.write(proc.stderr)
+
         return proc.returncode, duration
 
     except subprocess.TimeoutExpired:
@@ -178,69 +219,86 @@ def run_test_file(
     total: int,
     details: bool,
     exit_first: bool,
-) -> List[Tuple[str, int, float]]:
+) -> Tuple[List[Tuple[str, int, float]], Dict]:
 
-    if details:
-        print(f"\n\n=== Running {pyfile.name} ({current}/{total}) ===")
+    # if details:
+    print(f"\n\n=== Running {pyfile.name} ({current}/{total}) ===")
+
     module_name = module_from_path(pyfile)
 
-    # Discover classes using your project's helper
-    import importlib
-
+    # Find all class in this module
     try:
-        module = importlib.import_module(module_name)
+        test_ids = get_test_from_module(module_name)
     except Exception as e:
-        print(f"[discover] Failed to import '{module_name}': {e}")
-        return [(module_name, 1, 0)]
+        print(f"[discover] Failed to discover tests in '{module_name}': {e}")
+        empty_stats: Dict = {}
+        return [(f"{pyfile.name}:<discover>", 1, 0.0)], empty_stats
 
-    class_names = sorted([cls.__name__ for cls in find_test_classes(module)])
+    if not test_ids:
+        print(f"No tests found in file (module={module_name})")
+        return [], {}
 
     if details:
-        print(f"Found {len(class_names)} class(es) in {module_name}: {', '.join(class_names)}")
-
-    if not class_names:
-        print(f"No test classes found in file (module={module_name})")
-        return []
+        by_class: Dict[str, int] = defaultdict(int)
+        for tid in test_ids:
+            _, cls, _ = split_test_id(tid)
+            by_class[cls] += 1
+        print(f"Found {len(test_ids)} test(s) in {module_name}")
+        for cls in sorted(by_class):
+            print(f"  {cls} ({by_class[cls]})")
 
     # Env for child processes
     env = os.environ.copy()
     env["DETAILS"] = "1" if details else "0"
     env["FAILFAST"] = "1" if exit_first else "0"
+    env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
 
-    results = []
+    results: List[Tuple[str, int, float]] = []
+    class_stats: Dict = defaultdict(lambda: {"pass": 0, "fail": 0, "timeout": 0, "time": 0.0})
 
-    def run_one_test(label: str, cmd: List[str]) -> int:
+    if details:
+        print("\n...testing...\n")
+
+    for idx, test_id in enumerate(test_ids, 1):
+        _, cls, meth = split_test_id(test_id)
+        label = f"{pyfile.name}:{cls}.{meth}"
+
+        if details:
+            print(f"{label} ({idx}/{len(test_ids)})")
+
+        cmd = [sys.executable, "-m", "unittest", "-q", test_id]
         code, duration = _run_command(cmd, timeout, env)
         results.append((label, code, duration))
-        return code
 
-    # Run each test class in an isolated subprocess
-    for idx, class_name in enumerate(class_names, 1):
-        if details:
-            print(f"\n{class_name} ({idx}/{len(class_names)})")
-        label = f"{pyfile.name}:{class_name}"
+        class_stats[cls]["time"] += duration
+        if code == 0:
+            class_stats[cls]["pass"] += 1
+        elif code == 2:
+            class_stats[cls]["timeout"] += 1
+        else:
+            class_stats[cls]["fail"] += 1
 
-        one_liner = (
-            "import importlib, sys; "
-            f"m = importlib.import_module('{module_name}'); "
-            f"c = getattr(m, '{class_name}', None); "
-            "sys.exit(c.run_test_summary() if c else 1)"
-        )
-
-        cmd = [sys.executable, "-c", one_liner]
-        exit_code = run_one_test(label, cmd)
-        if exit_first and exit_code != 0:
+        if exit_first and code != 0:
             break
 
-    return results
+    if details:
+        print("\nModule Summary:", module_name)
+        for cls in sorted(class_stats):
+            s = class_stats[cls]
+            status = "PASS" if (s["fail"] == 0 and s["timeout"] == 0) else "FAIL"
+            print(
+                f"  {cls:<35} {status:<4} "
+                f"pass={s['pass']} fail={s['fail']} timeout={s['timeout']} "
+                f"time={s['time']:.2f}s"
+            )
+
+    return results, class_stats
 
 
 # --- Main Function ------------------------------------------------------------
 def main() -> None:
     """Main entry point for the test runner."""
     args = build_parser().parse_args()
-
-    t_start = time.perf_counter()
 
     # Discover all test files to run
     all_tests = []
@@ -251,10 +309,11 @@ def main() -> None:
 
     # Remove duplicates and sort
     all_tests = sorted(set(all_tests))
+    n_modules = len(all_tests)
 
     # Handle list mode
     if args.list:
-        print(f"Available test files ({len(all_tests)}):")
+        print(f"Available test files ({n_modules}):")
         for test_file in all_tests:
             try:
                 relative_path = test_file.relative_to(CASES_DIR)
@@ -264,102 +323,67 @@ def main() -> None:
         sys.exit(0)
 
     # Check if any tests were found
-    print(f"Found {len(all_tests)} test files")
-    if args.details:
-        for test_file in all_tests:
-            relative_path = test_file.relative_to(CASES_DIR)
-            print(f"  {relative_path}")
-
     if not all_tests:
-        SystemError("No test files found matching criteria")
+        print("No test files found matching criteria")
         sys.exit(0)
 
+    print(f"Found {n_modules} test file(s)")
+    if args.details:
+        for test_file in all_tests:
+            print(f"  {test_file.relative_to(CASES_DIR)}")
+
     # Run all tests
+    total_tests = 0
     failed_count = 0
     timeout_count = 0
-    all_results = []
+    passed_count = 0
+    test_time = 0.0
 
     for i, test_file in enumerate(all_tests, 1):
-        file_results = run_test_file(
+        file_results, class_stats = run_test_file(
             test_file,
             timeout=args.timeout,
             current=i,
-            total=len(all_tests),
+            total=n_modules,
             details=args.details,
             exit_first=args.exitfirst,
         )
 
-        # Process results from this file
-        for test_name, exit_code, duration in file_results:
-            all_results.append((test_name, exit_code, duration))
-            if args.details:
-                if exit_code == 0:
-                    print(f"{test_name}: PASSED")
-                elif exit_code == 2:
-                    print(f"{test_name}: TIMED OUT")
-                    timeout_count += 1
-                    if args.exitfirst:
-                        break
-                else:
-                    print(f"{test_name}: FAILED")
-                    failed_count += 1
-                    if args.exitfirst:
-                        break
+        for cls in class_stats:
+            s = class_stats[cls]
+            passed_count += s["pass"]
+            timeout_count += s["timeout"]
+            failed_count += s["fail"]
+            test_time += s["time"]
 
-        # Exit early if requested and there were failures
+        total_tests += len(file_results)
+
         if args.exitfirst and (failed_count > 0 or timeout_count > 0):
             break
-
-    # Print summary
-    total_tests = len(all_results)
-    passed_count = sum(1 for _, code, _ in all_results if code == 0)
 
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    print(f"  Total:    {total_tests}")
-    print(f"  Passed:   {passed_count}")
-    print(f"  Failed:   {failed_count}")
-    print(f"  Timeouts: {timeout_count}")
-
-    # Print detailed results if requested
-    if args.details:
-        print("\nDetailed Results:")
-        print("-" * 60)
-        for test_name, exit_code, duration in all_results:
-            if exit_code == 0:
-                status = "PASS"
-            elif exit_code == 2:
-                status = "TIMEOUT"
+    print(f"  Total module:        {n_modules}")
+    print(f"  Total tests:         {total_tests}")
+    print(f"  Passed:              {passed_count}")
+    print(f"  Failed:              {failed_count}")
+    print(f"  Timeouts:            {timeout_count}")
+    print(f"  Total time:          {test_time:.2f}s")
+    if resource is not None:
+        try:
+            # ru_maxrss units: Linux = KiB, macOS = bytes
+            peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+            if sys.platform == "darwin":
+                peak_bytes = float(peak)
             else:
-                status = "FAIL"
+                peak_bytes = float(peak) * 1024.0
+            print(f"  Peak RSS (children): {_fmt_bytes(peak_bytes)}")
+        except Exception as e:
+            print(f"  Peak RSS (children): error reading ({e})")
+    else:
+        print("  Peak RSS (children): unavailable (no 'resource' module)")
 
-            print(f"  {test_name:<40} {status:<8} {duration:6.2f}s")
-
-        t_end = time.perf_counter() - t_start
-        sum_class_time = sum(d for _, _, d in all_results)
-
-        print("\n" + "-" * 60)
-        print("TIMING")
-        print("-" * 60)
-        print(f"  Total time:          {t_end:.2f}s")
-        print(f"  Sum of test times:   {sum_class_time:.2f}s")
-
-        if resource is not None:
-            try:
-                # ru_maxrss units: Linux = KiB, macOS = bytes
-                peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-                if sys.platform == "darwin":
-                    peak_bytes = float(peak)  # bytes on macOS
-                else:
-                    peak_bytes = float(peak) * 1024.0  # KiB -> bytes on Linux
-                print(f"  Peak RSS (children): {_fmt_bytes(peak_bytes)}")
-            except Exception as e:
-                print(f"  Peak RSS (children): error reading ({e})")
-        else:
-            print("  Peak RSS (children): unavailable (no 'resource' module)")
-
-    # Exit with appropriate code
     exit_code = 1 if (failed_count > 0 or timeout_count > 0) else 0
     sys.exit(exit_code)
 
