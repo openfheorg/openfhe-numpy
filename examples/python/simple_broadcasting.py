@@ -10,7 +10,6 @@ def validate_and_print_results(computed, expected, operation_name):
     print("*" * 60)
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{computed}")
-s
     is_match, error = onp.check_equality(expected, computed)
     print(f"\nMatch: {is_match}, Total Error: {error}")
 

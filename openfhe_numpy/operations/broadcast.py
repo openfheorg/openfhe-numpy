@@ -39,11 +39,9 @@ matrix multiplication, and other mathematical operations.
 # Third-party imports
 import math
 import numpy as np
-from openfhe_numpy.utils.matlib import next_power_of_two
-from openfhe_numpy.tensor.ctarray import CTArray
-from openfhe_numpy import (
-    ArrayEncodingType,
-)
+from ..openfhe_numpy import ArrayEncodingType
+from ..utils.matlib import next_power_of_two
+from ..utils._helper_slots_ops import _create_masking, _duplicate_block
 
 
 # ------------------------------------------------------------------------------
@@ -76,37 +74,6 @@ def broadcast_shapes(x_shape, y_shape):
 # 3. Matrix: (m, n) -> (m, n)
 
 
-def _create_masking(indices, size):
-    """
-    Create a binary mask with 1s at specified indices
-
-    Args:
-        indices: List/array of indices to set to 1
-        size: Total size of the mask
-
-    Returns:
-        List with 1s at indices, 0s elsewhere
-    """
-    mask = [0] * size
-    for idx in indices:
-        mask[idx] = 1
-    return mask
-
-
-def _duplicate_block(x, duplicate_count, block_size, pt_mask=None):
-    cc = x.GetCryptoContext()
-    rotation = block_size
-    ct_res = x
-
-    while rotation < block_size * duplicate_count:
-        ct_rotated = cc.EvalRotate(ct_res, -rotation)
-        ct_res = cc.EvalAdd(ct_res, ct_rotated)
-        rotation *= 2
-    if pt_mask is not None:
-        ct_res = cc.EvalMult(pt_mask, ct_res)
-    return ct_res
-
-
 def generate_broadcast_key(secret_key, target_shape):
     if target_shape == ():
         return
@@ -124,6 +91,8 @@ def generate_broadcast_key(secret_key, target_shape):
 
 
 def broadcast_to(x, target_shape, order=None):
+    from openfhe_numpy.tensor.ctarray import CTArray
+
     # Broadcasting needs to generate rotation keys at the beginning.
     target_shape = tuple(target_shape)
     if target_shape == x.original_shape:

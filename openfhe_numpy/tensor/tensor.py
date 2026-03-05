@@ -46,6 +46,7 @@ TPL = TypeVar("Template")
 
 
 # BaseTensor - Abstract Interface
+# Don't implement anything here
 class BaseTensor(ABC, Generic[TPL]):
     @property
     @abstractmethod
@@ -174,6 +175,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
                 ONP_ERROR("Dimension is invalid!!!")
             self._order = order
             self._dtype = self.__class__.__name__
+            self._zeros = None
             self.extra = {}
 
     ###
