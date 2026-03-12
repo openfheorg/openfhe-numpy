@@ -24,6 +24,7 @@ python3 run_tests.py
 
 # Run tests in a subfolder under cases/
 python3 run_tests.py matrix_ops
+python3 run_tests.py slicing
 
 # Run a single tests
 python3 run_tests.py matrix_ops/test_matrix_sum.py
