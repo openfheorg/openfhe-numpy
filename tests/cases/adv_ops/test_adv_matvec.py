@@ -131,9 +131,3 @@ class TestColMajorRowMajor(MainUnittest):
                             result=result,
                         )
                         raise
-
-
-# --- Entry point --------------------------------------------------------------
-if __name__ == "__main__":
-    TestRowMajorColMajor.run_test_summary()
-    TestColMajorRowMajor.run_test_summary()

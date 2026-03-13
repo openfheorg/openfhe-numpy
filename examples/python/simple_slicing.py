@@ -42,12 +42,8 @@ def demo_matrix():
         mode="zero",
         public_key=keys.publicKey,
     )
-    nrow = next_power_of_2(len(matrix))
-    ncol = next_power_of_2(len(matrix[0]))
 
-    #
-    rotations = list(range(-nrow * ncol, nrow * ncol))
-    cc.EvalRotateKeyGen(keys.secretKey, rotations)
+    onp.generate_slicing_key(keys.secretKey, ctm.original_shape)
 
     ctm_result, expected = ctm[2][1], matrix[2][1]
     result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
@@ -160,11 +156,8 @@ def demo_vector():
         mode="zero",
         public_key=keys.publicKey,
     )
-    size = next_power_of_2(len(vector))
 
-    #
-    rotations = list(range(-size, size))
-    cc.EvalRotateKeyGen(keys.secretKey, rotations)
+    onp.generate_slicing_key(keys.secretKey, ctv.original_shape)
 
     ctv_result, expected = ctv[1:], vector[1:]
     result = ctv_result.decrypt(keys.secretKey, unpack_type="original")

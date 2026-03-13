@@ -74,42 +74,106 @@ def broadcast_shapes(x_shape, y_shape):
 # 3. Matrix: (m, n) -> (m, n)
 
 
-def generate_broadcast_key(secret_key, target_shape):
+# ------------------------------------------------------------------------------
+# Rotation index helpers
+# ------------------------------------------------------------------------------
+
+
+def _duplicate_block_indices(duplicate_count, block_size) -> set:
+    """
+    Mirrors the rotation pattern inside _duplicate_block:
+    """
+    indices = set()
+    rotation = block_size
+    while rotation < block_size * duplicate_count:
+        indices.add(-rotation)
+        rotation *= 2
+    return indices
+
+
+# ------------------------------------------------------------------------------
+# Key generation
+# ------------------------------------------------------------------------------
+
+
+def generate_broadcast_key(secret_key, original_shape, target_shape):
+    """
+    Pre-generate all rotation keys needed by broadcast_to for a given
+    (original_shape, target_shape) pair - for both ROW_MAJOR and COL_MAJOR.
+
+    Broadcasting cases covered:
+      Scalar  ()      -> Vector (n,)
+      Scalar  ()      -> Matrix (m, n)
+      Vector  (n,)    -> Matrix (m, n)
+      ColVec  (m, 1)  -> Matrix (m, n)
+    """
     if target_shape == ():
         return
-    elif len(target_shape) == 1:
-        nmax = next_power_of_two(target_shape[0])
-    else:
-        nmax = max(next_power_of_two(target_shape[0]), next_power_of_two(target_shape[1]))
-
-    exp_max = int(math.log2(nmax * nmax) + 1)
-    power_indices = [2**i for i in range(0, exp_max)] + [-(2**i) for i in range(0, exp_max)]
-    indices = power_indices + list(range(-nmax * nmax, nmax * nmax))
 
     cc = secret_key.GetCryptoContext()
-    cc.EvalRotateKeyGen(secret_key, indices)
+    indices = set()
+
+    # --- Scalar -> Vector ---
+    if len(target_shape) == 1:
+        nrow = target_shape[0]
+        if original_shape == ():
+            rotation = 1
+            while rotation < nrow:
+                indices.add(-rotation)
+                rotation *= 2
+
+    # --- Any -> Matrix ---
+    elif len(target_shape) == 2:
+        nrow, ncol = target_shape
+        nrow_pow_2 = next_power_of_two(nrow)
+        ncol_pow_2 = next_power_of_two(ncol)
+
+        if original_shape == ():
+            indices.update(_duplicate_block_indices(nrow, ncol_pow_2))
+            indices.update(_duplicate_block_indices(ncol, 1))
+            indices.update(_duplicate_block_indices(ncol, nrow_pow_2))
+            indices.update(_duplicate_block_indices(nrow, 1))
+
+        elif len(original_shape) == 1:
+            indices.update(_duplicate_block_indices(nrow, ncol_pow_2))
+            for i in range(1, original_shape[0]):
+                indices.add(-i * (nrow_pow_2 - 1))
+            indices.update(_duplicate_block_indices(nrow, 1))
+
+        elif len(original_shape) == 2:
+            indices.update(_duplicate_block_indices(ncol_pow_2, nrow_pow_2))
+            for i in range(1, original_shape[0]):
+                indices.add(-i * (ncol_pow_2 - 1))
+            indices.update(_duplicate_block_indices(ncol, 1))
+
+    cc.EvalRotateKeyGen(secret_key, sorted(indices))
+
+
+# ------------------------------------------------------------------------------
+# Broadcasting
+# ------------------------------------------------------------------------------
 
 
 def broadcast_to(x, target_shape, order=None):
     from openfhe_numpy.tensor.ctarray import CTArray
 
-    # Broadcasting needs to generate rotation keys at the beginning.
     target_shape = tuple(target_shape)
     if target_shape == x.original_shape:
         return x
 
     cc = x.data.GetCryptoContext()
-    # Scalar
+
+    # --- Scalar -> anything ---
     if x.original_shape == ():
-        # Scalar to Scalar
         if target_shape == ():
             return x
-        # Scalar to Vector
+
+        # Scalar -> Vector
         elif len(target_shape) == 1:
             mask = _create_masking([0], x.batch_size)
             pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-
             ct_res = cc.EvalMult(x.data, pt_mask)
+
             rotation = 1
             while rotation < target_shape[0]:
                 ct_rotated = cc.EvalRotate(ct_res, -rotation)
@@ -120,17 +184,17 @@ def broadcast_to(x, target_shape, order=None):
             pt_mask = cc.MakeCKKSPackedPlaintext(mask)
             ct_res = cc.EvalMult(ct_res, pt_mask)
 
-            z = CTArray(
+            return CTArray(
                 data=ct_res,
                 original_shape=target_shape,
                 batch_size=x.batch_size,
                 new_shape=(next_power_of_two(target_shape[0]),),
                 order=ArrayEncodingType.ROW_MAJOR,
             )
-            return z
-        # Scalar to Matrix
+
+        # Scalar -> Matrix
         elif len(target_shape) == 2:
-            nrow, ncol = target_shape[0], target_shape[1]
+            nrow, ncol = target_shape
             mask = _create_masking([0], x.batch_size)
             pt_mask = cc.MakeCKKSPackedPlaintext(mask)
             ct_res = cc.EvalMult(x.data, pt_mask)
@@ -142,7 +206,6 @@ def broadcast_to(x, target_shape, order=None):
                     for j in range(ncol):
                         mask[i * ncol_pow_2 + j] = 1
                 pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-
                 ct_res = _duplicate_block(ct_res, nrow, ncol_pow_2)
                 ct_res = _duplicate_block(ct_res, ncol, 1, pt_mask)
 
@@ -155,6 +218,7 @@ def broadcast_to(x, target_shape, order=None):
                 pt_mask = cc.MakeCKKSPackedPlaintext(mask)
                 ct_res = _duplicate_block(ct_res, ncol, nrow_pow_2)
                 ct_res = _duplicate_block(ct_res, nrow, 1, pt_mask)
+
             else:
                 raise ValueError(f"Invalid order ({order})")
 
@@ -168,11 +232,8 @@ def broadcast_to(x, target_shape, order=None):
 
         raise ValueError(f"Target shape ({target_shape}) is not supported")
 
-    # 1D row vector
-    #   original shape:  (n,)
-    #   original packing: [a, b, c, 0, 0 0]. The vector is always packed by ROW_MAJOR
+    # --- Vector (n,) -> Matrix (m, n) ---
     if len(x.original_shape) == 1:
-        # Vector to Matrix
         if len(target_shape) == 2:
             if target_shape[1] != x.original_shape[0]:
                 raise ValueError(
@@ -181,7 +242,7 @@ def broadcast_to(x, target_shape, order=None):
                     "Only supports broadcasting from (n,) to (m, n)."
                 )
 
-            nrow, ncol = target_shape[0], target_shape[1]
+            nrow, ncol = target_shape
             ncol_pow_2 = next_power_of_two(ncol)
             nrow_pow_2 = next_power_of_two(nrow)
 
@@ -198,6 +259,7 @@ def broadcast_to(x, target_shape, order=None):
                     new_shape=(nrow_pow_2, ncol_pow_2),
                     order=order,
                 )
+
             elif order == ArrayEncodingType.COL_MAJOR:
                 mask = [0] * x.batch_size
                 mask[0] = 1
@@ -205,12 +267,13 @@ def broadcast_to(x, target_shape, order=None):
                 ct_res = cc.EvalMult(x.data, pt_mask)
 
                 for i in range(1, x.original_shape[0]):
-                    mask = [0] * x.batch_size
+                    mask[i - 1] = 0
                     mask[i] = 1
                     pt_mask = cc.MakeCKKSPackedPlaintext(mask)
                     ct_scalar = cc.EvalMult(x.data, pt_mask)
                     ct_scalar = cc.EvalRotate(ct_scalar, -(nrow_pow_2 * i - i))
                     ct_res = cc.EvalAdd(ct_res, ct_scalar)
+                mask[x.original_shape[0] - 1] = 0  # reset
 
                 mask = [0] * x.batch_size
                 for i in range(ncol):
@@ -226,15 +289,11 @@ def broadcast_to(x, target_shape, order=None):
                     new_shape=(nrow_pow_2, ncol_pow_2),
                     order=order,
                 )
+
             else:
                 raise ValueError(f"Invalid order ({order})")
 
-    # Broadcasting a column vector to a matrix
-    # (m,1) + (m,n) -> (m,n)
-    # 1 -> 1111
-    # 2    2222
-    # 3    3333
-
+    # --- ColVec (m, 1) -> Matrix (m, n) ---
     elif len(x.original_shape) == 2:
         if len(target_shape) == 2:
             if target_shape[0] != x.original_shape[0]:
@@ -244,7 +303,7 @@ def broadcast_to(x, target_shape, order=None):
                     "Only supports broadcasting from (m,1) to (m, n)."
                 )
 
-            nrow, ncol = target_shape[0], target_shape[1]
+            nrow, ncol = target_shape
             ncol_pow_2 = next_power_of_two(ncol)
             nrow_pow_2 = next_power_of_two(nrow)
 
@@ -261,6 +320,7 @@ def broadcast_to(x, target_shape, order=None):
                     new_shape=(nrow_pow_2, ncol_pow_2),
                     order=order,
                 )
+
             elif order == ArrayEncodingType.ROW_MAJOR:
                 mask = [0] * x.batch_size
                 mask[0] = 1
@@ -268,12 +328,13 @@ def broadcast_to(x, target_shape, order=None):
                 ct_res = cc.EvalMult(x.data, pt_mask)
 
                 for i in range(1, x.original_shape[0]):
-                    mask = [0] * x.batch_size
+                    mask[i - 1] = 0
                     mask[i] = 1
                     pt_mask = cc.MakeCKKSPackedPlaintext(mask)
                     ct_scalar = cc.EvalMult(x.data, pt_mask)
                     ct_scalar = cc.EvalRotate(ct_scalar, -(ncol_pow_2 * i - i))
                     ct_res = cc.EvalAdd(ct_res, ct_scalar)
+                mask[x.original_shape[0] - 1] = 0  # reset
 
                 mask = [0] * x.batch_size
                 for i in range(nrow):
@@ -289,11 +350,11 @@ def broadcast_to(x, target_shape, order=None):
                     new_shape=(nrow_pow_2, ncol_pow_2),
                     order=order,
                 )
+
             else:
                 raise ValueError(f"Invalid order ({order})")
 
     raise ValueError(
-        f"Incompatible shapes: vector length {x.original_shape[0]} "
-        f"cannot be broadcast to target matrix shape {target_shape}. "
-        "Only supports broadcasting from (n,) to (m, n)."
+        f"Incompatible shapes: {x.original_shape} "
+        f"cannot be broadcast to target matrix shape {target_shape}."
     )

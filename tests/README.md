@@ -110,12 +110,11 @@ When passing targets, do not prefix them with "cases/" as the script already loc
 ```bash
 # Correct
 
-# run tests in matrix_ops
+# run tests in the folder matrix_ops
 python3 run_tests.py target_folder
 python3 run_tests.py matrix_ops
-python3 run_tests.py broadcasting/test_broadcasting_vector.py
 
-# run a single tests in matrix_ops
+# run a single test in matrix_ops
 python3 run_tests.py matrix_ops/test_matrix_mean.py
 
 # Incorrect

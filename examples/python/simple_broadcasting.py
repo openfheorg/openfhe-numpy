@@ -33,7 +33,6 @@ def example_broadcasting(order=onp.ROW_MAJOR):
     keys = cc.KeyGen()
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
-    onp.generate_broadcast_key(keys.secretKey, (3, 5))
 
     ring_dim = cc.GetRingDimension()
     batch_size = ring_dim // 2
@@ -41,8 +40,10 @@ def example_broadcasting(order=onp.ROW_MAJOR):
     print(f"Available slots:    {batch_size}")
 
     scalar = 5
-    vector = [10, 20, 30]
-    vector = [9.8745164, 8.72523343, 6.14485141, 5.19928817, 5.53364538]
+    vector = np.array([10, 20, 30])
+
+    onp.generate_broadcast_key(keys.secretKey, (), (3, 5))
+    onp.generate_broadcast_key(keys.secretKey, vector.shape, (3, 5))
 
     column_vector = [[10], [20], [30]]
     matrix = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0], [1.0, 2.0, 3.0, 4.0, 5.0]]
@@ -145,12 +146,14 @@ def example_broadcasting_with_operations(ord=onp.ROW_MAJOR):
     print(f"\nCKKS ring dimension: {ring_dim}")
     print(f"Available slots:    {batch_size}")
 
-    scalar = 5
-    vector = [101, 210, 310, 140, 150]
-    column_vector = [[10], [20], [30]]
+    scalar = np.array(5)
+    vector = np.array([101, 210, 310, 140, 150])
+    column_vector = np.array([[10], [20], [30]])
     matrix = [[1.0, 2.0, 3.0, 4.0, 5.0], [1.1, 2.1, 3.1, 4.1, 5.1], [1.2, 2.2, 3.2, 4.2, 5.2]]
 
-    onp.generate_broadcast_key(keys.secretKey, (3, 5))
+    onp.generate_broadcast_key(keys.secretKey, scalar.shape, (3, 5))
+    onp.generate_broadcast_key(keys.secretKey, vector.shape, (3, 5))
+    onp.generate_broadcast_key(keys.secretKey, column_vector.shape, (3, 5))
 
     print("\nInputs")
     print("scalar:", scalar)
