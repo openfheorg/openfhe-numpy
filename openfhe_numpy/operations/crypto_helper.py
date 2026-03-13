@@ -38,6 +38,7 @@ keys needed for various homomorphic operations in OpenFHE-NumPy.
 
 import openfhe
 import openfhe_numpy as backend  # Import from cpp source
+from openfhe_numpy.utils.matlib import next_power_of_two
 
 
 def accumulation_depth(nrows: int, ncols: int, accumulate_by_rows: bool):
@@ -210,3 +211,45 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
         ncols = ctm_matrix.ncols
 
     backend.EvalLinTransKeyGen(secret_key, ncols, backend.LinTransType.TRANSPOSE)
+
+
+def generate_slicing_key(secret_key, original_shape):
+    """
+    Pre-generate all rotation keys needed for any possible slicing
+    of a CTArray with the given original_shape.
+    """
+
+    indices = set()
+
+    if len(original_shape) == 1:
+        n = original_shape[0]
+        for i in range(n):
+            indices.add(i)
+        for i in range(1, n):
+            indices.add(-i)
+
+    elif len(original_shape) == 2:
+        nrow, ncol = original_shape
+        nrow_pow_2 = next_power_of_two(nrow)
+        ncol_pow_2 = next_power_of_two(ncol)
+
+        for r in range(nrow):
+            for c in range(ncol):
+                indices.add(r * ncol_pow_2 + c)
+                indices.add(c * nrow_pow_2 + r)
+
+        for i in range(1, max(nrow, ncol)):
+            indices.add(-i)
+
+        for res_nrow in range(1, nrow + 1):
+            for res_ncol in range(1, ncol + 1):
+                res_pow_2_r = next_power_of_two(res_nrow)
+                res_pow_2_c = next_power_of_two(res_ncol)
+                for r in range(res_nrow):
+                    for c in range(res_ncol):
+                        indices.add(-(res_pow_2_c * r + c))
+                        indices.add(-(res_pow_2_r * c + r))
+
+    if indices:
+        cc = secret_key.GetCryptoContext()
+        cc.EvalRotateKeyGen(secret_key, sorted(indices))

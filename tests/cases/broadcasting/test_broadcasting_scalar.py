@@ -1,3 +1,4 @@
+import gc
 import numpy as np
 from openfhe import *
 import openfhe_numpy as onp
@@ -16,28 +17,27 @@ OPS = [
 ]
 
 
-class TestScalarVectorOps(MainUnittest):
-    def _run(self, tag, np_fn, fhe_fn):
-        ckks_params = load_ckks_params()
-        for _, p in enumerate(ckks_params):
-            batch_size = p["ringDim"] // 2
+def _run_scalar_vector_ops(test_case, tag, np_fn, fhe_fn):
+    ckks_params = load_ckks_params()
+    for p in ckks_params:
+        batch_size = p["ringDim"] // 2
 
-            cc, keys = gen_crypto_context(p)
-            cc.EvalMultKeyGen(keys.secretKey)
-            cc.EvalSumKeyGen(keys.secretKey)
+        cc, keys = gen_crypto_context(p)
+        cc.EvalMultKeyGen(keys.secretKey)
+        cc.EvalSumKeyGen(keys.secretKey)
 
+        try:
             for size in SIZES_VECTOR:
                 if size > batch_size:
                     continue
 
-                # generate vector with dimension (size)
                 vector = generate_random_array(rows=size)
-                onp.generate_broadcast_key(keys.secretKey, (size,))
+                onp.generate_broadcast_key(keys.secretKey, (), vector.shape)
                 expected = np_fn(vector, SCALAR)
 
                 for order_name, order_value in ORDERS:
                     for mode in MODES:
-                        with self.subTest(
+                        with test_case.subTest(
                             op=tag,
                             order=order_name,
                             size=size,
@@ -45,6 +45,9 @@ class TestScalarVectorOps(MainUnittest):
                             ringDim=p["ringDim"],
                         ):
                             result = None
+                            ctv = None
+                            cts = None
+                            ctv_res = None
 
                             try:
                                 ctv = onp.array(
@@ -61,20 +64,15 @@ class TestScalarVectorOps(MainUnittest):
                                     data=SCALAR,
                                     batch_size=batch_size,
                                     order=order_value,
-                                    mode=mode,
                                     fhe_type="C",
+                                    mode=mode,
                                     public_key=keys.publicKey,
                                 )
-
-                                onp.gen_transpose_keys(keys.secretKey, ctv)
                                 ctv_res = fhe_fn(ctv, cts)
-
-                                # decrypt and compare
                                 result = ctv_res.decrypt(keys.secretKey, unpack_type="original")
-
-                                self.assertArrayClose(actual=result, expected=expected)
-                            except Exception as e:
-                                self._record_case(
+                                test_case.assertArrayClose(actual=result, expected=expected)
+                            except Exception:
+                                test_case._record_case(
                                     params={
                                         "case": "scalar_broadcasting",
                                         "size": size,
@@ -85,36 +83,32 @@ class TestScalarVectorOps(MainUnittest):
                                     result=result,
                                 )
                                 raise
-
-    def test_add(self):
-        self._run(*OPS[0])
-
-    def test_sub(self):
-        self._run(*OPS[1])
-
-    def test_multiply(self):
-        self._run(*OPS[2])
+                            finally:
+                                del ctv, cts, ctv_res, result
+                                gc.collect()
+        finally:
+            del cc, keys
+            gc.collect()
 
 
-class TestScalarMatrixOps(MainUnittest):
-    def _run_scalar_matrix_ops(self, ops):
-        tag, np_fn, fhe_fn = ops[0], ops[1], ops[2]
-        ckks_params = load_ckks_params()
-        for _, p in enumerate(ckks_params):
-            batch_size = p["ringDim"] // 2
+def _run_scalar_matrix_ops(self, ops):
+    tag, np_fn, fhe_fn = ops[0], ops[1], ops[2]
+    ckks_params = load_ckks_params()
+    for p in ckks_params:
+        batch_size = p["ringDim"] // 2
 
-            cc, keys = gen_crypto_context(p)
-            cc.EvalMultKeyGen(keys.secretKey)
-            cc.EvalSumKeyGen(keys.secretKey)
+        cc, keys = gen_crypto_context(p)
+        cc.EvalMultKeyGen(keys.secretKey)
+        cc.EvalSumKeyGen(keys.secretKey)
 
-            # for tag, np_fn, fhe_fn in ops:
+        try:
             for rows, cols in SIZES_MAT:
-                onp.generate_broadcast_key(keys.secretKey, (rows, cols))
                 if onp.next_power_of_two(rows) * onp.next_power_of_two(cols) > batch_size:
                     continue
 
-                # generate vector with dimension (size)
+                onp.generate_broadcast_key(keys.secretKey, (), (rows, cols))
                 matrix = generate_random_array(rows, cols)
+                expected = np_fn(matrix, SCALAR)
 
                 for order_name, order_value in ORDERS:
                     for mode in MODES:
@@ -126,6 +120,9 @@ class TestScalarMatrixOps(MainUnittest):
                             ringDim=p["ringDim"],
                         ):
                             result = None
+                            ctm = None
+                            ctm_res = None
+
                             try:
                                 ctm = onp.array(
                                     cc=cc,
@@ -136,15 +133,10 @@ class TestScalarMatrixOps(MainUnittest):
                                     mode=mode,
                                     public_key=keys.publicKey,
                                 )
-
-                                expected = np_fn(matrix, SCALAR)
                                 ctm_res = fhe_fn(ctm, SCALAR)
-
-                                # decrypt and compare
                                 result = ctm_res.decrypt(keys.secretKey, unpack_type="original")
-
                                 self.assertArrayClose(actual=result, expected=expected)
-                            except Exception as e:
+                            except Exception:
                                 self._record_case(
                                     params={
                                         "case": "scalar_broadcasting",
@@ -156,17 +148,31 @@ class TestScalarMatrixOps(MainUnittest):
                                     result=result,
                                 )
                                 raise
+                            finally:
+                                del ctm, ctm_res, result
+                                gc.collect()
+        finally:
+            del cc, keys
+            gc.collect()
 
+
+class TestScalarVectorOps(MainUnittest):
     def test_add(self):
-        self._run_scalar_matrix_ops(OPS[0])
+        _run_scalar_vector_ops(self, *OPS[0])
 
     def test_sub(self):
-        self._run_scalar_matrix_ops(OPS[1])
+        _run_scalar_vector_ops(self, *OPS[1])
 
     def test_multiply(self):
-        self._run_scalar_matrix_ops(OPS[2])
+        _run_scalar_vector_ops(self, *OPS[2])
 
 
-if __name__ == "__main__":
-    TestScalarVectorOps.run_test_summary()
-    TestScalarMatrixOps.run_test_summary()
+class TestScalarMatrixOps_Add(MainUnittest):
+    def test_add(self):
+        _run_scalar_matrix_ops(self, OPS[0])
+
+    def test_sub(self):
+        _run_scalar_matrix_ops(self, OPS[1])
+
+    def test_multiply(self):
+        _run_scalar_matrix_ops(self, OPS[2])

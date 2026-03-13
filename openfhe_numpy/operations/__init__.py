@@ -65,6 +65,7 @@ from .crypto_helper import (
     gen_square_matmult_key,
     gen_accumulate_rows_key,
     gen_accumulate_cols_key,
+    generate_slicing_key,
 )
 
 # Define public API
@@ -95,4 +96,5 @@ __all__ = [
     # broadcasting operations
     "broadcast_to",
     "generate_broadcast_key",
+    "generate_slicing_key",
 ]
