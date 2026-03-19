@@ -144,8 +144,6 @@ def _pack_vector_row_wise(
             ONP_ERROR(f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'.")
     elif expand == "zero":
         flattened[np.arange(n) * target_cols] = vector
-        # for i in range(n):
-        #     flattened[i * target_cols] = vector[i]
     else:
         ONP_ERROR(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
 
@@ -168,7 +166,6 @@ def _pack_vector_row_wise(
     return output, shape
 
 
-# # @validate_call
 def _pack_vector_col_wise(
     vector: ArrayNumeric,
     batch_size: int,

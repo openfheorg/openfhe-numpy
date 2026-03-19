@@ -42,6 +42,7 @@ import numpy as np
 from ..openfhe_numpy import ArrayEncodingType
 from ..utils.matlib import next_power_of_two
 from ..utils._helper_slots_ops import _create_masking, _duplicate_block
+from ..tensor.constructors import array
 
 
 # ------------------------------------------------------------------------------
@@ -154,7 +155,61 @@ def generate_broadcast_key(secret_key, original_shape, target_shape):
 # ------------------------------------------------------------------------------
 
 
-def broadcast_to(x, target_shape, order=None):
+def broadcast_to(x, target_shape, order=None, cc=None):
+    if x.dtype == "CTArray":
+        return _ct_broadcast_to(x, target_shape, order)
+    elif x.dtype == "PTArray":
+        return _pt_broadcast_to(x, target_shape, order, cc)
+    else:
+        raise ValueError(f"Broadcast doesn't support {type(x)}")
+
+
+def _pt_broadcast_to(pta_x, target_shape, order=None, cc=None):
+    target_shape = tuple(target_shape)
+
+    if target_shape == pta_x.original_shape:
+        return pta_x
+
+    def _make_array(data):
+        if cc is not None:
+            return array(
+                cc=cc,
+                data=data,
+                batch_size=pta_x.batch_size,
+                order=order,
+                fhe_type="P",
+                mode="zero",
+            )
+        raise ValueError("Broadcasting operation requires a crypto context")
+
+    packed = pta_x.data.GetRealPackedValue()
+
+    # --- Scalar () -> anything ---
+    if pta_x.original_shape == ():
+        x = np.broadcast_to(np.array(packed[0]), target_shape)
+        return _make_array(x)
+
+    # --- 1D (n,) -> (m, n) ---
+    if len(pta_x.original_shape) == 1:
+        n = pta_x.original_shape[0]
+        x = np.array(packed[:n])  # shape (n,)
+        x_broadcasted = np.broadcast_to(x, target_shape)
+        return _make_array(x_broadcasted)
+
+    # --- 2D (m,1) -> (m,n)  or  (1,n) -> (m,n) ---
+    if len(pta_x.original_shape) == 2:
+        m, n = pta_x.original_shape
+        x = np.array(packed[: m * n]).reshape(pta_x.original_shape)  # restore 2D shape
+        x_broadcasted = np.broadcast_to(x, target_shape)
+        return _make_array(x_broadcasted)
+
+    raise ValueError(
+        f"Incompatible shapes: {pta_x.original_shape} "
+        f"cannot be broadcast to target matrix shape {target_shape}."
+    )
+
+
+def _ct_broadcast_to(x, target_shape, order=None):
     from openfhe_numpy.tensor.ctarray import CTArray
 
     target_shape = tuple(target_shape)
@@ -296,13 +351,14 @@ def broadcast_to(x, target_shape, order=None):
     # --- ColVec (m, 1) -> Matrix (m, n) ---
     elif len(x.original_shape) == 2:
         if len(target_shape) == 2:
-            if target_shape[0] != x.original_shape[0]:
+            try:
+                new_shape = np.broadcast_shapes(x.original_shape, target_shape)
+            except ValueError as e:
                 raise ValueError(
-                    f"Incompatible shapes: vector length {x.original_shape} "
-                    f"cannot be broadcast to target matrix shape {target_shape}. "
-                    "Only supports broadcasting from (m,1) to (m, n)."
-                )
-
+                    f"Incompatible shapes: {x.original_shape} cannot be broadcast "
+                    f"to target shape {target_shape}. "
+                    "Only supports broadcasting from (m,1) to (m,n) or (1,n) to (m,n) "
+                ) from e
             nrow, ncol = target_shape
             ncol_pow_2 = next_power_of_two(ncol)
             nrow_pow_2 = next_power_of_two(nrow)
@@ -356,5 +412,5 @@ def broadcast_to(x, target_shape, order=None):
 
     raise ValueError(
         f"Incompatible shapes: {x.original_shape} "
-        f"cannot be broadcast to target matrix shape {target_shape}."
+        f"cannot be broadcast to target shape {target_shape}."
     )
