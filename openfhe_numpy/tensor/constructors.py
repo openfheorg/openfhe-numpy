@@ -322,11 +322,23 @@ def _ravel_vector(
 
     if order == ArrayEncodingType.ROW_MAJOR:
         return _pack_vector_row_wise(
-            data, batch_size, target_cols, expand, mode, pad_to_pow2, pad_value
+            vector=data,
+            batch_size=batch_size,
+            target_cols=target_cols,
+            expand=expand,
+            tile=mode,
+            pad_to_power_of_2=pad_to_pow2,
+            pad_value=pad_value,
         )
     elif order == ArrayEncodingType.COL_MAJOR:
-        return _pack_vector_col_wise(
-            data, batch_size, target_cols, expand, mode, pad_to_pow2, pad_value
+        return _pack_vector_row_wise(
+            vector=data,
+            batch_size=batch_size,
+            target_cols=target_cols,
+            expand=expand,
+            tile=mode,
+            pad_to_power_of_2=pad_to_pow2,
+            pad_value=pad_value,
         )
     else:
         ONP_ERROR("Unsupported encoding order")

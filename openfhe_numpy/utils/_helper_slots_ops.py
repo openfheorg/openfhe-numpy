@@ -27,6 +27,10 @@ def _get_single_element(cc, x, idx, batch_size):
 
 
 def _duplicate_block(x, duplicate_count, block_size, pt_mask=None):
+    """
+    Duplicates a block of 'block_size' slots 'duplicate_count' times.
+
+    """
     cc = x.GetCryptoContext()
     rotation = block_size
     ct_res = x
@@ -35,6 +39,8 @@ def _duplicate_block(x, duplicate_count, block_size, pt_mask=None):
         ct_rotated = cc.EvalRotate(ct_res, -rotation)
         ct_res = cc.EvalAdd(ct_res, ct_rotated)
         rotation *= 2
+
+    # mask out if needed
     if pt_mask is not None:
         ct_res = cc.EvalMult(pt_mask, ct_res)
     return ct_res

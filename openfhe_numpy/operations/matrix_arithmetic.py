@@ -89,10 +89,16 @@ def add_ct(a, b):
         return _eval_add(a, b)
     else:
         output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
-        if a.original_shape != output_shape:
-            a = broadcast_to(a, output_shape, a.order)
+        if a.is_encrypted:
+            crypto_context = a.data.GetCryptoContext()
+        elif b.is_encrypted:
+            crypto_context = b.data.GetCryptoContext()
         else:
-            b = broadcast_to(b, output_shape, b.order)
+            raise ValueError(f"This function needs at least one parameter to be encrypted.")
+        if a.original_shape != output_shape:
+            a = broadcast_to(a, output_shape, a.order, crypto_context)
+        else:
+            b = broadcast_to(b, output_shape, b.order, crypto_context)
         return _eval_add(a, b)
 
 
@@ -155,10 +161,18 @@ def subtract_ct(a, b):
         return _eval_sub(a, b)
     else:
         output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
+
+        if a.is_encrypted:
+            crypto_context = a.data.GetCryptoContext()
+        elif b.is_encrypted:
+            crypto_context = b.data.GetCryptoContext()
+        else:
+            raise ValueError(f"This function needs at least one parameter to be encrypted.")
         if a.original_shape != output_shape:
-            a = broadcast_to(a, output_shape, a.order)
-        if b.original_shape != output_shape:
-            b = broadcast_to(b, output_shape, b.order)
+            a = broadcast_to(a, output_shape, a.order, crypto_context)
+        else:
+            b = broadcast_to(b, output_shape, b.order, crypto_context)
+
         return _eval_sub(a, b)
 
 
@@ -203,10 +217,17 @@ def multiply_ct(a, b):
         return _eval_multiply(a, b)
     else:
         output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
+        if a.is_encrypted:
+            crypto_context = a.data.GetCryptoContext()
+        elif b.is_encrypted:
+            crypto_context = b.data.GetCryptoContext()
+        else:
+            raise ValueError(f"This function needs at least one parameter to be encrypted.")
         if a.original_shape != output_shape:
-            a = broadcast_to(a, output_shape, a.order)
-        if b.original_shape != output_shape:
-            b = broadcast_to(b, output_shape, b.order)
+            a = broadcast_to(a, output_shape, a.order, crypto_context)
+        else:
+            b = broadcast_to(b, output_shape, b.order, crypto_context)
+
         return _eval_multiply(a, b)
 
 
@@ -295,8 +316,8 @@ def _matmul_ct(lhs, rhs):
     elif rhs.ndim == 1:
         return _eval_matvec_ct(lhs, rhs)
     else:
-        ONPIncompatibleShape(
-            lhs.original_shape, rhs.original_shape, "Matrix dimension mismatch for multiplication"
+        raise ValueError(
+            f"Dimension mismatch for multiplication ({lhs.original_shape} @ {rhs.original_shape})"
         )
 
 
