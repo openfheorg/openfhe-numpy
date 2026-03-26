@@ -189,11 +189,8 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
         mode="tile",
         public_key=keys.publicKey,
     )
-    # b1_square_zero_padded = make_square_power_of_2(b1)
-    
     onp_pt_b1 = onp.array(
         cc=cc,
-        # data=b1_square_zero_padded,
         data=b1,
         batch_size=batch_size,
         order=onp.ROW_MAJOR,
@@ -226,10 +223,8 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
         mode="tile",
         public_key=keys.publicKey,
     )
-    # b2_square_zero_padded = make_square_power_of_2(b2, SQUARE_MATRIX_DIM)
     onp_pt_b2 = onp.array(
         cc=cc,
-        # data=b2_square_zero_padded,
         data=b2,
         batch_size=batch_size,
         order=onp.COL_MAJOR,
@@ -284,9 +279,10 @@ if __name__ == '__main__':
     # Cryptographic setup for OpenFHE
     batch_size = 16
     scale_mod_size = 35
+    first_mod_size = 40
     params = CCParamsCKKSRNS()
     params.SetScalingModSize(scale_mod_size)
-    params.SetFirstModSize(40)
+    params.SetFirstModSize(first_mod_size)
     params.SetMultiplicativeDepth(15)
     params.SetBatchSize(batch_size)
     params.SetScalingTechnique(FIXEDAUTO)
