@@ -1,11 +1,5 @@
 """
 Test runner for OpenFHE-NumPy test suite.
-
-This script discovers and runs unittest-based test files with support for:
-- Individual test class execution for better isolation
-- Timeout handling for long-running FHE operations
-- Detailed output and timing information
-- Early exit on first failure
 """
 
 import argparse
@@ -14,8 +8,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict
-from core import find_test_classes
+from collections import defaultdict
+from typing import List, Tuple, Optional, Dict, Any
+import unittest
 
 try:
     import resource  # not available on Windows
@@ -26,7 +21,13 @@ except Exception:
 PROJECT_ROOT = Path(__file__).parent.resolve()
 CASES_DIR = PROJECT_ROOT / "cases"
 DEFAULT_PATTERN = "test_*.py"
-DEFAULT_TIMEOUT = 1800  # seconds (30 minutes)
+DEFAULT_TIMEOUT = 7200  # seconds (2 hours)
+
+# Exit codes
+EXIT_PASS = 0
+EXIT_FAIL = 1
+EXIT_TIMEOUT = 2
+EXIT_KILLED = 3
 
 
 # --- Command Line Interface ---------------------------------------------------
@@ -37,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Examples:\n"
         "  %(prog)s                    # Run all tests\n"
         "  %(prog)s matrix_ops         # Run tests in matrix_ops folder\n"
-        "  %(prog)s --details -x  # Run with details, exit on first failure",
+        "  %(prog)s --details -x       # Run with details, exit on first failure",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -75,13 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
         "-v",
         "--details",
         action="store_true",
-        help="Enable verbose output with test summaries and timing",
+        help="Enable verbose output with test summaries, timing, CPU and RSS usage",
     )
 
     return parser
 
 
-# --- Resource Debug -----------------------------------------------------------
+# --- Formatting helpers -------------------------------------------------------
 def _fmt_bytes(n_bytes: float) -> str:
     units = ["B", "KiB", "MiB", "GiB", "TiB"]
     i = 0
@@ -89,13 +90,19 @@ def _fmt_bytes(n_bytes: float) -> str:
     while v >= 1024.0 and i < len(units) - 1:
         v /= 1024.0
         i += 1
-    return f"{v:.2f} {units[i]}"
+    return f"{v:.1f} {units[i]}"
+
+
+def _fmt_cpu(cpu_time: float, wall_time: float) -> str:
+    """Format CPU time with effective core multiplier."""
+    if wall_time > 0:
+        multiplier = cpu_time / wall_time
+        return f"{cpu_time:.2f}s ({multiplier:.1f}x cores)"
+    return f"{cpu_time:.2f}s"
 
 
 # --- Test Discovery -----------------------------------------------------------
-def find_tests(
-    target: Optional[str] = None, pattern: str = DEFAULT_PATTERN
-) -> List[Path]:
+def find_tests(target: Optional[str] = None, pattern: str = DEFAULT_PATTERN) -> List[Path]:
     """
     Find test files matching the given pattern.
 
@@ -114,18 +121,18 @@ def find_tests(
 
     target_path = CASES_DIR / target
     if target_path.is_dir():
-        return sorted(target_path.glob(pattern))
+        return sorted(target_path.rglob(pattern))
     if target_path.is_file():
         return [target_path]
 
-    # Try as absolute path
+    # Try as project-relative path
     alt_path = PROJECT_ROOT / target
+    if alt_path.is_dir():
+        return sorted(alt_path.rglob(pattern))
     if alt_path.is_file():
         return [alt_path]
 
-    print(
-        f"Error: Target '{target}' not found in {CASES_DIR} or {PROJECT_ROOT}"
-    )
+    print(f"Error: Target '{target}' not found in {CASES_DIR} or {PROJECT_ROOT}")
     sys.exit(1)
 
 
@@ -136,44 +143,140 @@ def module_from_path(pyfile: Path) -> str:
     return ".".join(relative_path.parts)
 
 
+# --- Unittest ID helpers ------------------------------------------------------
+def get_test_from_module(module_name: str) -> List[str]:
+    """
+    Return full unittest IDs like:
+      package.module.ClassName.test_method
+    """
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromName(module_name)
+    ids: List[str] = []
+
+    def walk(suite_obj: unittest.TestSuite) -> None:
+        for t in suite_obj:
+            if isinstance(t, unittest.TestSuite):
+                walk(t)
+            else:
+                ids.append(t.id())
+
+    walk(suite)
+    return sorted(ids)
+
+
+def split_test_id(test_id: str) -> Tuple[str, str, str]:
+    """
+    Split:
+      package.module.ClassName.test_method
+    into:
+      (package.module, ClassName, test_method)
+    """
+    mod, cls, meth = test_id.rsplit(".", 2)
+    return mod, cls, meth
+
+
 # --- Test Execution -----------------------------------------------------------
+def _get_children_cpu() -> Optional[Tuple[float, float]]:
+    """Return (utime, stime) for all children, or None if unavailable."""
+    if resource is None:
+        return None
+    r = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return r.ru_utime, r.ru_stime
+
+
+def _parse_stderr(raw: str) -> Tuple[Optional[float], str]:
+    """
+    Extract __RSS__ marker from stderr and return (rss_bytes, clean_stderr).
+
+    The __RSS__: line is always stripped from output — it's internal telemetry.
+    """
+    rss_bytes = None
+    clean_lines = []
+    for line in (raw or "").splitlines():
+        if line.startswith("__RSS__:"):
+            try:
+                rss_bytes = float(line.split(":", 1)[1])
+            except ValueError:
+                pass
+        else:
+            clean_lines.append(line)
+    return rss_bytes, "\n".join(clean_lines)
+
+
 def _run_command(
     cmd: List[str], timeout: int, env: Dict[str, str]
-) -> Tuple[int, float]:
+) -> Tuple[int, float, float, Optional[float]]:
     """
     Execute a command with timeout and return results.
 
-    Args:
-        cmd: Command and arguments to execute.
-        timeout: Timeout in seconds.
-        env: Environment variables for the subprocess.
-
     Returns:
-        Tuple of (exit_code, duration_seconds).
+        Tuple of (exit_code, wall_seconds, cpu_seconds, rss_bytes).
+        Exit codes:
+            0 = pass
+            1 = fail
+            2 = timeout
+            3 = killed by signal (e.g. OOM)
+        rss_bytes:
+            RSS reported by child via __RSS__: marker, or None if unavailable.
     """
-    start_time = time.time()
+    before_cpu = _get_children_cpu()
+    start_time = time.perf_counter()
+
+    def _cpu_delta() -> float:
+        if before_cpu is None:
+            return 0.0
+        after = _get_children_cpu()
+        if after is None:
+            return 0.0
+        return (after[0] - before_cpu[0]) + (after[1] - before_cpu[1])
 
     try:
         proc = subprocess.run(
             cmd,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             timeout=timeout,
             env=env,
         )
-        duration = time.time() - start_time
-        return proc.returncode, duration
+        duration = time.perf_counter() - start_time
+        cpu_time = _cpu_delta()
 
-    except subprocess.TimeoutExpired:
-        duration = time.time() - start_time
+        rss_bytes, clean_stderr = _parse_stderr(proc.stderr)
+
+        if proc.returncode < 0:
+            # Negative return code means killed by a signal (e.g. -9 = SIGKILL/OOM)
+            print(f"Process killed by signal {-proc.returncode} (likely OOM)")
+            if clean_stderr:
+                sys.stderr.write(clean_stderr + "\n")
+            return EXIT_KILLED, duration, cpu_time, rss_bytes
+
+        # Only print output on failure — passing tests stay silent
+        if proc.returncode != 0:
+            if proc.stdout:
+                sys.stdout.write(proc.stdout)
+            if clean_stderr:
+                sys.stderr.write(clean_stderr + "\n")
+
+        return proc.returncode, duration, cpu_time, rss_bytes
+
+    except subprocess.TimeoutExpired as e:
+        duration = time.perf_counter() - start_time
         print(f"Command timed out after {timeout}s")
-        return 2, duration  # Exit code 2 indicates timeout
+        if e.stdout:
+            sys.stdout.write(e.stdout)
+        if e.stderr:
+            rss_bytes, clean_stderr = _parse_stderr(e.stderr)
+            if clean_stderr:
+                sys.stderr.write(clean_stderr + "\n")
+        else:
+            rss_bytes = None
+        return EXIT_TIMEOUT, duration, _cpu_delta(), rss_bytes
 
     except Exception as e:
-        duration = time.time() - start_time
+        duration = time.perf_counter() - start_time
         print(f"Command failed with error: {e}")
-        return 1, duration  # Exit code 1 indicates error
+        return EXIT_FAIL, duration, _cpu_delta(), None
 
 
 def run_test_file(
@@ -184,60 +287,110 @@ def run_test_file(
     total: int,
     details: bool,
     exit_first: bool,
-) -> List[Tuple[str, int, float]]:
-    print(f"\n\n=== Running {pyfile.name} ({current}/{total}) ===")
+) -> Tuple[List[Tuple[str, int, float]], Dict[str, Dict[str, Any]], List[str]]:
+    if details:
+        print(f"\n\n=== Running {pyfile.name} ({current}/{total}) ===")
+    else:
+        print(f"\n\n... Running {pyfile.name} ({current}/{total}) ...")
     module_name = module_from_path(pyfile)
 
-    # Discover classes using your project's helper
-    import importlib
-
+    # Find all tests in this module
     try:
-        module = importlib.import_module(module_name)
+        test_ids = get_test_from_module(module_name)
     except Exception as e:
-        print(f"[discover] Failed to import '{module_name}': {e}")
-        return []
+        print(f"[discover] Failed to discover tests in '{module_name}': {e}")
+        label = f"{pyfile.name}:<discover>"
+        return [(label, EXIT_FAIL, 0.0)], {}, [label]
 
-    class_names = sorted([cls.__name__ for cls in find_test_classes(module)])
+    if not test_ids:
+        print(f"No tests found in file (module={module_name})")
+        return [], {}, []
+
     if details:
-        print(
-            f"Found {len(class_names)} class(es) in {module_name}: {', '.join(class_names)}"
-        )
-
-    if not class_names:
-        print(f"No test classes found in file (module={module_name})")
-        return []
+        by_class: Dict[str, int] = defaultdict(int)
+        for tid in test_ids:
+            _, cls, _ = split_test_id(tid)
+            by_class[cls] += 1
+        print(f"Found {len(test_ids)} test(s) in {module_name}")
+        for cls in sorted(by_class):
+            print(f"  {cls} ({by_class[cls]})")
 
     # Env for child processes
     env = os.environ.copy()
+    env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     env["DETAILS"] = "1" if details else "0"
-    env["FAILFAST"] = "1" if exit_first else "0"
 
-    results = []
+    results: List[Tuple[str, int, float]] = []
+    class_stats: Dict[str, Dict[str, Any]] = defaultdict(
+        lambda: {
+            "pass": 0,
+            "fail": 0,
+            "timeout": 0,
+            "killed": 0,
+            "time": 0.0,
+            "cpu_time": 0.0,
+            "max_rss": 0.0,
+        }
+    )
+    failed_labels: List[str] = []
 
-    def run_one_test(label: str, cmd: List[str]) -> int:
-        code, duration = _run_command(cmd, timeout, env)
+    if details:
+        print("\n...testing...\n")
+
+    for idx, test_id in enumerate(test_ids, 1):
+        _, cls, meth = split_test_id(test_id)
+        label = f"{pyfile.name}:{cls}.{meth}"
+
+        if details:
+            print(f"  [{idx}/{len(test_ids)}] {label}")
+
+        cmd = [sys.executable, "-m", "unittest", "-q"]
+        if exit_first:
+            cmd.append("--failfast")
+        cmd.append(test_id)
+
+        code, duration, cpu_time, rss_bytes = _run_command(cmd, timeout, env)
         results.append((label, code, duration))
-        return code
 
-    # Run each test class in an isolated subprocess
-    for idx, class_name in enumerate(class_names, 1):
-        print(f"\n{class_name} ({idx}/{len(class_names)})")
-        label = f"{pyfile.name}:{class_name}"
+        class_stats[cls]["time"] += duration
+        class_stats[cls]["cpu_time"] += cpu_time
+        if rss_bytes is not None:
+            class_stats[cls]["max_rss"] = max(class_stats[cls]["max_rss"], rss_bytes)
 
-        # IMPORTANT: use module_name here (not 'module')
-        one_liner = (
-            "import importlib, sys; "
-            f"m = importlib.import_module('{module_name}'); "
-            f"c = getattr(m, '{class_name}', None); "
-            "sys.exit(c.run_test_summary() if c else 1)"
-        )
+        if code == EXIT_PASS:
+            class_stats[cls]["pass"] += 1
+        elif code == EXIT_TIMEOUT:
+            class_stats[cls]["timeout"] += 1
+            failed_labels.append(label)
+        elif code == EXIT_KILLED:
+            class_stats[cls]["killed"] += 1
+            failed_labels.append(label)
+        else:
+            class_stats[cls]["fail"] += 1
+            failed_labels.append(label)
 
-        cmd = [sys.executable, "-c", one_liner]
-        exit_code = run_one_test(label, cmd)
-        if exit_first and exit_code != 0:
+        if details:
+            if code == EXIT_KILLED:
+                status = "KILLED"
+            elif code == EXIT_TIMEOUT:
+                status = "TIMEOUT"
+            elif code == EXIT_PASS:
+                status = "PASS"
+            else:
+                status = "FAIL"
+
+            rss_str = _fmt_bytes(rss_bytes) if rss_bytes is not None else "n/a"
+            print(
+                f"        {status:>7} | "
+                f"wall={duration:>8.2f}s | "
+                f"cpu={_fmt_cpu(cpu_time, duration):>24} | "
+                f"rss={rss_str:>10}"
+            )
+
+        if exit_first and code != EXIT_PASS:
             break
 
-    return results
+    return results, class_stats, failed_labels
 
 
 # --- Main Function ------------------------------------------------------------
@@ -245,10 +398,8 @@ def main() -> None:
     """Main entry point for the test runner."""
     args = build_parser().parse_args()
 
-    t_start = time.perf_counter()
-
     # Discover all test files to run
-    all_tests = []
+    all_tests: List[Path] = []
     targets = args.targets or [None]
 
     for target in targets:
@@ -256,10 +407,11 @@ def main() -> None:
 
     # Remove duplicates and sort
     all_tests = sorted(set(all_tests))
+    n_modules = len(all_tests)
 
     # Handle list mode
     if args.list:
-        print(f"Available test files ({len(all_tests)}):")
+        print(f"Available test files ({n_modules}):")
         for test_file in all_tests:
             try:
                 relative_path = test_file.relative_to(CASES_DIR)
@@ -269,97 +421,120 @@ def main() -> None:
         sys.exit(0)
 
     # Check if any tests were found
-    print(f"Found {len(all_tests)} test files")
     if not all_tests:
         print("No test files found matching criteria")
         sys.exit(0)
 
+    if args.details:
+        slurm_cpus = os.environ.get("SLURM_CPUS_ON_NODE") or os.environ.get("SLURM_CPUS_PER_TASK")
+        cpu_count = slurm_cpus if slurm_cpus else str(os.cpu_count() or 1)
+        cpu_source = "SLURM" if slurm_cpus else "(os)"
+        print()
+        print("  ---- System Information ------------------------------------")
+        print(f"    CPUs available:    {cpu_count:<6} ({cpu_source})")
+        print(f"    OMP_NUM_THREADS:   {os.environ.get('OMP_NUM_THREADS', '1 (default)')}")
+        try:
+            mem_total = mem_avail = None
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        mem_total = int(line.split()[1]) * 1024
+                    elif line.startswith("MemAvailable:"):
+                        mem_avail = int(line.split()[1]) * 1024
+                    if mem_total and mem_avail:
+                        break
+            if mem_total and mem_avail:
+                used = mem_total - mem_avail
+                pct = used / mem_total * 100
+                print(f"    RAM total:         {_fmt_bytes(mem_total)}")
+                print(
+                    f"    RAM available:     {_fmt_bytes(mem_avail)}  "
+                    f"(used {_fmt_bytes(used)}, {pct:.0f}%)"
+                )
+        except Exception:
+            pass
+        print("  ------------------------------------------------------------")
+        print()
+
+    print(f"Found {n_modules} test file(s)")
+
+    if args.details:
+        for test_file in all_tests:
+            print(f"  {test_file.relative_to(CASES_DIR)}")
+
     # Run all tests
+    passed_count = 0
     failed_count = 0
     timeout_count = 0
-    all_results = []
+    killed_count = 0
+    test_time = 0.0
+    total_cpu_time = 0.0
+    max_reported_rss = 0.0
+    all_failed: List[str] = []
 
     for i, test_file in enumerate(all_tests, 1):
-        file_results = run_test_file(
+        file_results, class_stats, failed_labels = run_test_file(
             test_file,
             timeout=args.timeout,
             current=i,
-            total=len(all_tests),
+            total=n_modules,
             details=args.details,
             exit_first=args.exitfirst,
         )
 
-        # Process results from this file
-        for test_name, exit_code, duration in file_results:
-            all_results.append((test_name, exit_code, duration))
+        all_failed.extend(failed_labels)
 
-            if exit_code == 0:
-                print(f"{test_name}: PASSED")
-            elif exit_code == 2:
-                print(f"{test_name}: TIMED OUT")
-                timeout_count += 1
-                if args.exitfirst:
-                    break
-            else:
-                print(f"{test_name}: FAILED")
-                failed_count += 1
-                if args.exitfirst:
-                    break
+        if not class_stats and file_results:
+            failed_count += 1
+        else:
+            for cls in class_stats:
+                s = class_stats[cls]
+                passed_count += s["pass"]
+                failed_count += s["fail"]
+                timeout_count += s["timeout"]
+                killed_count += s["killed"]
+                test_time += s["time"]
+                total_cpu_time += s["cpu_time"]
+                max_reported_rss = max(max_reported_rss, s["max_rss"])
 
-        # Exit early if requested and there were failures
-        if args.exitfirst and (failed_count > 0 or timeout_count > 0):
+        if args.exitfirst and (failed_count > 0 or timeout_count > 0 or killed_count > 0):
             break
 
-    # Print summary
-    total_tests = len(all_results)
-    passed_count = sum(1 for _, code, _ in all_results if code == 0)
+    total_tests = passed_count + failed_count + timeout_count + killed_count
 
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    print(f"  Total:    {total_tests}")
-    print(f"  Passed:   {passed_count}")
-    print(f"  Failed:   {failed_count}")
-    print(f"  Timeouts: {timeout_count}")
+    print(f"  Total modules:       {n_modules}")
+    print(f"  Total tests:         {total_tests}")
+    print(f"  Passed:              {passed_count}")
+    print(f"  Failed:              {failed_count}")
+    print(f"  Timeouts:            {timeout_count}")
+    print(f"  Killed (OOM/signal): {killed_count}")
 
-    # Print detailed results if requested
-    if args.details:
-        print("\nDetailed Results:")
-        print("-" * 60)
-        for test_name, exit_code, duration in all_results:
-            if exit_code == 0:
-                status = "PASS"
-            elif exit_code == 2:
-                status = "TIMEOUT"
-            else:
-                status = "FAIL"
-            print(f"  {test_name:<40} {status:<8} {duration:6.2f}s")
+    if all_failed:
+        print("\n  Unsuccessful tests:")
+        for label in all_failed:
+            print(f"    ✗ {label}")
 
-        t_end = time.perf_counter() - t_start
-        sum_class_time = sum(d for _, _, d in all_results)
+    print(f"\n  Total wall time:     {test_time:.2f}s")
+    print(f"  Total CPU time:      {_fmt_cpu(total_cpu_time, test_time)}")
 
-        print("\n" + "-" * 60)
-        print("TIMING")
-        print("-" * 60)
-        print(f"  Total time:          {t_end:.2f}s")
-        print(f"  Sum of test times:   {sum_class_time:.2f}s")
+    if max_reported_rss > 0:
+        print(f"  Max RSS reported:    {_fmt_bytes(max_reported_rss)}")
 
-        if resource is not None:
-            try:
-                # ru_maxrss units: Linux = KiB, macOS = bytes
-                peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-                if sys.platform == "darwin":
-                    peak_bytes = float(peak)  # bytes on macOS
-                else:
-                    peak_bytes = float(peak) * 1024.0  # KiB -> bytes on Linux
-                print(f"  Peak RSS (children): {_fmt_bytes(peak_bytes)}")
-            except Exception as e:
-                print(f"  Peak RSS (children): error reading ({e})")
-        else:
-            print("  Peak RSS (children): unavailable (no 'resource' module)")
+    if resource is not None:
+        try:
+            # ru_maxrss units: Linux = KiB, macOS = bytes
+            peak = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+            peak_bytes = float(peak) if sys.platform == "darwin" else float(peak) * 1024.0
+            print(f"  Peak RSS (children): {_fmt_bytes(peak_bytes)}")
+        except Exception as e:
+            print(f"  Peak RSS (children): error reading ({e})")
+    else:
+        print("  Peak RSS (children): unavailable (no 'resource' module)")
 
-    # Exit with appropriate code
-    exit_code = 1 if (failed_count > 0 or timeout_count > 0) else 0
+    exit_code = 1 if (failed_count > 0 or timeout_count > 0 or killed_count > 0) else 0
     sys.exit(exit_code)
 
 

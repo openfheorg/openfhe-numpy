@@ -144,8 +144,6 @@ def _pack_vector_row_wise(
             ONP_ERROR(f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'.")
     elif expand == "zero":
         flattened[np.arange(n) * target_cols] = vector
-        # for i in range(n):
-        #     flattened[i * target_cols] = vector[i]
     else:
         ONP_ERROR(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
 
@@ -168,7 +166,6 @@ def _pack_vector_row_wise(
     return output, shape
 
 
-# # @validate_call
 def _pack_vector_col_wise(
     vector: ArrayNumeric,
     batch_size: int,
@@ -544,26 +541,33 @@ def _extract_matrix(data, info):
         nrows = info["batch_size"] // ncols
         reshaped = np.reshape(data, (nrows, ncols))
         tranposed = np.transpose(reshaped)
-        # print("DEBUG ::: reshaped", reshaped)
-        # print("DEBUG ::: tranposed", tranposed)
         return tranposed[: info["original_shape"][0], : info["original_shape"][1]]
     else:
         ONP_ERROR("Order is not supported!!!")
         return None
 
 
-# @validate_call
+# Function _extract_vector recovers the packed vector in "zero" or "tile" mode
+# 1. mode "zero"
+#   vector of [a,b,c] is packed as [a,b,c]
+# 2. mode "tiles"
+#   an (m,) vector is extended to mxn matrix with a new shape of (m, n)
+#   [a,b,c]
+#   [a,b,c]
+#   RM packing is : a b c 0 | a b c 0
+#   CM packing is : a a | b b | c c |0 0
 def _extract_vector(data, info):
     if info["ndim"] == 1:
-        original_row = info["original_shape"][0]
-
-        ncols = info["shape"][1]
-        nrows = info["batch_size"] // ncols
+        if len(info["shape"]) == 1 or info["shape"][1] == 1:
+            return data[: info["original_shape"][0]]
+        else:
+            original_row = info["original_shape"][0]
+            ncols = info["shape"][1]
+            nrows = info["batch_size"] // ncols
 
         reshaped = np.reshape(data, (nrows, ncols))
 
         if info["order"] == ROW_MAJOR:
-            # get [original_row] elements from the first columns
             return reshaped[:original_row, 0]
         elif info["order"] == COL_MAJOR:
             return reshaped[0, :original_row]
@@ -594,7 +598,6 @@ def process_packed_data(
     ndarray
         Reshaped array to its desired shape
     """
-
     if info["ndim"] == 2:
         return _extract_matrix(data, info)
     else:

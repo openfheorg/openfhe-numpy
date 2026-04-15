@@ -1,6 +1,7 @@
 # Sphinx documentation dependencies for OpenFHE-NumPy
-sphinx>=7,<9
-myst-parser>=0.18.0
+numpy>=1.26
+sphinx>=7
+myst-parser>=2.0
 sphinx-rtd-theme
 sphinx-autodoc-typehints
 sphinx-copybutton

@@ -40,6 +40,7 @@ matrix multiplication, and other mathematical operations.
 from typing import Optional
 
 # Third-party imports
+import numpy as np
 from numpy.typing import ArrayLike
 from .dispatch import register_tensor_function
 
@@ -53,12 +54,13 @@ from openfhe_numpy.utils.errors import (
     ONPDimensionError,
 )
 from openfhe_numpy.utils.typecheck import is_numeric_scalar
-from openfhe_numpy import (
+from openfhe_numpy.openfhe_numpy import (
     ArrayEncodingType,
     EvalMatMulSquare,
     EvalReduceCumRows,
     EvalReduceCumCols,
 )
+from openfhe_numpy.operations.broadcast import broadcast_to
 
 
 ##############################################################################
@@ -72,20 +74,11 @@ from openfhe_numpy import (
 def _eval_add(lhs, rhs):
     """Internal function to evaluate addition between encrypted tensors."""
     crypto_context = lhs.data.GetCryptoContext()
-
-    if isinstance(rhs, (int, float)):
-        rhs = crypto_context.MakeCKKSPackedPlaintext([rhs] * lhs.batch_size)
-        result = crypto_context.EvalAdd(lhs.data, rhs)
-    else:
-        result = crypto_context.EvalAdd(lhs.data, rhs.data)
-    return CTArray(
-        result, lhs.original_shape, lhs.batch_size, lhs.shape, lhs.order
-    )
+    result = crypto_context.EvalAdd(lhs.data, rhs.data)
+    return CTArray(result, lhs.original_shape, lhs.batch_size, lhs.shape, lhs.order)
 
 
-@register_tensor_function(
-    "add", [("CTArray", "CTArray"), ("CTArray", "PTArray")]
-)
+@register_tensor_function("add", [("CTArray", "CTArray"), ("CTArray", "PTArray")])
 def add_ct(a, b):
     """Add two tensors."""
     if a.shape == ():
@@ -94,13 +87,35 @@ def add_ct(a, b):
         return _eval_add(a, b)
     elif a.shape == b.shape:
         return _eval_add(a, b)
-    raise ONPIncompatibleShape(a.shape, b.shape)
+    else:
+        output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
+        if a.is_encrypted:
+            crypto_context = a.data.GetCryptoContext()
+        elif b.is_encrypted:
+            crypto_context = b.data.GetCryptoContext()
+        else:
+            raise ValueError(f"This function needs at least one parameter to be encrypted.")
+        if a.original_shape != output_shape:
+            a = broadcast_to(a, output_shape, a.order, crypto_context)
+        else:
+            b = broadcast_to(b, output_shape, b.order, crypto_context)
+        return _eval_add(a, b)
 
 
 @register_tensor_function("add", ("CTArray", "scalar"))
-def add_ct_scalar(a, scalar):
+def add_cta_scalar(a, scalar):
     """Add a scalar to a x."""
-    return _eval_add(a, scalar)
+    crypto_context = a.data.GetCryptoContext()
+    result = crypto_context.EvalAdd(a.data, scalar)
+    return CTArray(result, a.original_shape, a.batch_size, a.shape, a.order)
+
+
+@register_tensor_function("add", ("scalar", "CTArray"))
+def add_scalar_cta(scalar, a):
+    """Add a scalar to a x."""
+    crypto_context = a.data.GetCryptoContext()
+    result = crypto_context.EvalAdd(a.data, scalar)
+    return CTArray(result, a.original_shape, a.batch_size, a.shape, a.order)
 
 
 @register_tensor_function(
@@ -108,17 +123,13 @@ def add_ct_scalar(a, scalar):
 )
 def add_block_ct(a, b):
     """Add two block tensors."""
-    raise NotImplementedError(
-        "BlockPTArray and BlockCTArray addition not implemented yet."
-    )
+    raise NotImplementedError("BlockPTArray and BlockCTArray addition not implemented yet.")
 
 
 @register_tensor_function("add", [("BlockCTArray", "scalar")])
 def add_block_ct_scalar(a, scalar):
     """Add a scalar to a block x."""
-    raise NotImplementedError(
-        "BlockPTArray and scalar addition not implemented yet."
-    )
+    raise NotImplementedError("BlockPTArray and scalar addition not implemented yet.")
 
 
 # ------------------------------------------------------------------------------
@@ -126,10 +137,9 @@ def add_block_ct_scalar(a, scalar):
 # ------------------------------------------------------------------------------
 def _eval_sub(lhs, rhs):
     """Internal function to evaluate subtraction between encrypted tensors."""
+
     crypto_context = (
-        rhs.data.GetCryptoContext()
-        if rhs.dtype == "CTArray"
-        else lhs.data.GetCryptoContext()
+        rhs.data.GetCryptoContext() if rhs.dtype == "CTArray" else lhs.data.GetCryptoContext()
     )
 
     if isinstance(rhs, (int, float)):
@@ -147,17 +157,37 @@ def _eval_sub(lhs, rhs):
 )
 def subtract_ct(a, b):
     """Subtract two tensors."""
-    if a.shape != b.shape:
-        raise ONPIncompatibleShape(a.shape, b.shape)
-    return _eval_sub(a, b)
+    if a.shape == b.shape:
+        return _eval_sub(a, b)
+    else:
+        output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
+
+        if a.is_encrypted:
+            crypto_context = a.data.GetCryptoContext()
+        elif b.is_encrypted:
+            crypto_context = b.data.GetCryptoContext()
+        else:
+            raise ValueError(f"This function needs at least one parameter to be encrypted.")
+        if a.original_shape != output_shape:
+            a = broadcast_to(a, output_shape, a.order, crypto_context)
+        else:
+            b = broadcast_to(b, output_shape, b.order, crypto_context)
+
+        return _eval_sub(a, b)
 
 
-@register_tensor_function(
-    "subtract", [("CTArray", "scalar"), ("scalar", "CTArray")]
-)
-def subtract_ct_scalar(a, b):
-    """Subtract a scalar from a tensor or vice versa."""
-    return _eval_sub(a, b.data)
+@register_tensor_function("subtract", [("CTArray", "scalar")])
+def subtract_ct_scalar(a, scalar):
+    crypto_context = a.data.GetCryptoContext()
+    result = crypto_context.EvalSub(a.data, scalar)
+    return a.clone(result)
+
+
+@register_tensor_function("subtract", [("scalar", "CTArray")])
+def subtract_scalar_ct(scalar, a):
+    crypto_context = a.data.GetCryptoContext()
+    result = crypto_context.EvalSub(scalar, a.data)
+    return a.clone(result)
 
 
 # ------------------------------------------------------------------------------
@@ -167,9 +197,7 @@ def _eval_multiply(lhs, rhs):
     """Internal function to evaluate element-wise multiplication."""
     crypto_context = lhs.data.GetCryptoContext()
     if is_numeric_scalar(rhs):
-        rhs_data = crypto_context.MakeCKKSPackedPlaintext(
-            [rhs] * lhs.batch_size
-        )
+        rhs_data = crypto_context.MakeCKKSPackedPlaintext([rhs] * lhs.batch_size)
     else:
         rhs_data = rhs.data
 
@@ -185,9 +213,21 @@ def multiply_ct(a, b):
     """Multiply two tensors element-wise."""
     if is_numeric_scalar(a) or is_numeric_scalar(b):
         return _eval_multiply(a, b)
-    elif a.shape != b.shape:
-        raise ONPIncompatibleShape(a.shape, b.shape)
+    elif a.shape == b.shape:
+        return _eval_multiply(a, b)
     else:
+        output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
+        if a.is_encrypted:
+            crypto_context = a.data.GetCryptoContext()
+        elif b.is_encrypted:
+            crypto_context = b.data.GetCryptoContext()
+        else:
+            raise ValueError(f"This function needs at least one parameter to be encrypted.")
+        if a.original_shape != output_shape:
+            a = broadcast_to(a, output_shape, a.order, crypto_context)
+        else:
+            b = broadcast_to(b, output_shape, b.order, crypto_context)
+
         return _eval_multiply(a, b)
 
 
@@ -203,17 +243,13 @@ def multiply_ct_scalar(a, scalar):
 )
 def multiply_block_ct(a, b):
     """Multiply two block tensors element-wise."""
-    raise NotImplementedError(
-        "BlockPTArray multiplication not implemented yet."
-    )
+    raise NotImplementedError("BlockPTArray multiplication not implemented yet.")
 
 
 @register_tensor_function("multiply", [("BlockCTArray", "scalar")])
 def multiply_block_ct_scalar(a, scalar):
     """Multiply a block tensor by a scalar."""
-    raise NotImplementedError(
-        "BlockPTArray and scalar multiplication not implemented yet."
-    )
+    raise NotImplementedError("BlockPTArray and scalar multiplication not implemented yet.")
 
 
 ##############################################################################
@@ -226,16 +262,14 @@ def multiply_block_ct_scalar(a, scalar):
 # ------------------------------------------------------------------------------
 def _eval_matvec_ct(lhs, rhs):
     """Internal function to evaluate matrix-vector multiplication."""
+    cc = rhs.data.GetCryptoContext() if rhs.dtype == "CTArray" else lhs.data.GetCryptoContext()
     if lhs.ndim == 2 and rhs.ndim == 1:
         if lhs.original_shape[1] != rhs.original_shape[0]:
             ONPIncompatibleShape(
                 f"Matrix dimension [{lhs.original_shape}] mismatch with vector dimension [{rhs.shape}]"
             )
-        if (
-            lhs.order == ArrayEncodingType.ROW_MAJOR
-            and rhs.order == ArrayEncodingType.COL_MAJOR
-        ):
-            cc = lhs.data.GetCryptoContext()
+
+        if lhs.order == ArrayEncodingType.ROW_MAJOR and rhs.order == ArrayEncodingType.COL_MAJOR:
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
             ct_prod = cc.EvalSumCols(ct_mult, lhs.ncols, lhs.extra["colkey"])
             return CTArray(
@@ -246,15 +280,9 @@ def _eval_matvec_ct(lhs, rhs):
                 ArrayEncodingType.ROW_MAJOR,
             )
 
-        elif (
-            lhs.order == ArrayEncodingType.COL_MAJOR
-            and rhs.order == ArrayEncodingType.ROW_MAJOR
-        ):
-            cc = lhs.data.GetCryptoContext()
+        elif lhs.order == ArrayEncodingType.COL_MAJOR and rhs.order == ArrayEncodingType.ROW_MAJOR:
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
-            ct_prod = cc.EvalSumRows(
-                ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size * 4
-            )
+            ct_prod = cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size * 4)
             return CTArray(
                 ct_prod,
                 (lhs.original_shape[0],),
@@ -269,30 +297,33 @@ def _eval_matvec_ct(lhs, rhs):
     elif lhs.ndim == 1 and rhs.ndim == 1:
         return _dot(lhs, rhs)
     else:
-        ONPIncompatibleShape(
-            lhs.original_shape, rhs.original_shape, "Matrix Product"
-        )
+        ONPIncompatibleShape(lhs.original_shape, rhs.original_shape, "Matrix Product")
 
 
 def _matmul_ct(lhs, rhs):
     """Internal function to evaluate matrix multiplication."""
-    if lhs.is_encrypted and rhs.is_encrypted:
-        # same size: matrix x matrix
-        if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
-            return lhs.clone(EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols))
+    # matrix @ matrix
+    if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
+        return CTArray(
+            EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols),
+            lhs.original_shape,
+            lhs.batch_size,
+            lhs.shape,
+            lhs.order,
+        )
 
-        # matrix x vector
-        elif rhs.ndim == 1:
-            return _eval_matvec_ct(lhs, rhs)
-        else:
-            ONPIncompatibleShape(
-                lhs.original_shape,
-                rhs.original_shape,
-                "Matrix dimension mismatch for multiplication",
-            )
+    # matrix @ vector
+    elif rhs.ndim == 1:
+        return _eval_matvec_ct(lhs, rhs)
+    else:
+        raise ValueError(
+            f"Dimension mismatch for multiplication ({lhs.original_shape} @ {rhs.original_shape})"
+        )
 
 
-@register_tensor_function("matmul", [("CTArray", "CTArray")])
+@register_tensor_function(
+    "matmul", [("CTArray", "CTArray"), ("CTArray", "PTArray"), ("PTArray", "CTArray")]
+)
 def matmul_ct(a, b):
     """Perform matrix multiplication between two tensors."""
     return _matmul_ct(a, b)
@@ -307,12 +338,8 @@ def _dot(lhs, rhs):
 
     # inner product: <vector, vector>
     if lhs.ndim == 1 and rhs.ndim == 1:
-        ciphertext = crypto_context.EvalInnerProduct(
-            lhs.data, rhs.data, lhs.batch_size
-        )
-        return CTArray(
-            ciphertext, (), lhs.batch_size, (), ArrayEncodingType.ROW_MAJOR
-        )
+        ciphertext = crypto_context.EvalInnerProduct(lhs.data, rhs.data, lhs.batch_size)
+        return CTArray(ciphertext, (), lhs.batch_size, (), ArrayEncodingType.ROW_MAJOR)
     else:
         return lhs.__matmul__(rhs)
 
@@ -485,9 +512,7 @@ def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
 #     23 48 23 48
 
 
-def _ct_sum_matrix(
-    x: ArrayLike, axis: Optional[int] = None, keepdims: bool = True
-):
+def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = True):
     """
     This function computes a sum of a padded matrix. It is similar to np.sum
     """
@@ -509,9 +534,7 @@ def _ct_sum_matrix(
     elif axis == 0:
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
-            ct_sum = cc.EvalSumRows(
-                fhe_data, ncols, x.extra["rowkey"], x.batch_size * 4
-            )
+            ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], x.batch_size * 4)
             padded_shape = x.shape
             order = ArrayEncodingType.COL_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
@@ -534,9 +557,7 @@ def _ct_sum_matrix(
             padded_shape = x.shape
             order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
-            ct_sum = cc.EvalSumRows(
-                fhe_data, nrows, x.extra["rowkey"], x.batch_size * 4
-            )
+            ct_sum = cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], x.batch_size * 4)
             padded_shape = (ncols, nrows)
             order = ArrayEncodingType.COL_MAJOR
         else:
@@ -564,9 +585,7 @@ def _ct_sum_vector(
     return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
 
 
-@register_tensor_function(
-    "sum", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")]
-)
+@register_tensor_function("sum", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")])
 def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     if x.ndim == 2:
         return _ct_sum_matrix(x, axis, keepdims)
@@ -581,9 +600,7 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
 # ------------------------------------------------------------------------------
 
 
-@register_tensor_function(
-    "mean", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")]
-)
+@register_tensor_function("mean", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")])
 def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     cc = x.data.GetCryptoContext()
     nrows, ncols = x.original_shape
@@ -611,9 +628,7 @@ def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
 # ------------------------------------------------------------------------------
 
 
-@register_tensor_function(
-    "roll", [("CTArray", "int"), ("CTArray", "int", "int")]
-)
+@register_tensor_function("roll", [("CTArray", "int"), ("CTArray", "int", "int")])
 def roll(x: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
     if axis is None:
         return _ct_vector_rotation(x, -shift)

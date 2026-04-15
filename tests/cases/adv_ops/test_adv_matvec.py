@@ -39,9 +39,7 @@ class TestRowMajorColMajor(MainUnittest):
                             mode="tile",
                             public_key=keys.publicKey,
                         )
-                        ctm.extra["colkey"] = onp.sum_col_keys(
-                            keys.secretKey, ctm.ncols
-                        )
+                        ctm.extra["colkey"] = onp.sum_col_keys(keys.secretKey, ctm.ncols)
                         ctv = onp.array(
                             cc=cc,
                             data=b,
@@ -52,9 +50,7 @@ class TestRowMajorColMajor(MainUnittest):
                             public_key=keys.publicKey,
                         )
                         ctv_result = ctm @ ctv
-                        result = ctv_result.decrypt(
-                            keys.secretKey, unpack_type="original"
-                        )
+                        result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
 
                         self.assertArrayClose(result, expected)
 
@@ -119,9 +115,7 @@ class TestColMajorRowMajor(MainUnittest):
                             keys.secretKey, ctm.nrows, ctm.batch_size
                         )
                         ctv_result = ctm @ ctv
-                        result = ctv_result.decrypt(
-                            keys.secretKey, unpack_type="original"
-                        )
+                        result = ctv_result.decrypt(keys.secretKey, unpack_type="original")
 
                         self.assertArrayClose(result, expected)
 
@@ -137,9 +131,3 @@ class TestColMajorRowMajor(MainUnittest):
                             result=result,
                         )
                         raise
-
-
-# --- Entry point --------------------------------------------------------------
-if __name__ == "__main__":
-    TestRowMajorColMajor.run_test_summary()
-    TestColMajorRowMajor.run_test_summary()

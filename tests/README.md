@@ -24,6 +24,7 @@ python3 run_tests.py
 
 # Run tests in a subfolder under cases/
 python3 run_tests.py matrix_ops
+python3 run_tests.py slicing
 
 # Run a single tests
 python3 run_tests.py matrix_ops/test_matrix_sum.py
@@ -109,11 +110,11 @@ When passing targets, do not prefix them with "cases/" as the script already loc
 ```bash
 # Correct
 
-# run tests in matrix_ops
+# run tests in the folder matrix_ops
 python3 run_tests.py target_folder
 python3 run_tests.py matrix_ops
 
-# run a single tests in matrix_ops
+# run a single test in matrix_ops
 python3 run_tests.py matrix_ops/test_matrix_mean.py
 
 # Incorrect

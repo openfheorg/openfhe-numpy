@@ -46,6 +46,7 @@ TPL = TypeVar("Template")
 
 
 # BaseTensor - Abstract Interface
+# Don't implement anything here
 class BaseTensor(ABC, Generic[TPL]):
     @property
     @abstractmethod
@@ -149,6 +150,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         new_shape: Tuple[int, int],
         order: int = 0,
     ) -> None:
+
         if isinstance(data, PackedArrayInformation):
             self._data = data.data
             self._original_shape = data.original_shape
@@ -172,8 +174,8 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             if self._ndim > 2 or self._ndim < 0:
                 ONP_ERROR("Dimension is invalid!!!")
             self._order = order
-            # dtype in ["CTArray", "BlockCTArray"]
             self._dtype = self.__class__.__name__
+            self._zeros = None
             self.extra = {}
 
     ###
@@ -340,10 +342,19 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     def __add__(self, other):
         return self.__tensor_function__("add", (self, other))
 
+    def __radd__(self, other):
+        return self.__tensor_function__("add", (self, other))
+
     def __sub__(self, other):
         return self.__tensor_function__("subtract", (self, other))
 
+    def __rsub__(self, other):
+        return self.__tensor_function__("subtract", (other, self))
+
     def __mul__(self, other):
+        return self.__tensor_function__("multiply", (self, other))
+
+    def __rmul__(self, other):
         return self.__tensor_function__("multiply", (self, other))
 
     def __matmul__(self, other):

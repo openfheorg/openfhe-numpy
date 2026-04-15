@@ -73,6 +73,23 @@ def demo():
     #   - Product Packing Style: row-major
     # ---------------------------------------------
 
+    # When mode = "tile", the matrix is repeated (tiled) across all slots.
+    #
+    # Example:
+    #   Matrix:
+    #     1 2 3
+    #     4 5 6
+    #
+    #   Row-wise packing:
+    #     1 2 3 0 4 5 6 0  1 2 3 0 4 5 6 0
+    #
+    #   Column-wise packing:
+    #     1 4 2 5 3 6 0 0  1 4 2 5 3 6 0 0
+    #
+    # For a vector [1 2 3], both row-wise and column-wise packing
+    # produce the same result:
+    #   1 2 3 0 1 2 3 0 1 2 3 0
+
     ctm_m_rm = onp.array(
         cc=cc,
         data=matrix,
@@ -94,6 +111,11 @@ def demo():
     )
 
     ctv_result_rm = ctm_m_rm @ ctv_v_cm
+    print(f"dim = {ctv_result_rm.ndim}")
+    print(f"shape = {ctv_result_rm.shape}")
+    print(f"original_shape = {ctv_result_rm.original_shape}")
+
+    print(f"result.info = {ctv_result_rm.info}")
     result_rm = ctv_result_rm.decrypt(keys.secretKey, unpack_type="original")
     is_match_rm, error_rm = onp.check_equality(result_rm, expected)
 
@@ -120,6 +142,13 @@ def demo():
         fhe_type="C",
         public_key=keys.publicKey,
     )
+
+    # In this function, when you choose target_cols = a,
+    # the original vector of shape (n, 1) is expanded into
+    # a matrix of shape (n, a), and then packed accordingly.
+    #
+    # For matrix-vector multiplication, target_cols is set
+    # to the number of columns in the matrix.
 
     ctv_v_rm = onp.array(
         cc=cc,

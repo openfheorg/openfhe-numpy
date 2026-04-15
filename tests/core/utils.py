@@ -40,4 +40,4 @@ def generate_random_array(rows, cols=None, low=0, high=10, seed=None):
         size = rows  # 1D vector
     else:
         size = (rows, cols)  # 2D matrix
-    return rng.uniform(low, high, size=size)
+    return np.array(rng.uniform(low, high, size=size))

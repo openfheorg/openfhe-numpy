@@ -69,13 +69,9 @@ class TestVectorUnaryOps(MainUnittest):
                                         ctv_res = fhe_fn(ctv)
 
                                     # decrypt and compare
-                                    result = ctv_res.decrypt(
-                                        keys.secretKey, unpack_type="original"
-                                    )
+                                    result = ctv_res.decrypt(keys.secretKey, unpack_type="original")
 
-                                    self.assertArrayClose(
-                                        actual=result, expected=expected
-                                    )
+                                    self.assertArrayClose(actual=result, expected=expected)
                                 except Exception as e:
                                     self._record_case(
                                         params={
@@ -149,13 +145,9 @@ class TestVectorBinaryOps(MainUnittest):
                                     ctv_res = fhe_fn(ctv_a, ctv_b)
 
                                     # decrypt and compare
-                                    result = ctv_res.decrypt(
-                                        keys.secretKey, unpack_type="original"
-                                    )
+                                    result = ctv_res.decrypt(keys.secretKey, unpack_type="original")
 
-                                    self.assertArrayClose(
-                                        actual=result, expected=expected
-                                    )
+                                    self.assertArrayClose(actual=result, expected=expected)
 
                                 except Exception as e:
                                     self._record_case(
@@ -169,8 +161,3 @@ class TestVectorBinaryOps(MainUnittest):
                                         result=result,
                                     )
                                     raise
-
-
-if __name__ == "__main__":
-    TestVectorBinaryOps.run_test_summary()
-    TestVectorUnaryOps.run_test_summary()

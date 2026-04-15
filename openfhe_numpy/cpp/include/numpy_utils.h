@@ -31,15 +31,54 @@
 #ifndef __NUMPY_UTILS_H__
 #define __NUMPY_UTILS_H__
 
+#include <algorithm>
 #include <vector>
 #include <cstdint>
+#include <stdexcept>
 
 uint32_t NextPow2(uint32_t x);
-std::vector<double> GenSigmaDiag(uint32_t rowsize, int32_t k);
-std::vector<double> GenTauDiag(uint32_t total_slots, uint32_t rowsize, int32_t k);
-std::vector<double> GenPhiDiag(uint32_t rowsize, int32_t k, int type);
-std::vector<double> GenPsiDiag(uint32_t rowsize, int32_t k);
-std::vector<double> GenTransposeDiag(uint32_t total_slots, uint32_t rowsize, int32_t i);
+std::vector<double> GenSigmaDiag(size_t total_slot, size_t rowsize, int32_t k);
+std::vector<double> GenTauDiag(size_t total_slots, size_t rowsize, int32_t k);
+std::vector<double> GenPhiDiag(size_t total_slot, size_t rowsize, int32_t k, int type);
+std::vector<double> GenPsiDiag(size_t total_slot, size_t rowsize);
+std::vector<double> GenTransposeDiag(size_t total_slots, size_t rowsize, int32_t i);
 void RoundVector(std::vector<double>& vector);
+
+template <typename T>
+std::vector<T> elementwise_add(const std::vector<T>& a,
+                               const std::vector<T>& b) {
+    if (a.size() != b.size()) {
+        throw std::invalid_argument("Vectors must have the same size");
+    }
+
+    std::vector<T> result(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+        result[i] = a[i] + b[i];
+    return result;
+}
+
+template <typename T>
+std::vector<T> elementwise_mult(const std::vector<T>& a,
+                                const std::vector<T>& b) {
+    if (a.size() != b.size()) {
+        throw std::invalid_argument("Vectors must have the same size");
+    }
+
+    std::vector<T> result(a.size());
+    for (size_t i = 0; i < a.size(); ++i)
+        result[i] = a[i] * b[i];
+    return result;
+}
+
+template<typename T>
+T RotateVector(T input, int32_t shift) {
+    if (input.empty()) return input;
+
+    const auto size = static_cast<int32_t>(input.size());
+    shift = ((shift % size) + size) % size;
+
+    std::rotate(input.begin(), input.begin() + shift, input.end());
+    return input;
+}
 
 #endif  // __NUMPY_UTILS_H__
