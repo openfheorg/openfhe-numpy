@@ -11,7 +11,7 @@ if repo_root not in sys.path:
 project = "OpenFHE-Numpy"
 author = "Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy"
 copyright = f"2025, {author}"
-version = release = "1.4.2.0"
+version = release = "1.5.1.0"
 language = "en"
 
 extensions = [
