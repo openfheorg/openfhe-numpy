@@ -64,7 +64,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Print parameters passed to .github/actions
       run: |
@@ -81,4 +81,3 @@ jobs:
         openfhe_development_branch: ${{ inputs.openfhe_development_branch }}
         openfhe_python_branch: ${{ inputs.openfhe_python_branch }}
         cmake_args_openfhe_lib: "${{ needs.init.outputs.compiler }}"
-
