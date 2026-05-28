@@ -19,11 +19,11 @@ def validate_and_print_results(computed, expected, operation_name):
 def main():
     """
     Run a demonstration of homomorphic vector operations using OpenFHE-NumPy:
-      • addition
-      • subtraction
-      • transpose
-      • elementwise multiplication
-      • inner product via *
+      - addition
+      - subtraction
+      - transpose
+      - elementwise multiplication
+      - inner product via *
     """
     # Cryptographic setup
     mult_depth = 4

@@ -2,6 +2,10 @@ from openfhe import *
 import openfhe_numpy as onp
 from core import *
 
+# Advanced matrix-vector multiplication tests
+# - row-major matrix x col-major vector
+# - col-major matrix x row-major vector
+# - tile and zero packing modes for matrix-vector products
 SIZES = [2, 3, 5, 16]
 
 

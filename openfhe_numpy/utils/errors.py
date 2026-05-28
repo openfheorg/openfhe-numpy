@@ -29,6 +29,7 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ==================================================================================
 
+
 """Logging and error handling for OpenFHE-NumPy.
 
 This module provides:
@@ -45,12 +46,23 @@ Environment Variables:
     OPENFHE_LOG_BACKUP_COUNT: Number of backup log files
 
 Usage::
-    from openfhe_numpy.utils.errors import ONP_DEBUG, ONP_ERROR, ONP_WARNING
+
+    from openfhe_numpy.utils.errors import (
+        ONPError,
+        ONPIncompatibleShapeError,
+        ONPDimensionError,
+        ONP_DEBUG,
+        ONP_WARNING,
+    )
 
     ONP_DEBUG("Processing data...")
     ONP_WARNING("Unusual input detected")
-    if problem:
-        ONP_ERROR("Invalid input data")
+
+    if bad_shape:
+        raise ONPIncompatibleShapeError(a.shape, b.shape, "matmul requires matching inner dims")
+
+    if bad_axis:
+        raise ONPDimensionError(f"Invalid axis {axis} for {ndim}D tensor")
 """
 
 import inspect
@@ -146,7 +158,7 @@ class ONPError(Exception):
     """Base class for OpenFHE-NumPy errors."""
 
     def __init__(self, message: str):
-        stack = traceback.extract_stack(limit=2)[-2]
+        stack = traceback.extract_stack(limit=3)[-3]
         filename = os.path.basename(stack.filename)
         function_name = stack.name
         line_number = stack.lineno
@@ -161,7 +173,7 @@ class ONPTypeError(ONPError, TypeError):
 
 
 class ONPDimensionError(ONPError, ValueError):
-    """Raised when an invalid axis is provided."""
+    """Raised when an invalid axis or dimensionality is provided."""
 
     pass
 
@@ -173,8 +185,8 @@ class ONPValueError(ONPError, ValueError):
         super().__init__(message)
 
 
-class ONPIncompatibleShape(ONPValueError, ValueError):
-    """Raised when tensor shapes are incompatible."""
+class ONPIncompatibleShapeError(ONPError, ValueError):
+    """Raised when tensor shapes are incompatible for an operation."""
 
     def __init__(self, shape_a, shape_b, message: str = None):
         if message is None:
@@ -183,17 +195,23 @@ class ONPIncompatibleShape(ONPValueError, ValueError):
 
 
 class ONPNotImplementedError(ONPError, NotImplementedError):
-    """Raised when a feature is not implemented."""
+    """Raised when a feature is not yet implemented."""
 
     def __init__(self, message: str = "This feature is not implemented."):
-        super().__init__(f"{message}")
+        super().__init__(message)
 
 
 class ONPNotSupportedError(ONPError, NotImplementedError):
     """Raised when a feature is not supported."""
 
     def __init__(self, message: str = "This feature is not supported."):
-        super().__init__(f"{message}")
+        super().__init__(message)
+
+
+# === Backward Compatibility ===
+# Alias for code that used the old name without the Error suffix.
+# New code should use ONPIncompatibleShapeError directly.
+ONPIncompatibleShape = ONPIncompatibleShapeError
 
 
 # === Logging Helpers ===
@@ -210,37 +228,36 @@ def _format_log(level: str, message: str, stack_level: int = 2) -> str:
 def _log(level: str, message: str, stack_level: int = 2) -> None:
     formatted_message = _format_log(level, message, stack_level)
     logger = get_logger()
-    if level == "ONP_ERROR":
+    if level == "ERROR":
         logger.error(formatted_message)
-    elif level == "ONP_DEBUG" and ENABLE_DEBUG:
+    elif level == "DEBUG" and ENABLE_DEBUG:
         logger.debug(formatted_message)
-    elif level == "ONP_WARNING":
+    elif level == "WARNING":
         logger.warning(formatted_message)
-    elif level == "ONP_INFO":
+    elif level == "INFO":
         logger.info(formatted_message)
-    else:
-        return
 
 
-# === Public API ===
+# === Public Logging API ===
+#
+# These are for LOGGING ONLY. They do not raise exceptions.
+# To signal an error, use:   raise ONPError("message")
+# To log before raising:     ONP_WARNING("about to fail"); raise ONPError("message")
 
 
 def ONP_INFO(message: str) -> None:
-    _log("ONP_INFO", message)
-
-
-def ONP_ERROR(message: str, raise_exception: bool = True) -> None:
-    _log("ONP_ERROR", message)
-    if raise_exception:
-        raise ONPError(message)
+    """Log an informational message."""
+    _log("INFO", message)
 
 
 def ONP_DEBUG(message: str) -> None:
-    _log("ONP_DEBUG", message)
+    """Log a debug message (only visible when OPENFHE_DEBUG is enabled)."""
+    _log("DEBUG", message)
 
 
 def ONP_WARNING(message: str) -> None:
-    _log("ONP_WARNING", message)
+    """Log a warning message."""
+    _log("WARNING", message)
 
 
 def capture_logs(level: int = logging.DEBUG) -> logging.Handler:
@@ -256,13 +273,13 @@ def capture_logs(level: int = logging.DEBUG) -> logging.Handler:
     Returns
     -------
     logging.Handler
-        A handler with a 'messages' attribute containing captured log messages
+        A handler with a ``messages`` attribute containing captured log messages.
 
     Example
     -------
-    handler = capture_logs()
-    ONP_DEBUG("Test message")
-    assert "Test message" in handler.messages
+    >>> handler = capture_logs()
+    >>> ONP_DEBUG("Test message")
+    >>> assert "Test message" in handler.messages
     """
 
     class MemoryHandler(logging.Handler):

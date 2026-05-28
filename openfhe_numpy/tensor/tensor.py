@@ -37,7 +37,7 @@ from typing import overload, Any, Dict, Generic, Optional, Tuple, TypeVar, Union
 import numpy as np
 
 # Internal C++ module Imports
-from openfhe_numpy.utils.errors import ONP_ERROR
+from openfhe_numpy.utils.errors import ONPError
 from openfhe_numpy.utils.constants import *
 
 # -----------------------------------------------------------
@@ -162,7 +162,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             self.extra = {}
         else:
             if None in (original_shape, batch_size, new_shape):
-                ONP_ERROR(
+                raise ONPError(
                     "Raw form requires (data, original_shape, ndim, batch_size, shape[, order])"
                 )
             self._data = data
@@ -172,7 +172,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
 
             self._ndim = len(original_shape)
             if self._ndim > 2 or self._ndim < 0:
-                ONP_ERROR("Dimension is invalid!!!")
+                raise ONPError("Dimension is invalid!!!")
             self._order = order
             self._dtype = self.__class__.__name__
             self._zeros = None
@@ -197,7 +197,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
 
     @property
     def data(self) -> TPL:
-        """Underlying encrypted/plaintext payload."""
+        """Underlying encrypted/plaintext."""
         return self._data
 
     @data.setter
@@ -209,7 +209,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         elif isinstance(data, openfhe.Plaintext):
             self._dtype = "PTArray"
         else:
-            ONP_ERROR(
+            raise ONPError(
                 "Object data is incorrect. \
                       Only support FHETensor only supports Ciphertext or Plaintext"
             )
@@ -274,7 +274,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         if order in ["R", "C"]:
             self._order = order
         else:
-            ONP_ERROR("Not support order [{order}]")
+            raise ONPError("Not support order [{order}]")
 
     @property
     def is_encrypted(self) -> int:
@@ -296,6 +296,17 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     @property
     def T(self):
         return self.transpose()
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"original_shape={self.original_shape}, "
+            f"batch_size={self.batch_size}, "
+            f"shape={self.shape}, "
+            f"order={self.order}, "
+            f"ndim={self.ndim}, "
+            f"extra={self.extra})"
+        )
 
     ###
     ### Update properties in some specific cases
@@ -361,7 +372,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         return self.__tensor_function__("matmul", (self, other))
 
     def __pow__(self, exp):
-        return self.__tensor_function__("power", (self, exp))
+        return self.__tensor_function__("pow", (self, exp))
 
     # Replace these methods too
     def sum(self, axis=0):

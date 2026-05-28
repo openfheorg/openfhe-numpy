@@ -29,8 +29,11 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ==================================================================================
 
+import numpy as np
 from .tensor import FHETensor  # Use relative import
 from .ctarray import CTArray
+from ..utils.constants import UnpackType
+from ..utils.packing import process_packed_data
 from openfhe import Plaintext, CryptoContext, PublicKey
 
 
@@ -45,7 +48,7 @@ class PTArray(FHETensor[Plaintext]):
             data or self.data,
             self.original_shape,
             self.batch_size,
-            self.ncols,
+            self.shape,
             self.order,
         )
 
@@ -62,8 +65,24 @@ class PTArray(FHETensor[Plaintext]):
     def decrypt(self, *args, **kwargs):
         raise NotImplementedError("Decrypt not implemented for plaintext")
 
+    def decode(self, unpack_type: UnpackType = UnpackType.ORIGINAL) -> np.ndarray:
+        """Decode plaintext packed slots into a NumPy array."""
+        self.data.SetLength(self.batch_size)
+        result = self.data.GetRealPackedValue()
+
+        if isinstance(unpack_type, str):
+            unpack_type = UnpackType(unpack_type.lower())
+
+        if unpack_type == UnpackType.RAW:
+            return np.asarray(result)
+
+        if unpack_type == UnpackType.ORIGINAL:
+            return process_packed_data(result, self.info)
+
+        return np.asarray(result)
+
     def __repr__(self) -> str:
-        return f"PTArray(meta={self.metadata})"
+        return f"PTArray(meta={self.info})"
 
     def serialize(self) -> dict:
         raise NotImplementedError("Serialize not implemented for plaintext")

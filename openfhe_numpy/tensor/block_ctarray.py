@@ -1,49 +1,80 @@
-# ==================================================================================
-#  BSD 2-Clause License
-#
-#  Copyright (c) 2014-2025, NJIT, Duality Technologies Inc. and other contributors
-#
-#  All rights reserved.
-#
-#  Author TPOC: contact@openfhe.org
-#
-#  Redistribution and use in source and binary forms, with or without
-#  modification, are permitted provided that the following conditions are met:
-#
-#  1. Redistributions of source code must retain the above copyright notice, this
-#     list of conditions and the following disclaimer.
-#
-#  2. Redistributions in binary form must reproduce the above copyright notice,
-#     this list of conditions and the following disclaimer in the documentation
-#     and/or other materials provided with the distribution.
-#
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-#  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-#  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-#  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-#  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-#  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# ==================================================================================
+from __future__ import annotations
+
+import numpy as np
 
 from openfhe import Ciphertext
+
+from ..utils.constants import UnpackType
 from .block_tensor import BlockFHETensor
 
 
 class BlockCTArray(BlockFHETensor[Ciphertext]):
-    tensor_priority = 40  # Higher priority than CTArray
+    """Block tensor of encrypted blocks (CTArray).
 
-    def __str__(self):
-        return f"BlockCTArray(shape={self.original_shape}, cell={len(self._blocks)} {len(self._blocks[0]) if self._blocks else 0}, block_shape={self.block_shape})"
+    This is a thin subclass. All storage, indexing, and metadata
+    logic lives in BlockFHETensor. BlockCTArray adds only:
 
-    def __repr__(self):
-        return self.__str__()
+        - decrypt()
+        - higher tensor_priority for dispatch
+    """
 
-    def clone(self, blocks=None):
-        pass
+    tensor_priority = 40
 
-    def decrypt(self, secret_key):
-        pass
+    def decrypt(
+        self,
+        secret_key,
+        unpack_type: UnpackType = UnpackType.ORIGINAL,
+        new_shape=None,
+    ) -> np.ndarray:
+        """Decrypt all blocks and return a NumPy array with original_shape."""
+        if isinstance(unpack_type, str):
+            unpack_type = UnpackType(unpack_type.lower())
+
+        if unpack_type != UnpackType.ORIGINAL:
+            raise NotImplementedError(
+                "BlockCTArray.decrypt currently supports only unpack_type='original'."
+            )
+
+        if self.ndim == 1:
+            chunks = [
+                np.asarray(block.decrypt(secret_key, unpack_type=unpack_type)).reshape(
+                    self.block_shape
+                )
+                for block in self.data
+            ]
+            full = np.concatenate(chunks)
+            return full[: self.original_shape[0]]
+
+        rows, cols = self.original_shape
+        br, bc = self.block_shape
+        grid_rows, grid_cols = self.grid_shape
+
+        full = np.zeros(self.shape, dtype=np.float64)
+
+        for gi in range(grid_rows):
+            for gj in range(grid_cols):
+                block = self.get_block(gi, gj)
+                plain = np.asarray(block.decrypt(secret_key, unpack_type=unpack_type)).reshape(
+                    self.block_shape
+                )
+
+                r0 = gi * br
+                c0 = gj * bc
+                full[r0 : r0 + br, c0 : c0 + bc] = plain
+
+        if new_shape is not None:
+            return full[:rows, :cols].reshape(new_shape)
+
+        return full[:rows, :cols]
+
+    def __repr__(self) -> str:
+        return (
+            f"BlockCTArray("
+            f"original_shape={self.original_shape}, "
+            f"shape={self.shape}, "
+            f"block_shape={self.block_shape}, "
+            f"grid_shape={self.grid_shape}, "
+            f"num_blocks={self.num_blocks}, "
+            f"batch_size={self.batch_size}, "
+            f"slot_utilization={self.slot_utilization:.3f})"
+        )

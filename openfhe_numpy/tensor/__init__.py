@@ -6,10 +6,11 @@ from .ptarray import PTArray
 from .ctarray import CTArray
 from .block_tensor import BlockFHETensor
 from .block_ctarray import BlockCTArray
+from .block_ptarray import BlockPTArray
 
 
 # Import tensor constructors
-from .constructors import array
+from .constructors import array, block_array
 
 # Define public API
 __all__ = [
@@ -19,7 +20,9 @@ __all__ = [
     "CTArray",
     "BlockFHETensor",
     "BlockCTArray",
+    "BlockPTArray",
     "array",
+    "block_array",
 ]
 
 

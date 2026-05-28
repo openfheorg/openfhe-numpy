@@ -3,7 +3,12 @@ from openfhe import *
 import openfhe_numpy as onp
 from core import *
 
-
+# Simple vector operation tests
+# - transpose
+# - scalar multiplication
+# - sum
+# - elementwise add/sub/mul
+# - vector dot product
 SCALAR = 7.9
 SIZES = [5, 8, 16]
 ORDERS = [("row_major", onp.ROW_MAJOR)]

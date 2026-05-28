@@ -51,7 +51,7 @@ from numpy.typing import ArrayLike
 
 from openfhe_numpy.openfhe_numpy import *
 
-from .errors import ONP_ERROR
+from .errors import ONPError
 from .matlib import is_power_of_two, next_power_of_two
 from .typecheck import *
 
@@ -99,7 +99,7 @@ def _pack_vector_row_wise(
 
     Raises
     ------
-    ONP_ERROR
+    ONPError
         - If batch_size is not a power of two
         - If expanded vector size exceeds batch_size
         - If expand mode is invalid
@@ -117,7 +117,7 @@ def _pack_vector_row_wise(
     """
 
     if not is_power_of_two(batch_size):
-        ONP_ERROR(f"Batch size [{batch_size}] must be a power of two")
+        raise ONPError(f"Batch size [{batch_size}] must be a power of two")
 
     n = len(vector)
     nrows = next_power_of_two(n) if pad_to_power_of_2 else n
@@ -130,7 +130,7 @@ def _pack_vector_row_wise(
     expanded_size = nrows * ncols
 
     if batch_size < (expanded_size):
-        ONP_ERROR(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
+        raise ONPError(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
 
     flattened = np.zeros(expanded_size, dtype=np.asarray(vector).dtype)
     if expand == "tile":
@@ -141,21 +141,21 @@ def _pack_vector_row_wise(
             for i in range(n):
                 flattened[i * ncols : (i + 1) * ncols] = vector[i]
         else:
-            ONP_ERROR(f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'.")
+            raise ONPError(f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'.")
     elif expand == "zero":
         flattened[np.arange(n) * target_cols] = vector
     else:
-        ONP_ERROR(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
+        raise ONPError(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
 
     if tile == "tile":
         tiles = batch_size // expanded_size
     elif tile == "zero":
         tiles = 1
     else:
-        ONP_ERROR(f"Invalid tile mode: '{tile}'. Valid options are 'zero' or 'tile'.")
+        raise ONPError(f"Invalid tile mode: '{tile}'. Valid options are 'zero' or 'tile'.")
 
     if batch_size < (expanded_size * tiles):
-        ONP_ERROR(
+        raise ONPError(
             f"Padded vector [{expanded_size} x {tiles}] is longer than the batch size [{batch_size}]"
         )
 
@@ -201,7 +201,7 @@ def _pack_vector_col_wise(
 
     Raises
     ------
-    ONP_ERROR
+    ONPError
         - If batch_size is not a power of two
         - If expanded vector size exceeds batch_size
         - If tile_mode is invalid
@@ -217,7 +217,7 @@ def _pack_vector_col_wise(
 
     """
     if not is_power_of_two(batch_size):
-        ONP_ERROR(f"Batch size [{batch_size}] must be a power of two")
+        raise ONPError(f"Batch size [{batch_size}] must be a power of two")
 
     n = len(vector)
     nrows = next_power_of_two(n) if pad_to_power_of_2 else n
@@ -229,7 +229,7 @@ def _pack_vector_col_wise(
     expanded_size = nrows * ncols
 
     if batch_size < (expanded_size):
-        ONP_ERROR(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
+        raise ONPError(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
 
     padded = np.zeros(nrows, dtype=vector.dtype)
     padded[:n] = vector
@@ -244,14 +244,14 @@ def _pack_vector_col_wise(
     elif expand == "zero":
         flattened[: n * ncols : ncols] = vector
     else:
-        ONP_ERROR(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
+        raise ONPError(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
 
     if tile == "tile":
         tiles = batch_size // expanded_size
     elif tile == "zero":
         tiles = 1
     else:
-        ONP_ERROR(f"Invalid tile mode: '{tile}'. Valid options are 'zero' or 'tile'.")
+        raise ONPError(f"Invalid tile mode: '{tile}'. Valid options are 'zero' or 'tile'.")
 
     total_len = tiles * expanded_size
     output = np.zeros(batch_size, dtype=flattened.dtype)
@@ -300,12 +300,12 @@ def _pack_matrix_row_wise(
 
     Raises
     ------
-    ONP_ERROR
+    ONPError
         If 'batch_size' is not a power of two, not divisible by the padded size,
         or insufficient to hold the padded matrix.
     """
     if not is_power_of_two(batch_size):
-        ONP_ERROR(f"batch_size [{batch_size}] must be a power of two")
+        raise ONPError(f"batch_size [{batch_size}] must be a power of two")
 
     rows, cols = len(matrix), len(matrix[0])
     nrows, ncols = rows, cols
@@ -325,13 +325,13 @@ def _pack_matrix_row_wise(
     elif mode == "zero":
         tiles = 1
     else:
-        ONP_ERROR(f"Invalid padding mode: '{mode}'. Valid options are 'zero' or 'tile'.")
+        raise ONPError(f"Invalid padding mode: '{mode}'. Valid options are 'zero' or 'tile'.")
 
     if batch_size % required_size != 0:
-        ONP_ERROR(f"batch_size [{batch_size}] must be divisible by required_size")
+        raise ONPError(f"batch_size [{batch_size}] must be divisible by required_size")
 
     if batch_size < required_size:
-        ONP_ERROR(
+        raise ONPError(
             f"batch_size [{batch_size}] is insufficient for padding  [{required_size * tiles}]."
         )
 
@@ -383,12 +383,12 @@ def _pack_matrix_col_wise(
 
     Raises
     ------
-    ONP_ERROR
+    ONPError
         If batch_size is not a power of two, or if batch_size is not divisible by
         the required size, or if batch_size is insufficient for the padded matrix.
     """
     if not is_power_of_two(batch_size):
-        ONP_ERROR(f"batch_size [{batch_size}] must be a power of two")
+        raise ONPError(f"batch_size [{batch_size}] must be a power of two")
 
     rows, cols = len(matrix), len(matrix[0])
     nrows, ncols = rows, cols
@@ -408,13 +408,13 @@ def _pack_matrix_col_wise(
     elif mode == "zero":
         tiles = 1
     else:
-        ONP_ERROR(f"Invalid padding mode: '{mode}'. Valid options are 'zero' or 'tile'.")
+        raise ONPError(f"Invalid padding mode: '{mode}'. Valid options are 'zero' or 'tile'.")
 
     if batch_size % required_size != 0:
-        ONP_ERROR(f"batch_size [{batch_size}] must be divisible by required_size")
+        raise ONPError(f"batch_size [{batch_size}] must be divisible by required_size")
 
     if batch_size < required_size:
-        ONP_ERROR(
+        raise ONPError(
             f"batch_size [{batch_size}] is insufficient for padding  [{required_size * tiles}]."
         )
 
@@ -543,7 +543,7 @@ def _extract_matrix(data, info):
         tranposed = np.transpose(reshaped)
         return tranposed[: info["original_shape"][0], : info["original_shape"][1]]
     else:
-        ONP_ERROR("Order is not supported!!!")
+        raise ONPError("Order is not supported!!!")
         return None
 
 
@@ -572,7 +572,7 @@ def _extract_vector(data, info):
         elif info["order"] == COL_MAJOR:
             return reshaped[0, :original_row]
         else:
-            ONP_ERROR("Order is not supported!!!")
+            raise ONPError("Order is not supported!!!")
             return None
     else:
         return data[0]
