@@ -47,8 +47,8 @@ from .dispatch import register_tensor_function
 
 from openfhe_numpy.tensor.ctarray import CTArray
 from openfhe_numpy.utils.errors import (
-    ONP_ERROR,
-    ONPIncompatibleShape,
+    ONPError,
+    ONPIncompatibleShapeError,
     ONPNotSupportedError,
     ONPValueError,
     ONPDimensionError,
@@ -265,7 +265,8 @@ def _eval_matvec_ct(lhs, rhs):
     cc = rhs.data.GetCryptoContext() if rhs.dtype == "CTArray" else lhs.data.GetCryptoContext()
     if lhs.ndim == 2 and rhs.ndim == 1:
         if lhs.original_shape[1] != rhs.original_shape[0]:
-            ONPIncompatibleShape(
+            raise ONPIncompatibleShapeError(
+                lhs.original_shape, rhs.original_shape,
                 f"Matrix dimension [{lhs.original_shape}] mismatch with vector dimension [{rhs.shape}]"
             )
 
@@ -291,13 +292,13 @@ def _eval_matvec_ct(lhs, rhs):
                 ArrayEncodingType.COL_MAJOR,
             )
         else:
-            ONP_ERROR(
+            raise ONPError(
                 f"Encoding styles of matrix ({lhs.order}) and vector ({rhs.order}) must be complementary (ROW_MAJOR/COL_MAJOR or vice versa)."
             )
     elif lhs.ndim == 1 and rhs.ndim == 1:
         return _dot(lhs, rhs)
     else:
-        ONPIncompatibleShape(lhs.original_shape, rhs.original_shape, "Matrix Product")
+        raise ONPIncompatibleShapeError(lhs.original_shape, rhs.original_shape, "Matrix Product")
 
 
 def _matmul_ct(lhs, rhs):
@@ -372,10 +373,10 @@ def transpose_ct(a):
 def _pow(x, exp: int):
     """Exponentiate a matrix to power k using homomorphic multiplication."""
     if not isinstance(exp, int):
-        ONP_ERROR(f"Exponent must be integer, got {type(exp).__name__}")
+        raise ONPError(f"Exponent must be integer, got {type(exp).__name__}")
 
     if exp < 0:
-        ONP_ERROR("Negative exponent not supported in homomorphic encryption")
+        raise ONPError("Negative exponent not supported in homomorphic encryption")
 
     if exp == 0:
         # return algebra.eye(tensor))
@@ -453,7 +454,7 @@ def _reduce_ct(a, axis=0, keepdims=False):
         A new tensor with cumulative reduction along the specified axis.
     """
     if axis not in (0, 1):
-        ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
+        raise ONPError("Axis must be 0 or 1 for cumulative sum operation")
 
     if axis == 0:
         ciphertext = EvalReduceCumRows(a.data, a.ncols, a.original_shape[1])
@@ -543,7 +544,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             order = ArrayEncodingType.ROW_MAJOR
 
         else:
-            ONPNotSupportedError(f"Not support the current encoding [{order}] ")
+            raise ONPNotSupportedError(f"Not support the current encoding [{order}] ")
 
         if keepdims:
             shape = (cols, 1)
@@ -561,7 +562,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             padded_shape = (ncols, nrows)
             order = ArrayEncodingType.COL_MAJOR
         else:
-            ONPNotSupportedError(f"Not support the current encoding [{order}]")
+            raise ONPNotSupportedError(f"Not support the current encoding [{order}]")
 
         if keepdims:
             shape = (rows, 1)
@@ -569,7 +570,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             shape = (rows,)
 
     else:
-        ONPValueError(f"Invalid axis [{axis}]")
+        raise ONPValueError(f"Invalid axis [{axis}]")
 
     return CTArray(ct_sum, shape, x.batch_size, padded_shape, order)
 
@@ -580,7 +581,7 @@ def _ct_sum_vector(
 ):
     crypto_context = x.data.GetCryptoContext()
     if axis is not None:
-        ONPDimensionError(f"The dimension is invalid axis = {axis}")
+        raise ONPDimensionError(f"The dimension is invalid axis = {axis}")
     ct_sum = crypto_context.EvalSum(x.data, x.shape[0])
     return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
 
@@ -592,7 +593,7 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     elif x.ndim == 1:
         return _ct_sum_vector(x, axis)
     else:
-        ONPDimensionError(f"The dimension is invalid = {x.ndims}")
+        raise ONPDimensionError(f"The dimension is invalid = {x.ndims}")
 
 
 # ------------------------------------------------------------------------------
@@ -612,7 +613,7 @@ def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     elif axis == 1:  # sum over cols
         ct_mean = cc.EvalMult(sum_x.data, 1.0 / ncols)
     else:
-        ONPDimensionError(f"The dimension is invalid axis = {axis}")
+        raise ONPDimensionError(f"The dimension is invalid axis = {axis}")
 
     return CTArray(
         ct_mean,
@@ -633,7 +634,7 @@ def roll(x: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
     if axis is None:
         return _ct_vector_rotation(x, -shift)
     else:
-        ONP_ERROR(f"This function only supports packed vector")
+        raise ONPError(f"This function only supports packed vector")
 
 
 def _ct_vector_rotation(ctv: CTArray, shift: int):
