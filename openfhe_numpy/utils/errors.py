@@ -295,17 +295,13 @@ def capture_logs(level: int = logging.DEBUG) -> logging.Handler:
             self.messages.append(self.format(record))
 
     handler = MemoryHandler()
-    handler.setLevel(level)
     handler.setFormatter(logging.Formatter("%(message)s"))
 
     test_logger = get_logger()
 
-    # Remove the default no-op handler in tests, if present.
-    test_logger.handlers = [
-        existing_handler
-        for existing_handler in test_logger.handlers
-        if not isinstance(existing_handler, logging.NullHandler)
-    ]
+    for existing_handler in list(test_logger.handlers):
+        if isinstance(existing_handler, logging.NullHandler):
+            test_logger.removeHandler(existing_handler)
 
     test_logger.addHandler(handler)
 
