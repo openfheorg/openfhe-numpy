@@ -52,6 +52,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     """
 
     tensor_priority = 10
+    is_encrypted = True
 
     @property
     def crypto_context(self):
@@ -312,9 +313,18 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     def __repr__(self) -> str:
         return f"CTArray(metadata={self.metadata})"
 
-    def _sum(self) -> "CTArray":
-        # TODO: implement sum over encrypted data
-        pass
+    def __neg__(self) -> "CTArray":
+        """Return the homomorphic negation of this ciphertext array."""
+        cc = self.data.GetCryptoContext()
+        return self.clone(cc.EvalNegate(self.data))
+
+    def sum(self, axis=None, keepdims: bool = False) -> "CTArray":
+        """Sum tensor elements over an axis."""
+        return self.__tensor_function__(
+            "sum",
+            (self,),
+            {"axis": axis, "keepdims": keepdims},
+        )
 
     def _transpose(self) -> "CTArray":
         """Internal function to evaluate transpose of an encrypted array."""
@@ -337,7 +347,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.order,
         )
 
-    def cumulative_sum(self, axis: int = 0) -> "CTArray":
+    def cumsum(self, axis: int = 0) -> "CTArray":
         """
         Compute the cumulative sum of tensor elements along a given axis.
 
@@ -368,7 +378,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         if axis is None:
             ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
 
-        # cumulative_sum over rows
+        # cumsum over rows
         elif axis == 0:
             if self.order == ArrayEncodingType.ROW_MAJOR:
                 ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
@@ -379,7 +389,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             else:
                 raise ONPError(f"Not support this packing order [{self.order}].")
 
-        # cumulative_sum over cols
+        # cumsum over cols
         elif axis == 1:
             if self.order == ArrayEncodingType.ROW_MAJOR:
                 ciphertext = EvalSumCumCols(self.data, self.ncols)

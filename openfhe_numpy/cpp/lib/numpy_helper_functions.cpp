@@ -85,7 +85,8 @@ std::vector<double> MulMatVec(std::vector<std::vector<double>> mat, std::vector<
     if (m != k)
         OPENFHE_THROW("Mismatched vector sizes");
 
-    std::vector<double> result(m, 0);
+    std::vector<double> result(n, 0.0);
+
     for (uint32_t i = 0; i < n; i++) {
         for (uint32_t j = 0; j < m; j++) {
             result[i] += mat[i][j] * vec[j];
@@ -93,7 +94,7 @@ std::vector<double> MulMatVec(std::vector<std::vector<double>> mat, std::vector<
     }
 
     return result;
-};
+}
 
 std::vector<double> RandVec(int n, int modulus, bool verbose) {
     std::vector<double> vec(n, 0);

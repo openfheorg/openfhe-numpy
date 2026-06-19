@@ -130,7 +130,9 @@ def _pack_vector_row_wise(
     expanded_size = nrows * ncols
 
     if batch_size < (expanded_size):
-        raise ONPError(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
+        raise ONPError(
+            f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]"
+        )
 
     flattened = np.zeros(expanded_size, dtype=np.asarray(vector).dtype)
     if expand == "tile":
@@ -229,7 +231,9 @@ def _pack_vector_col_wise(
     expanded_size = nrows * ncols
 
     if batch_size < (expanded_size):
-        raise ONPError(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
+        raise ONPError(
+            f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]"
+        )
 
     padded = np.zeros(nrows, dtype=vector.dtype)
     padded[:n] = vector
@@ -601,3 +605,19 @@ def process_packed_data(
         return _extract_matrix(data, info)
     else:
         return _extract_vector(data, info)
+
+
+# ------------------------------------------------------------------------------
+# Packing-order helpers
+# ------------------------------------------------------------------------------
+# Code cleaning
+
+
+def _is_row_major(order: Any) -> bool:
+    """Return True if ``order`` is row-major packing."""
+    return order == ArrayEncodingType.ROW_MAJOR
+
+
+def _is_col_major(order: Any) -> bool:
+    """Return True if ``order`` is column-major packing."""
+    return order == ArrayEncodingType.COL_MAJOR

@@ -30,8 +30,11 @@
 # ==================================================================================
 
 import math
+from typing import Any, Iterable
+
 import numpy as np
 from .constants import EPSILON
+from .errors import ONPValueError
 
 
 def next_power_of_two(x):
@@ -188,3 +191,18 @@ def _rotate_vector(vec, k):
 
     k %= n
     return vec[k:] + vec[:k]
+
+
+def _sum_terms(terms: Iterable[Any]) -> Any:
+    """Accumulate a non-empty iterable of encoded terms by addition."""
+    iterator = iter(terms)
+
+    try:
+        acc = next(iterator)
+    except StopIteration:
+        raise ONPValueError("Cannot sum an empty sequence of terms.") from None
+
+    for term in iterator:
+        acc = acc + term
+
+    return acc
