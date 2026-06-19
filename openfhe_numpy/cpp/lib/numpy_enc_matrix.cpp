@@ -74,6 +74,7 @@ static std::vector<int32_t> GenLinTransIndices(
 
     switch (type) {
         case LinTransType::SIGMA:
+            // Generate indices from -numCols to numCols - 1
             rotationIndices.reserve(2 * nCols);
             for (int32_t k = -nCols; k < nCols; ++k) {
                 rotationIndices.push_back(k);
@@ -81,6 +82,7 @@ static std::vector<int32_t> GenLinTransIndices(
             break;
 
         case LinTransType::TAU:
+            // Generate indices: 0, numCols, 2*numCols, ..., (numCols-1)*numCols
             rotationIndices.reserve(2 * nCols - 1);
             for (int32_t k = 0; k < nCols; ++k) {
                 rotationIndices.push_back(nCols * k);
@@ -91,6 +93,7 @@ static std::vector<int32_t> GenLinTransIndices(
             break;
 
         case LinTransType::PHI:
+            // Generate indices: numRepeats, numRepeats - numCols
             rotationIndices.reserve(2);
             for (int32_t k = 0; k < 2; ++k) {
                 rotationIndices.push_back(repeats - k * nCols);
@@ -98,6 +101,7 @@ static std::vector<int32_t> GenLinTransIndices(
             break;
 
         case LinTransType::PSI:
+            // Generate a single index based on offset
             rotationIndices.reserve(2);
             rotationIndices.push_back(nCols * repeats);
             if (repeats != 0) {
@@ -106,6 +110,7 @@ static std::vector<int32_t> GenLinTransIndices(
             break;
 
         case LinTransType::TRANSPOSE:
+            // Generate indices for transposing a square matrix via diagonals
             rotationIndices.reserve(2 * nCols);
             for (int32_t k = -nCols + 1; k < nCols; ++k) {
                 rotationIndices.push_back((nCols - 1) * k);

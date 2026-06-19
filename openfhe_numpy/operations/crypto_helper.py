@@ -83,10 +83,6 @@ def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0, slots: int = 0)
         Generated sum keys
     """
     context = secret_key.GetCryptoContext()
-    # subringDim=0 means "use the full cyclotomic order". `slots` is not a
-    # reliable stand-in for it: tensors (e.g. block tensors) may carry a
-    # small logical batch_size that has nothing to do with the ciphertext's
-    # actual physical slot count, so deriving subringDim from it is wrong.
     return context.EvalSumRowsKeyGen(secret_key, None, ncols, 0)
 
 

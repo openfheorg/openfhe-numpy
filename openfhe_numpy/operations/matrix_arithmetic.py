@@ -223,21 +223,6 @@ def multiply_ct_scalar(a, scalar):
     return _eval_multiply(a, scalar)
 
 
-@register_tensor_function(
-    "multiply",
-    [("BlockCTArray", "BlockCTArray"), ("BlockCTArray", "BlockPTArray")],
-)
-def multiply_block_ct(a, b):
-    """Multiply two block tensors element-wise."""
-    raise NotImplementedError("BlockPTArray multiplication not implemented yet.")
-
-
-@register_tensor_function("multiply", [("BlockCTArray", "scalar")])
-def multiply_block_ct_scalar(a, scalar):
-    """Multiply a block tensor by a scalar."""
-    raise NotImplementedError("BlockPTArray and scalar multiplication not implemented yet.")
-
-
 ##############################################################################
 # MATRIX OPERATIONS
 ##############################################################################
@@ -270,9 +255,6 @@ def _eval_matvec_ct(lhs, rhs):
 
         elif lhs.order == ArrayEncodingType.COL_MAJOR and rhs.order == ArrayEncodingType.ROW_MAJOR:
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
-            # subringDim=0 means "use the full cyclotomic order". lhs.batch_size
-            # is not a reliable stand-in for it (e.g. block tensors carry a small
-            # logical batch_size unrelated to the ciphertext's physical slot count).
             ct_prod = cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], 0)
             return CTArray(
                 ct_prod,
@@ -394,12 +376,6 @@ def pow_ct(a, exp):
     return _pow(a, exp)
 
 
-@register_tensor_function("pow", [("BlockCTArray", "int")])
-def pow_block_ct(a, exp):
-    """Raise a block tensor to an integer power."""
-    raise NotImplementedError("BlockPTArray power not implemented yet.")
-
-
 # ------------------------------------------------------------------------------
 # Cumulative Sum Operations
 # ------------------------------------------------------------------------------
@@ -413,12 +389,6 @@ def cumsum_ct(obj, axis=0, keepdims=True):
     """Compute cumulative sum of a tensor along specified axis."""
     # return _cumsum_ct(a, axis, keepdims)
     return obj.cumsum(axis)
-
-
-@register_tensor_function("cumsum", [("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")])
-def cumsum_block_ct(obj, axis=0, keepdims=True):
-    """Compute cumulative sum of a block tensor along specified axis."""
-    raise NotImplementedError("BlockPTArray cumulative not implemented yet.")
 
 
 # ------------------------------------------------------------------------------
@@ -456,12 +426,6 @@ def _reduce_ct(a, axis=0, keepdims=False):
 def cumulative_reduce_ct(a, axis=0, keepdims=False):
     """Compute cumulative reduction of a tensor along specified axis."""
     return _reduce_ct(a, axis, keepdims)
-
-
-@register_tensor_function("cumulative_reduce", [("BlockCTArray", "int")])
-def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
-    """Compute cumulative reduction of a block tensor along specified axis."""
-    raise NotImplementedError("BlockPTArray power not implemented yet.")
 
 
 # ------------------------------------------------------------------------------

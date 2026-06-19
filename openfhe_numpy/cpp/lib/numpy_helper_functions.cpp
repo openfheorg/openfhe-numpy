@@ -94,7 +94,7 @@ std::vector<double> MulMatVec(std::vector<std::vector<double>> mat, std::vector<
     }
 
     return result;
-}
+};
 
 std::vector<double> RandVec(int n, int modulus, bool verbose) {
     std::vector<double> vec(n, 0);
