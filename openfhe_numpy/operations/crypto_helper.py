@@ -36,9 +36,11 @@ This module provides functions for generating rotation, accumulation, and other 
 keys needed for various homomorphic operations in OpenFHE-NumPy.
 """
 
+from typing import Any
 import openfhe
 import openfhe_numpy as backend  # Import from cpp source
-from openfhe_numpy.utils.matlib import next_power_of_two
+from ..utils.packing import _is_row_major, _is_col_major
+from ..utils.matlib import next_power_of_two
 
 
 def accumulation_depth(nrows: int, ncols: int, accumulate_by_rows: bool):
@@ -81,7 +83,7 @@ def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0, slots: int = 0)
         Generated sum keys
     """
     context = secret_key.GetCryptoContext()
-    return context.EvalSumRowsKeyGen(secret_key, None, ncols, slots * 4)
+    return context.EvalSumRowsKeyGen(secret_key, None, ncols, 0)
 
 
 def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
@@ -253,3 +255,72 @@ def generate_slicing_key(secret_key, original_shape):
     if indices:
         cc = secret_key.GetCryptoContext()
         cc.EvalRotateKeyGen(secret_key, sorted(indices))
+
+
+##############################################################################
+# BLOCK ARITHMETIC OPERATIONS
+##############################################################################
+
+
+# [CTArray] attach key for mat@vec product
+def attach_matvec_keys(matrix, secret_key, emit: bool = False) -> tuple[str, Any] | None:
+    """Attach the summation key required for matrix-vector multiplication.
+
+    Required keys:
+    - ROW_MAJOR matrix @ COL_MAJOR vector uses extra["colkey"].
+    - COL_MAJOR matrix @ ROW_MAJOR vector uses extra["rowkey"].
+
+    Limitation:
+    - The key is generated from one matrix layout. All blocks in a block matrix
+      are expected to share the same packing order and logical column count.
+    """
+    if matrix.ndim != 2:
+        raise ONPValueError("attach_matvec_keys expects a 2-D matrix.")
+
+    if _is_row_major(matrix.order):
+        key_name = "colkey"
+        key = sum_col_keys(secret_key)
+
+    elif _is_col_major(matrix.order):
+        key_name = "rowkey"
+        key = sum_row_keys(secret_key, matrix.ncols, matrix.batch_size)
+
+    else:
+        raise ONPValueError(f"Unsupported packing order: {matrix.order}")
+
+    matrix.extra[key_name] = key
+
+    if emit:
+        return key_name, key
+
+    return None
+
+
+# [BlockCTArray] attach key for mat@vec product
+def attach_block_matvec_keys(
+    block_matrix, secret_key, emit: bool = False
+) -> tuple[str, Any] | None:
+    """Attach summation keys to encrypted matrix blocks for block matvec.
+
+    Required keys:
+    - ROW_MAJOR matrix @ COL_MAJOR vector uses ``extra["colkey"]``.
+    - COL_MAJOR matrix @ ROW_MAJOR vector uses ``extra["rowkey"]``.
+
+    The key-generation parameters must match the CTArray evaluator:
+    - EvalSumCols(..., lhs.ncols, ...)
+    - EvalSumRows(..., lhs.nrows, ..., lhs.batch_size)
+    """
+
+    if block_matrix.ndim != 2 or len(block_matrix.data) <= 0:
+        raise ONPValueError("attach_matvec_keys expects a 2-D block matrix.")
+
+    reference = block_matrix.data[0]
+    key_name, key = attach_matvec_keys(reference, secret_key, True)
+
+    for block in block_matrix.data:
+        block.extra[key_name] = key
+
+    if emit:
+        return key_name, key
+
+    return None

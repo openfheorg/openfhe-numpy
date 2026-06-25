@@ -56,7 +56,7 @@ class TestMatrixCumulativeSumRow(MainUnittest):
                                 else:
                                     onp.gen_accumulate_cols_key(keys.secretKey, ctm.ncols)
 
-                                ctm_result = onp.cumulative_sum(ctm, axis=0)
+                                ctm_result = onp.cumsum(ctm, axis=0)
                                 result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
                                 self.assertArrayClose(actual=result, expected=expected)
                             except Exception:
@@ -119,7 +119,7 @@ class TestMatrixCumulativeSumCol(MainUnittest):
                                 else:
                                     onp.gen_accumulate_rows_key(keys.secretKey, ctm.ncols)
 
-                                ctm_result = onp.cumulative_sum(ctm, axis=1)
+                                ctm_result = onp.cumsum(ctm, axis=1)
                                 result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
                                 self.assertArrayClose(actual=result, expected=expected)
                             except Exception:

@@ -10,7 +10,7 @@ from .block_ptarray import BlockPTArray
 
 
 # Import tensor constructors
-from .constructors import array
+from .constructors import array, block_array
 
 # Define public API
 __all__ = [
@@ -22,4 +22,8 @@ __all__ = [
     "BlockCTArray",
     "BlockPTArray",
     "array",
+    "block_array",
 ]
+
+
+# _register_all_operations()

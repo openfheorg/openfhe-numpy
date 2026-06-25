@@ -158,6 +158,11 @@ def get_test_from_module(module_name: str) -> List[str]:
             if isinstance(t, unittest.TestSuite):
                 walk(t)
             else:
+                if t.__class__.__name__ == "_FailedTest":
+                    raise RuntimeError(
+                        f"Failed to import/discover tests for module '{module_name}'. "
+                        f"Run: python3 -m unittest -v {module_name}"
+                    )
                 ids.append(t.id())
 
     walk(suite)
@@ -515,7 +520,7 @@ def main() -> None:
     if all_failed:
         print("\n  Unsuccessful tests:")
         for label in all_failed:
-            print(f"    ✗ {label}")
+            print(f"    x {label}")
 
     print(f"\n  Total wall time:     {test_time:.2f}s")
     print(f"  Total CPU time:      {_fmt_cpu(total_cpu_time, test_time)}")

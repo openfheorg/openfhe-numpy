@@ -48,6 +48,8 @@ TPL = TypeVar("Template")
 # BaseTensor - Abstract Interface
 # Don't implement anything here
 class BaseTensor(ABC, Generic[TPL]):
+    is_encrypted: bool = False
+
     @property
     @abstractmethod
     def shape(self) -> Tuple[int, ...]: ...
@@ -128,6 +130,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         "_dtype",
         "extra",
     )
+    is_encrypted = False
 
     @overload
     def __init__(
@@ -197,7 +200,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
 
     @property
     def data(self) -> TPL:
-        """Underlying encrypted/plaintext payload."""
+        """Underlying encrypted/plaintext."""
         return self._data
 
     @data.setter
@@ -371,14 +374,29 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     def __matmul__(self, other):
         return self.__tensor_function__("matmul", (self, other))
 
-    def __pow__(self, exp):
-        return self.__tensor_function__("power", (self, exp))
+    def __pow__(self, exponent):
+        return self.__tensor_function__("power", (self, exponent))
 
-    # Replace these methods too
-    def sum(self, axis=0):
-        if axis < 0 or axis >= self.ndim:
-            raise ValueError(f"Invalid axis {axis} for tensor with {self.ndim} dimensions.")
-        return self.__tensor_function__("sum", (self,), {"axis": axis})
+    def sum(self, axis=None, keepdims=False):
+        """
+        Sum tensor entries over all elements or one axis.
+        Remark: Tuple axes are not supported
+        """
+        if axis is not None:
+            if not isinstance(axis, int):
+                raise TypeError(f"axis must be None or an integer, got {type(axis).__name__}.")
+
+            if axis < 0:
+                axis += self.ndim
+
+            if axis < 0 or axis >= self.ndim:
+                raise ValueError(f"Invalid axis {axis} for tensor with {self.ndim} dimensions.")
+
+        return self.__tensor_function__(
+            "sum",
+            (self,),
+            {"axis": axis, "keepdims": keepdims},
+        )
 
     def reduce(self, axis=0):
         return self.__tensor_function__("reduce", (self,), {"axis": axis})

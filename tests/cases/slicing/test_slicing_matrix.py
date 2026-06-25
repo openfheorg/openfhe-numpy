@@ -18,7 +18,7 @@ OPS = [
 ]
 
 
-def next_power_of_2(n):
+def next_power_of_two(n):
     if n <= 0:
         return 1
     return 1 << (n - 1).bit_length()
@@ -34,8 +34,8 @@ class TestSlicingMatrix(MainUnittest):
 
             try:
                 for rows, cols in SHAPES:
-                    nrow = next_power_of_2(rows)
-                    ncol = next_power_of_2(cols)
+                    nrow = onp.next_power_of_two(rows)
+                    ncol = onp.next_power_of_two(cols)
                     nelements = nrow * ncol
 
                     if nelements > batch_size:

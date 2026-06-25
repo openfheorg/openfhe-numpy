@@ -36,7 +36,6 @@ for working with homomorphically encrypted matrix/vector using OpenFHE.
 """
 
 from .broadcast import broadcast_to, generate_broadcast_key
-from . import matrix_arithmetic
 
 # Import arithmetic operations
 from .matrix_api import (
@@ -46,13 +45,16 @@ from .matrix_api import (
     dot,
     matmul,
     transpose,
-    pow,
-    cumulative_sum,
+    power,
+    cumsum,
     cumulative_reduce,
     sum,
     roll,
     mean,
 )
+
+from . import matrix_arithmetic
+from . import block_arithmetic
 
 # Import crypto context utilities
 from .crypto_helper import (
@@ -66,7 +68,10 @@ from .crypto_helper import (
     gen_accumulate_rows_key,
     gen_accumulate_cols_key,
     generate_slicing_key,
+    attach_block_matvec_keys,
+    attach_matvec_keys,
 )
+
 
 # Define public API
 __all__ = [
@@ -77,8 +82,8 @@ __all__ = [
     "dot",
     "matmul",
     "transpose",
-    "pow",
-    "cumulative_sum",
+    "power",
+    "cumsum",
     "cumulative_reduce",
     "sum",
     "roll",
@@ -97,4 +102,6 @@ __all__ = [
     "broadcast_to",
     "generate_broadcast_key",
     "generate_slicing_key",
+    "attach_matvec_keys",
+    "attach_block_matvec_keys",
 ]
