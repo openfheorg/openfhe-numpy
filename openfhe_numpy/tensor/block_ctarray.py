@@ -102,3 +102,15 @@ class BlockCTArray(BlockFHETensor[Ciphertext]):
     def __neg__(self) -> BlockCTArray:
         """Return the blockwise homomorphic negation."""
         return self.clone(data=[-block for block in self.data])
+
+    def apply(self, func: Callable, *args: Any, **kwargs: Any) -> "BlockCTArray":
+        """Apply a ciphertext-level function to every encrypted block.
+
+        The function is applied to each block's underlying ciphertext while block
+        tensor metadata is preserved.
+        """
+        if not callable(func):
+            raise TypeError(f"apply expects a callable, got {type(func).__name__}.")
+
+        ct_result = [block.apply(func, *args, **kwargs) for block in self.data]
+        return self.clone(data=ct_result)

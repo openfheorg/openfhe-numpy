@@ -30,7 +30,7 @@
 # ==================================================================================
 
 import io
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Callable, Any
 import numpy as np
 import openfhe
 
@@ -413,3 +413,40 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             raise ValueError("Invalid order.")
 
         return sum_rows_key
+
+    def apply(self, func: Callable, *args: Any, **kwargs: Any) -> "CTArray":
+        """Apply a ciphertext-level function to the underlying ciphertext.
+
+        The function must accept ``self.data`` as its first argument and return an
+        OpenFHE ciphertext with the same logical packing layout.
+
+        Parameters
+        ----------
+        func : Callable
+            Function applied to the underlying ciphertext.
+        *args : Any
+            Additional positional arguments passed to ``func``.
+        **kwargs : Any
+            Additional keyword arguments passed to ``func``.
+
+        Returns
+        -------
+        CTArray
+            A new CTArray with the same shape/metadata but the transformed ciphertext.
+
+        Examples
+        --------
+        Bootstrap to refresh noise level:
+
+        ``result = a.apply(cc.EvalBootstrap)``
+
+        Chebyshev-style functions can be wrapped when the ciphertext is not the
+        first argument:
+
+        ``result = a.apply(lambda ct: cc.EvalChebyshevSeries(ct, coeffs, -8, 8))``
+        """
+        if not callable(func):
+            raise TypeError(f"apply expects a callable, got {type(func).__name__}.")
+
+        ct_result = func(self.data, *args, **kwargs)
+        return self.clone(data=ct_result)
