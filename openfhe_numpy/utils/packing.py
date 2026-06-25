@@ -601,3 +601,9 @@ def process_packed_data(
         return _extract_matrix(data, info)
     else:
         return _extract_vector(data, info)
+def _is_row_major(order: Any) -> bool:
+    """Return True if ``order`` is row-major packing."""
+    return order == ArrayEncodingType.ROW_MAJOR
+def _is_col_major(order: Any) -> bool:
+    """Return True if ``order`` is column-major packing."""
+    return order == ArrayEncodingType.COL_MAJOR
