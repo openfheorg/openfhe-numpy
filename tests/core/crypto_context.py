@@ -116,23 +116,35 @@ KEY_SWITCH_TECHNIQUE_MAP: Dict[str, Any] = {
 # ==============================================================================
 
 
-def load_ckks_params() -> List[Dict[str, Any]]:
-    """
-    Load and parse CKKS parameter sets from CSV file.
+def load_ckks_params(path: Path | str | None = None) -> List[Dict[str, Any]]:
+    """Load and parse CKKS parameter sets from a CSV file.
 
-    Returns:
-        List of parameter dictionaries with converted types.
+    Parameters
+    ----------
+    path : Path | str | None, default=None
+        CSV file to load. If ``None``, uses ``PARAMS_CSV``.
 
-    Raises:
-        FileNotFoundError: If the CSV file is not found.
-        ValueError: If parameter conversion fails.
+    Returns
+    -------
+    list[dict[str, Any]]
+        Parameter dictionaries with converted types.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the CSV file is not found.
+    ValueError
+        If parameter conversion fails.
     """
-    if not PARAMS_CSV.exists():
-        raise FileNotFoundError(f"Missing CSV file: {PARAMS_CSV}")
+    print("path = ", path)
+    csv_path = PARAMS_CSV if path is None else Path(path)
+
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Missing CSV file: {csv_path}")
 
     params_list: List[Dict[str, Any]] = []
 
-    with PARAMS_CSV.open(newline="") as csvfile:
+    with csv_path.open(newline="") as csvfile:
         reader = csv.DictReader(csvfile)
 
         for row_num, row in enumerate(reader, start=1):
@@ -143,9 +155,7 @@ def load_ckks_params() -> List[Dict[str, Any]]:
                 try:
                     entry[key] = converter(val)
                 except ValueError as e:
-                    raise ValueError(
-                        f"Error parsing '{key}' at row {row_num}: {e}"
-                    ) from e
+                    raise ValueError(f"Error parsing '{key}' at row {row_num}: {e}") from e
 
             params_list.append(entry)
 
@@ -210,9 +220,7 @@ def gen_crypto_context(params: Dict[str, Any]) -> Tuple[Any, Any]:
     return cc, keys
 
 
-def get_cached_crypto_context(
-    params: Dict[str, Any], use_cache: bool = True
-) -> Tuple[Any, Any]:
+def get_cached_crypto_context(params: Dict[str, Any], use_cache: bool = True) -> Tuple[Any, Any]:
     """
     Get a cached CryptoContext or generate a new one.
 

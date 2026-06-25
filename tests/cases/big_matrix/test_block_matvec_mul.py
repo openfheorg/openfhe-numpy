@@ -5,8 +5,10 @@ import openfhe_numpy as onp
 from core import *
 
 
-SIZES = [5, 8]
-BLOCK_BATCH_SIZE = 4
+# ckks_params_block.csv uses ringDim=512, so the CKKS slot capacity is 256.
+# A 17 x 17 matrix has 289 entries, forcing block packing because 289 > 256.
+SIZES = [17]
+BLOCK_PARAMS_CSV = CRYPTO_PARAMS_DIR / "ckks_params_block.csv"
 
 
 def _ensure_depth(params: dict, min_depth: int = 4) -> dict:
@@ -56,27 +58,13 @@ class BlockMatVecTestBase:
     vector_mode = None
     case_name = None
 
-    def _attach_matvec_keys(self, secret_key, block_matrix):
-        """Attach sum keys to each matrix block for block matvec."""
-        for block in block_matrix.data:
-            if block.order == onp.ROW_MAJOR:
-                block.extra["colkey"] = onp.sum_col_keys(secret_key, block.ncols)
-            elif block.order == onp.COL_MAJOR:
-                block.extra["rowkey"] = onp.sum_row_keys(
-                    secret_key,
-                    block.nrows,
-                    block.batch_size * 4,
-                )
-            else:
-                raise ValueError(f"Unsupported order: {block.order}")
-
     def test_block_matrix_vector_product(self):
-        ckks_params = load_ckks_params()
+        ckks_params = load_ckks_params(BLOCK_PARAMS_CSV)
 
         for p in ckks_params:
             params = _ensure_depth(p, 4)
-            max_batch_size = params["ringDim"] // 2
-            batch_size = min(BLOCK_BATCH_SIZE, max_batch_size)
+            slot_capacity = params["ringDim"] // 2
+            batch_size = slot_capacity
 
             if batch_size <= 0:
                 continue
@@ -87,11 +75,11 @@ class BlockMatVecTestBase:
 
             try:
                 for size in SIZES:
-                    if size > max_batch_size:
-                        continue
-                    size = 5
+                    self.assertGreater(size * size, slot_capacity)
+
                     A = generate_random_array(rows=size, cols=size)
                     b = generate_random_array(rows=size)
+                    expected = A @ b
 
                     result = None
                     ctm = None
@@ -133,13 +121,12 @@ class BlockMatVecTestBase:
                         self.assertArrayClose(actual=result, expected=expected)
 
                     except Exception:
-                        print(A, b, size, batch_size, params["ringDim"])
-                        print(f"expected={expected}")
-                        print(f"result={result}")
                         self._record_case(
                             params={
                                 "case": self.case_name,
                                 "size": size,
+                                "matrix_slots": size * size,
+                                "slot_capacity": slot_capacity,
                                 "batch_size": batch_size,
                                 "ringDim": params["ringDim"],
                             },

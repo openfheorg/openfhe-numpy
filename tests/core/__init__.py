@@ -1,5 +1,5 @@
 from .utils import generate_random_array
-from .crypto_context import load_ckks_params, gen_crypto_context
+from .crypto_context import load_ckks_params, gen_crypto_context, CRYPTO_PARAMS_DIR
 from .case import MainUnittest
 from .runner import QuietRunner
 from .result import MainTextTestResult
@@ -13,4 +13,5 @@ __all__ = [
     "generate_random_array",
     "load_ckks_params",
     "gen_crypto_context",
+    "CRYPTO_PARAMS_DIR",
 ]

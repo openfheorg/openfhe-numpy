@@ -5,10 +5,12 @@ import openfhe_numpy as onp
 from core import *
 
 
-SIZES = [5, 8, 16]
-BLOCK_BATCH_SIZE = 4
+# ckks_params_block.csv uses ringDim=512, so the CKKS slot capacity is 256.
+# A 17 x 17 matrix has 289 entries, forcing block packing because 289 > 256.
+SIZES = [17]
 ORDERS = [("row_major", onp.ROW_MAJOR)]
 MODES = ["zero"]
+BLOCK_PARAMS_CSV = CRYPTO_PARAMS_DIR / "ckks_params_block.csv"
 
 
 def _ensure_depth(params: dict, min_depth: int = 4) -> dict:
@@ -59,12 +61,12 @@ class BlockMatrixTestBase:
         raise NotImplementedError
 
     def test_matrix_operation(self):
-        ckks_params = load_ckks_params()
+        ckks_params = load_ckks_params(BLOCK_PARAMS_CSV)
 
         for _, p in enumerate(ckks_params):
             params = _ensure_depth(p, self.min_depth)
-            max_batch_size = params["ringDim"] // 2
-            batch_size = min(BLOCK_BATCH_SIZE, max_batch_size)
+            slot_capacity = params["ringDim"] // 2
+            batch_size = slot_capacity
 
             if batch_size <= 0:
                 continue
@@ -82,14 +84,14 @@ class BlockMatrixTestBase:
 
             try:
                 for size in SIZES:
-                    if size * size > max_batch_size and batch_size > max_batch_size:
-                        continue
+                    self.assertGreater(size * size, slot_capacity)
 
                     A = generate_random_array(rows=size, cols=size)
                     B = generate_random_array(rows=size, cols=size)
 
                     for order_name, order_value in ORDERS:
                         for mode in MODES:
+                            expected = self.np_fn(A, B)
                             result = None
                             ctm_a = None
                             ctm_b = None
@@ -115,7 +117,6 @@ class BlockMatrixTestBase:
                                     public_key=keys.publicKey,
                                 )
 
-                                expected = self.np_fn(A, B)
                                 ctm_res = self.fhe_fn(ctm_a, ctm_b)
                                 result = ctm_res.decrypt(
                                     keys.secretKey,
@@ -130,6 +131,8 @@ class BlockMatrixTestBase:
                                         "case": "block_matrix_operation",
                                         "op": self.op_name,
                                         "size": size,
+                                        "matrix_slots": size * size,
+                                        "slot_capacity": slot_capacity,
                                         "order": order_name,
                                         "mode": mode,
                                         "batch_size": batch_size,

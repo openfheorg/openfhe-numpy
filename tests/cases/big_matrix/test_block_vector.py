@@ -5,10 +5,12 @@ import openfhe_numpy as onp
 from core import *
 
 
-SIZES = [5, 8]
-BLOCK_BATCH_SIZE = 4
+# ckks_params_block.csv uses ringDim=512, so the CKKS slot capacity is 256.
+# A vector of length 257 forces block packing because 257 > 256.
+SIZES = [257]
 ORDERS = [("row_major", onp.ROW_MAJOR)]
 MODES = ["zero"]
+BLOCK_PARAMS_CSV = CRYPTO_PARAMS_DIR / "ckks_params_block.csv"
 
 
 def _ensure_depth(params: dict, min_depth: int = 4) -> dict:
@@ -61,12 +63,12 @@ class BlockVectorBinaryTestBase:
         if self.__class__ is BlockVectorBinaryTestBase:
             self.skipTest("base class")
 
-        ckks_params = load_ckks_params()
+        ckks_params = load_ckks_params(BLOCK_PARAMS_CSV)
 
         for _, p in enumerate(ckks_params):
             params = _ensure_depth(p, self.min_depth)
-            max_batch_size = params["ringDim"] // 2
-            batch_size = min(BLOCK_BATCH_SIZE, max_batch_size)
+            slot_capacity = params["ringDim"] // 2
+            batch_size = slot_capacity
 
             if batch_size <= 0:
                 continue
@@ -81,8 +83,7 @@ class BlockVectorBinaryTestBase:
 
             try:
                 for size in SIZES:
-                    if size > max_batch_size:
-                        continue
+                    self.assertGreater(size, slot_capacity)
 
                     a = generate_random_array(rows=size)
                     b = generate_random_array(rows=size)
@@ -130,6 +131,8 @@ class BlockVectorBinaryTestBase:
                                         "case": "block_vector_binary",
                                         "op": self.op_name,
                                         "size": size,
+                                        "vector_slots": size,
+                                        "slot_capacity": slot_capacity,
                                         "order": order_name,
                                         "mode": mode,
                                         "batch_size": batch_size,
@@ -162,7 +165,7 @@ class TestBlockVectorAdd(BlockVectorBinaryTestBase, MainUnittest):
 
 
 class TestBlockVectorSubtract(BlockVectorBinaryTestBase, MainUnittest):
-    op_name = "sub"
+    op_name = "subtract"
     min_depth = 2
 
     def np_fn(self, a, b):
@@ -173,7 +176,7 @@ class TestBlockVectorSubtract(BlockVectorBinaryTestBase, MainUnittest):
 
 
 class TestBlockVectorMultiply(BlockVectorBinaryTestBase, MainUnittest):
-    op_name = "mul"
+    op_name = "multiply"
     min_depth = 4
     needs_mult_key = True
 
