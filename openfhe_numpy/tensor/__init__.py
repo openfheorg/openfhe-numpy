@@ -6,6 +6,7 @@ from .ptarray import PTArray
 from .ctarray import CTArray
 from .block_tensor import BlockFHETensor
 from .block_ctarray import BlockCTArray
+from .block_ptarray import BlockPTArray
 
 
 # Import tensor constructors
@@ -19,8 +20,6 @@ __all__ = [
     "CTArray",
     "BlockFHETensor",
     "BlockCTArray",
+    "BlockPTArray",
     "array",
 ]
-
-
-# _register_all_operations()

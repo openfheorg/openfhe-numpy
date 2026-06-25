@@ -29,54 +29,36 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ==================================================================================
 
-
 from __future__ import annotations
-
 import numpy as np
-from openfhe import Ciphertext
 
-from ..utils.constants import UnpackType
+from openfhe import Plaintext
 from .block_tensor import BlockFHETensor
 
 
-class BlockCTArray(BlockFHETensor[Ciphertext]):
-    """Block tensor of encrypted blocks (CTArray).
+class BlockPTArray(BlockFHETensor[Plaintext]):
+    """Block tensor of plaintext blocks (PTArray).
 
-    This is a thin subclass. All storage, indexing, and metadata
-    logic lives in BlockFHETensor. BlockCTArray adds only:
-
-        - is_encrypted = True
-        - decrypt()
-        - higher tensor_priority for dispatch
+    All storage, indexing, and metadata logic lives in BlockFHETensor.
+    BlockPTArray adds plaintext decoding and a higher tensor priority than
+    PTArray for dispatch.
     """
 
-    tensor_priority = 40
-    is_encrypted = True
+    tensor_priority = 35
+    is_encrypted = False
 
-    def decrypt(
-        self,
-        secret_key,
-        unpack_type: UnpackType = UnpackType.ORIGINAL,
-        new_shape=None,
-    ) -> np.ndarray:
-        """Decrypt all blocks and return a NumPy array with original_shape."""
-        if isinstance(unpack_type, str):
-            unpack_type = UnpackType(unpack_type.lower())
+    def decrypt(self, *args, **kwargs) -> np.ndarray:
+        raise NotImplementedError(
+            "Decrypt is not defined for plaintext block arrays. Use decode()."
+        )
 
-        if unpack_type != UnpackType.ORIGINAL:
-            raise NotImplementedError(
-                "BlockCTArray.decrypt currently supports only unpack_type='original'."
-            )
+    def decode(self) -> np.ndarray:
+        """Decode all blocks and reassemble the original logical array.
 
+        Returns a NumPy array with shape == original_shape.
+        """
         if self.ndim == 1:
-            if new_shape is not None:
-                raise NotImplementedError("new_shape is not supported for 1-D BlockCTArray.")
-            chunks = [
-                np.asarray(block.decrypt(secret_key, unpack_type=unpack_type)).reshape(
-                    self.block_shape
-                )
-                for block in self.data
-            ]
+            chunks = [np.asarray(block.decode()).reshape(self.block_shape) for block in self.data]
             full = np.concatenate(chunks)
             return full[: self.original_shape[0]]
 
@@ -89,16 +71,9 @@ class BlockCTArray(BlockFHETensor[Ciphertext]):
         for gi in range(grid_rows):
             for gj in range(grid_cols):
                 block = self.get_block(gi, gj)
-                plain = np.asarray(block.decrypt(secret_key, unpack_type=unpack_type)).reshape(
-                    self.block_shape
-                )
-                r0, c0 = gi * br, gj * bc
+                plain = np.asarray(block.decode()).reshape(self.block_shape)
+                r0 = gi * br
+                c0 = gj * bc
                 full[r0 : r0 + br, c0 : c0 + bc] = plain
 
-        if new_shape is not None:
-            return full[:rows, :cols].reshape(new_shape)
         return full[:rows, :cols]
-
-    def __neg__(self) -> BlockCTArray:
-        """Return the blockwise homomorphic negation."""
-        return self.clone(data=[-block for block in self.data])
