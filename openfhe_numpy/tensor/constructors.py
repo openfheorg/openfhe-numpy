@@ -30,7 +30,7 @@
 # ==================================================================================
 
 """
-Array constructor functions for OpenFHE-NumPy.
+Constructor functions for OpenFHE-NumPy.
 
 This module provides functions to create FHE array from various input types,
 including support for block-based tensor operations.
@@ -43,7 +43,7 @@ from openfhe import CryptoContext, PublicKey
 
 # Package-level imports
 from openfhe_numpy.openfhe_numpy import ArrayEncodingType
-from openfhe_numpy.utils.errors import ONP_ERROR
+from openfhe_numpy.utils.errors import ONPError
 from openfhe_numpy.utils.matlib import is_power_of_two
 from openfhe_numpy.utils.packing import (
     _pack_matrix_col_wise,
@@ -136,11 +136,11 @@ def _pack_array(
       - order          : int
     """
     if batch_size < 0:
-        ONP_ERROR("The batch size cannot be negative.")
+        raise ONPError("The batch size cannot be negative.")
     if not is_power_of_two(batch_size):
-        ONP_ERROR(f"Batch size [{batch_size}] must be a power of two.")
+        raise ONPError(f"Batch size [{batch_size}] must be a power of two.")
 
-    data = np.array(data)
+    data = np.asarray(data)
 
     if is_numeric_scalar(data):
         if mode == "zero":
@@ -149,7 +149,7 @@ def _pack_array(
         elif mode == "tile":
             packed = np.full(batch_size, data)
         else:
-            ONP_ERROR(f"Invalid padding mode: '{mode}'. Use 'zero' or 'tile'.")
+            raise ONPError(f"Invalid padding mode: '{mode}'. Use 'zero' or 'tile'.")
         shape = (batch_size, 1)
 
     elif is_numeric_arraylike(data):
@@ -158,10 +158,10 @@ def _pack_array(
         elif data.ndim == 1:
             packed, shape = _ravel_vector(data, batch_size, order, True, mode, **kwargs)
         else:
-            ONP_ERROR(f"Unsupported data dimension [{data.ndim}].")
+            raise ONPError(f"Unsupported data dimension [{data.ndim}].")
 
     else:
-        ONP_ERROR("Input is not numeric.")
+        raise ONPError("Input is not numeric.")
 
     return PackedArrayInformation(
         data=packed,
@@ -202,12 +202,12 @@ def array(
     FHETensor
     """
     if cc is None:
-        ONP_ERROR("CryptoContext does not exist")
+        raise ONPError("CryptoContext does not exist")
 
     if batch_size is None:
         batch_size = cc.GetBatchSize()
     if not isinstance(batch_size, int) or batch_size < 0:
-        ONP_ERROR(f"batch_size must be a non-negative int or None, got {batch_size}.")
+        raise ONPError(f"batch_size must be a non-negative int or None, got {batch_size}.")
 
     if not package:
         package = _pack_array(data, batch_size, order, mode, **kwargs)
@@ -215,7 +215,7 @@ def array(
     try:
         plaintext = cc.MakeCKKSPackedPlaintext(package.data)
     except Exception as e:
-        ONP_ERROR("Error: " + str(e))
+        raise ONPError("Error: " + str(e))
 
     if fhe_type == "P":
         return PTArray(
@@ -227,7 +227,7 @@ def array(
         )
     elif fhe_type == "C":
         if public_key is None:
-            ONP_ERROR("Public key must be provided for ciphertext encoding.")
+            raise ONPError("Public key must be provided for ciphertext encoding.")
         try:
             ciphertext = cc.Encrypt(public_key, plaintext)
             return CTArray(
@@ -238,9 +238,9 @@ def array(
                 package.order,  # order
             )
         except Exception as e:
-            ONP_ERROR(f"Failed to encrypt: {e}")
+            raise ONPError(f"Failed to encrypt: {e}")
     else:
-        ONP_ERROR(f"type must be 'C' or 'P', got '{fhe_type}'.")
+        raise ONPError(f"type must be 'C' or 'P', got '{fhe_type}'.")
 
 
 def _ravel_matrix(
@@ -315,7 +315,7 @@ def _ravel_vector(
     """
     target_cols = kwargs.get("target_cols")
     if target_cols is not None and not (isinstance(target_cols, int) and target_cols > 0):
-        ONP_ERROR(f"target_cols must be positive int or None, got {target_cols!r}.")
+        raise ONPError(f"target_cols must be positive int or None, got {target_cols!r}.")
 
     pad_value = kwargs.get("pad_value", "tile")
     expand = kwargs.get("expand", "tile")
@@ -341,4 +341,4 @@ def _ravel_vector(
             pad_value=pad_value,
         )
     else:
-        ONP_ERROR("Unsupported encoding order")
+        raise ONPError("Unsupported encoding order")

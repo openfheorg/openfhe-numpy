@@ -38,7 +38,7 @@ import openfhe
 from ..openfhe_numpy import EvalSumCumCols, EvalSumCumRows, EvalTranspose, ArrayEncodingType
 from ..utils.matlib import next_power_of_two
 from ..utils.constants import UnpackType
-from ..utils.errors import ONP_ERROR
+from ..utils.errors import ONPError
 from ..utils.packing import process_packed_data
 from ..utils._helper_slots_ops import _get_single_element
 
@@ -243,12 +243,12 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             The decrypted data, formatted by 'unpack_type'.
         """
         if secret_key is None:
-            ONP_ERROR("Secret key is missing.")
+            raise ONPError("Secret key is missing.")
 
         cc = self.data.GetCryptoContext()
         plaintext = cc.Decrypt(self.data, secret_key)
         if plaintext is None:
-            ONP_ERROR("Decryption failed.")
+            raise ONPError("Decryption failed.")
 
         plaintext.SetLength(self.batch_size)
         result = plaintext.GetRealPackedValue()
@@ -269,7 +269,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         """
         stream = io.BytesIO()
         if not openfhe.Serialize(self.data, stream):
-            ONP_ERROR("Failed to serialize ciphertext.")
+            raise ONPError("Failed to serialize ciphertext.")
 
         return {
             "type": self.type,
@@ -294,12 +294,12 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         ]
         for key in required_keys:
             if key not in obj:
-                ONP_ERROR(f"Missing required key '{key}' in serialized object.")
+                raise ONPError(f"Missing required key '{key}' in serialized object.")
 
         stream = io.BytesIO(bytes.fromhex(obj["ciphertext"]))
         ciphertext = openfhe.Ciphertext()
         if not openfhe.Deserialize(ciphertext, stream):
-            ONP_ERROR("Failed to deserialize ciphertext.")
+            raise ONPError("Failed to deserialize ciphertext.")
 
         return cls(
             ciphertext,
@@ -353,13 +353,13 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         """
 
         if self.ndim != 1 and self.ndim != 2:
-            ONP_ERROR(f"Dimension of array {self.ndim} is illegal ")
+            raise ONPError(f"Dimension of array {self.ndim} is illegal ")
 
         if self.ndim != 1 and axis is None:
-            ONP_ERROR("axis=None not allowed for >1D")
+            raise ONPError("axis=None not allowed for >1D")
 
         if self.ndim == 2 and axis not in (0, 1):
-            ONP_ERROR("Axis must be 0 or 1 for cumulative sum operation")
+            raise ONPError("Axis must be 0 or 1 for cumulative sum operation")
 
         order = self.order
         shape = self.shape
@@ -377,7 +377,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
                 ciphertext = EvalSumCumCols(self.data, self.nrows)
 
             else:
-                raise ONP_ERROR(f"Not support this packing order [{self.order}].")
+                raise ONPError(f"Not support this packing order [{self.order}].")
 
         # cumulative_sum over cols
         elif axis == 1:
@@ -388,9 +388,9 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
                 ciphertext = EvalSumCumRows(self.data, self.nrows, self.original_shape[0])
 
             else:
-                raise ONP_ERROR(f"Not support this packing order[{self.order}].")
+                raise ONPError(f"Not support this packing order[{self.order}].")
         else:
-            raise ONP_ERROR(f"Invalid axis [{axis}].")
+            raise ONPError(f"Invalid axis [{axis}].")
         return CTArray(ciphertext, original_shape, self.batch_size, shape, order)
 
     def gen_sum_row_key(self, secret_key: openfhe.PrivateKey) -> openfhe.EvalKey:

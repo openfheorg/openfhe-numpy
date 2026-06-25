@@ -19,11 +19,11 @@ def validate_and_print_results(computed, expected, operation_name):
 def main():
     """
     Run a demonstration of homomorphic vector operations using OpenFHE-NumPy:
-      • addition
-      • subtraction
-      • transpose
-      • elementwise multiplication
-      • inner product via *
+      - addition
+      - subtraction
+      - transpose
+      - elementwise multiplication
+      - inner product via *
     """
     # Cryptographic setup
     mult_depth = 4
@@ -48,7 +48,7 @@ def main():
     # Sample input vectors
     vector_a = [1.0, 2.0, 3.0, 4.0, 5.0]
     vector_b = [4.0, 0.0, 1.0, 3.0, 6.0]
-    vector_c = [1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8]
+    vector_c = [1.1, 2.2, 3.3, 4.0, 5.5, 6.6, 7.7, 8.8]
 
     print("\nInput vectors")
     print("vector_a:", vector_a)
@@ -113,7 +113,7 @@ def main():
     onp.gen_transpose_keys(keys.secretKey, ctv_a)
     ctv_a_T = onp.transpose(ctv_a)
     res_T = ctv_a_T.decrypt(keys.secretKey, unpack_type="original")
-    validate_and_print_results(res_T, np.transpose(vector_a), f"Tranpose \n{vector_a}")
+    validate_and_print_results(res_T, np.transpose(vector_a), f"Transpose \n{vector_a}")
 
     # 4) Elementwise multiplication
     ctv_mul = ctv_a * ctv_b
@@ -124,13 +124,13 @@ def main():
         f"Elementwise multiplication \n{vector_a} \n{vector_b} ",
     )
 
-    # 5) Elementwise multiplication
+    # 5) Scalar multiplication
     ctv_mul_scalar = ctv_a * 7
     res_mul_scalar = ctv_mul_scalar.decrypt(keys.secretKey, unpack_type="original")
     validate_and_print_results(
         res_mul_scalar,
         np.multiply(vector_a, 7),
-        f"Scalar Multiplcation \n{vector_a} and 7",
+        f"Scalar Multiplication \n{vector_a} and 7",
     )
 
     # 6) Inner product
