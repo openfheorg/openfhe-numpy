@@ -30,7 +30,7 @@
 # ==================================================================================
 
 import io
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Callable, Any
 import numpy as np
 import openfhe
 
@@ -52,6 +52,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     """
 
     tensor_priority = 10
+    is_encrypted = True
 
     @property
     def crypto_context(self):
@@ -312,9 +313,17 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     def __repr__(self) -> str:
         return f"CTArray(metadata={self.metadata})"
 
-    def _sum(self) -> "CTArray":
-        # TODO: implement sum over encrypted data
-        pass
+    def __neg__(self) -> "CTArray":
+        """Return the homomorphic negation of this ciphertext array."""
+        cc = self.data.GetCryptoContext()
+        return self.clone(cc.EvalNegate(self.data))
+    def sum(self, axis=None, keepdims: bool = False) -> "CTArray":
+        """Sum tensor elements over an axis."""
+        return self.__tensor_function__(
+            "sum",
+            (self,),
+            {"axis": axis, "keepdims": keepdims},
+        )
 
     def _transpose(self) -> "CTArray":
         """Internal function to evaluate transpose of an encrypted array."""
@@ -337,7 +346,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.order,
         )
 
-    def cumulative_sum(self, axis: int = 0) -> "CTArray":
+    def cumsum(self, axis: int = 0) -> "CTArray":
         """
         Compute the cumulative sum of tensor elements along a given axis.
 
@@ -403,3 +412,31 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             raise ValueError("Invalid order.")
 
         return sum_rows_key
+    def apply(self, func: Callable, *args: Any, **kwargs: Any) -> "CTArray":
+        """Apply a ciphertext-level function to the underlying ciphertext.
+        The function must accept ``self.data`` as its first argument and return an
+        OpenFHE ciphertext with the same logical packing layout.
+        Parameters
+        ----------
+        func : Callable
+            Function applied to the underlying ciphertext.
+        *args : Any
+            Additional positional arguments passed to ``func``.
+        **kwargs : Any
+            Additional keyword arguments passed to ``func``.
+        Returns
+        -------
+        CTArray
+            A new CTArray with the same shape/metadata but the transformed ciphertext.
+        Examples
+        --------
+        Bootstrap to refresh noise level:
+        ``result = a.apply(cc.EvalBootstrap)``
+        Chebyshev-style functions can be wrapped when the ciphertext is not the
+        first argument:
+        ``result = a.apply(lambda ct: cc.EvalChebyshevSeries(ct, coeffs, -8, 8))``
+        """
+        if not callable(func):
+            raise TypeError(f"apply expects a callable, got {type(func).__name__}.")
+        ct_result = func(self.data, *args, **kwargs)
+        return self.clone(data=ct_result)
