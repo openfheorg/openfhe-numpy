@@ -36,8 +36,10 @@ This module provides functions to create FHE array from various input types,
 including support for block-based tensor operations.
 """
 
+from __future__ import annotations
 # Third‐party imports
-from typing import Literal, Optional, Union
+from math import ceil, prod
+from typing import Any, Literal
 import numpy as np
 from openfhe import CryptoContext, PublicKey
 
@@ -59,49 +61,209 @@ from openfhe_numpy.utils.typecheck import (
 
 
 # Tensor imports
+from .tensor import FHETensor, PackedArrayInformation
 from .ctarray import CTArray
 from .ptarray import PTArray
-from .tensor import FHETensor, PackedArrayInformation
+from .block_tensor import BlockFHETensor
+from .block_ctarray import BlockCTArray
+from .block_ptarray import BlockPTArray
 
 
-def _get_block_dimensions(data: np.ndarray, slots: int) -> tuple[int, int]:
-    """
-    TODO: Compute the block‐matrix dimensions (rows, cols)
-    given raw `data` and number of slots.
-    """
-    pass
-
-
-def block_array(
-    cc: CryptoContext,
-    data: np.ndarray | Number | list,
-    batch_size: Optional[int] = None,
+def _shape(data: Any) -> tuple[int, ...]:
+    """Return NumPy-style shape."""
+    if isinstance(data, Number):
+        return ()
+    shape = getattr(data, "shape", None)
+    if shape is None:
+        shape = np.shape(data)
+    return tuple(shape)
+def _compute_block_dimensions(
+    shape: tuple[int, ...],
+    batch_size: int,
+    block_shape: tuple[int, ...] | None = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
-    fhe_type: Literal["C", "P"] = "C",
+    target_cols: int | None = None,
+    compact: bool = False,
+) -> tuple[int, ...]:
+    """Choose block dimensions if block_shape is None.
+    Default rules:
+        Vector  (n,)    -> (batch_size,), or (side,) where
+                           side = 2^floor(log2(batch_size)/2) if compact=True
+        Column  (m, 1)  -> (batch_size, 1)
+        Row     (1, n)  -> (1, batch_size)
+        General (m, n)  -> (side, side) where side = 2^floor(log2(batch_size)/2)
+    ``compact=True`` requests the smaller, square-compatible vector block
+    size required to pair a block vector with a block matrix for block
+    matrix-vector multiplication (see ``block_array``'s ``compact``
+    parameter). Plain block vectors used for vector-vector arithmetic
+    (add/sub/multiply/dot/matmul) should use the default, non-compact sizing.
+    TODO:
+    [OPTIONAL] For rectangular matrices where one dimension fits in a single
+    block, use rectangular block_shape to reduce wasted slots.
+    """
+    if len(shape) not in (1, 2):
+        raise ValueError(f"Only 1-D or 2-D shapes are supported; got {shape}.")
+    if batch_size <= 0:
+        raise ValueError(f"batch_size must be positive; got {batch_size}.")
+    if any(dim <= 0 for dim in shape):
+        raise ValueError(f"shape must be positive; got {shape}.")
+    if block_shape is not None:
+        block_shape = tuple(block_shape)
+        if len(block_shape) != len(shape):
+            raise ValueError(
+                f"block_shape rank must match shape rank; "
+                f"got block_shape={block_shape}, shape={shape}."
+            )
+        if any(dim <= 0 for dim in block_shape):
+            raise ValueError(f"block_shape must be positive; got {block_shape}.")
+        if prod(block_shape) > batch_size:
+            raise ValueError(
+                f"block_shape={block_shape} uses {prod(block_shape)} slots, "
+                f"but batch_size={batch_size}."
+            )
+        if len(block_shape) == 2:
+            br, bc = block_shape
+            if not is_power_of_two(br) or not is_power_of_two(bc):
+                raise ValueError(
+                    f"Matrix block dimensions must be powers of two; got block_shape={block_shape}."
+                )
+        return block_shape
+    if target_cols is not None:
+        if len(shape) != 1:
+            raise ValueError("target_cols is only valid for block vectors.")
+        if not isinstance(target_cols, int) or target_cols <= 0:
+            raise ValueError(f"target_cols must be a positive integer, got {target_cols!r}.")
+        if target_cols > batch_size:
+            raise ValueError(f"target_cols={target_cols} exceeds batch_size={batch_size}.")
+        return (target_cols,)
+    if len(shape) == 1:
+        if not compact:
+            return (batch_size,)
+        side = 1 << ((batch_size.bit_length() - 1) // 2)
+        return (side,)
+    m, n = shape
+    if n == 1:
+        return (batch_size, 1)
+    if m == 1:
+        return (1, batch_size)
+    side = 1 << ((batch_size.bit_length() - 1) // 2)
+    return (side, side)
+
+
+def _compute_grid_shape(
+    original_shape: tuple[int, ...],
+    block_shape: tuple[int, ...],
+) -> tuple[int, ...]:
+    """Return the number of blocks along each dimension."""
+    if len(original_shape) != len(block_shape):
+        raise ValueError(
+            f"original_shape and block_shape must have the same rank; "
+            f"got original_shape={original_shape}, block_shape={block_shape}."
+        )
+    return tuple(ceil(s / b) for s, b in zip(original_shape, block_shape))
+def block_array(
+    cc,
+    data: np.ndarray | list,
+    block_shape: tuple | None = None,
+    batch_size: int | None = None,
+    order: int = ArrayEncodingType.ROW_MAJOR,
     mode: str = "tile",
-    package: Optional[dict] = None,
-    public_key: PublicKey = None,
-    **kwargs,
-) -> FHETensor:
+    fhe_type: Literal["C", "P"] = "C",
+    public_key=None,
+    target_cols: int | None = None,
+    compact: bool = False,
+) -> BlockFHETensor:
+    """Construct a block plaintext/ciphertext tensor.
+    Tiles the input into encoded blocks, zero-pads edge blocks, and
+    returns a BlockCTArray or BlockPTArray.
+    ``compact`` (vectors only) requests the duplicated, square-compatible
+    packing (e.g. ROW_MAJOR -> [x0, x0, x1, x1]) required to pair a block
+    vector with a block matrix for block matrix-vector multiplication.
+    Leave it False (default) for plain block-vector arithmetic
+    (add/sub/multiply/dot/matmul) -- compact packing duplicates each
+    element, which corrupts summation-based ops like dot/matmul if used
+    outside of block matvec. Passing an explicit ``target_cols`` implies
+    ``compact=True``.
+    For advanced users who already have encoded blocks, call
+    BlockCTArray(...) or BlockPTArray(...) directly.
     """
-    Construct a block‐plaintext or block‐ciphertext array from raw input.
+    if cc is None:
+        raise ValueError("CryptoContext is required.")
+    if fhe_type not in ("C", "P"):
+        raise ValueError(f"fhe_type must be 'C' or 'P'; got {fhe_type!r}.")
+    if fhe_type == "C" and public_key is None:
+        raise ValueError("public_key is required for encryption.")
 
-    Parameters
-    ----------
-    cc         : CryptoContext
-    data       : np.ndarray | Number | list
-    batch_size : Optional[int]
-    order      : ArrayEncodingType
-    type      : "C" for ciphertext, "P" for plaintext
-    mode       : padding mode ("tile" or "zero")
-    package    : Optional prepacked dict from `_pack_array`
-    public_key : PublicKey (required for encryption)
+    if batch_size is None:
+        batch_size = cc.GetBatchSize()
+    arr = np.asarray(data)
+    original_shape = arr.shape
+    if arr.ndim == 0:
+        raise ValueError("Scalar input not supported. Use array() instead.")
+    if arr.ndim > 2:
+        raise ValueError(f"Only 1-D and 2-D supported; got shape {arr.shape}.")
+    is_compact = compact or target_cols is not None
+    block_shape = _compute_block_dimensions(
+        original_shape,
+        batch_size,
+        block_shape,
+        order=order,
+        target_cols=target_cols,
+        compact=is_compact,
+    )
+    grid_shape = _compute_grid_shape(original_shape, block_shape)
+    block_cls = BlockCTArray if fhe_type == "C" else BlockPTArray
+    blocks = []
+    if arr.ndim == 1:
+        chunk = block_shape[0]
+        for i in range(grid_shape[0]):
+            start = i * chunk
+            stop = min(start + chunk, original_shape[0])
+            tile = np.zeros(block_shape, dtype=arr.dtype)
+            tile[: stop - start] = arr[start:stop]
+            # matrix-vector multiplication.
+            vector_target_cols = chunk if is_compact and chunk * chunk <= batch_size else None
+            blocks.append(
+                array(
+                    cc=cc,
+                    data=tile,
+                    batch_size=batch_size,
+                    order=order,
+                    mode=mode,
+                    fhe_type=fhe_type,
+                    public_key=public_key,
+                    target_cols=vector_target_cols,
+                )
+            )
+    else:
+        br, bc = block_shape
+        for gi in range(grid_shape[0]):
+            r0, r1 = gi * br, min((gi + 1) * br, original_shape[0])
+            for gj in range(grid_shape[1]):
+                c0, c1 = gj * bc, min((gj + 1) * bc, original_shape[1])
+                tile = np.zeros(block_shape, dtype=arr.dtype)
+                tile[: r1 - r0, : c1 - c0] = arr[r0:r1, c0:c1]
+                blocks.append(
+                    array(
+                        cc=cc,
+                        data=tile,
+                        batch_size=batch_size,
+                        order=order,
+                        mode=mode,
+                        fhe_type=fhe_type,
+                        public_key=public_key,
+                    )
+                )
 
-    Returns
-    -------
-    FHETensor
-    """
-    pass
+    return block_cls(
+        data=blocks,
+        grid_shape=grid_shape,
+        block_shape=block_shape,
+        original_shape=original_shape,
+        batch_size=batch_size,
+        order=order,
+    )
+
 
 
 def _pack_array(
@@ -176,11 +338,11 @@ def _pack_array(
 def array(
     cc: CryptoContext,
     data: np.ndarray | Number | list,
-    batch_size: Optional[int] = None,
+    batch_size: int | None = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
     fhe_type: Literal["C", "P"] = "P",
     mode: str = "tile",
-    package: Optional[PackedArrayInformation] = None,
+    package: PackedArrayInformation | None = None,
     public_key: PublicKey = None,
     **kwargs,
 ) -> FHETensor:
@@ -209,7 +371,7 @@ def array(
     if not isinstance(batch_size, int) or batch_size < 0:
         raise ONPError(f"batch_size must be a non-negative int or None, got {batch_size}.")
 
-    if not package:
+    if package is None:
         package = _pack_array(data, batch_size, order, mode, **kwargs)
 
     try:
@@ -277,10 +439,9 @@ def _ravel_matrix(
 
     if order == ArrayEncodingType.ROW_MAJOR:
         return _pack_matrix_row_wise(data, batch_size, pad_to_pow2, mode)
-    elif order == ArrayEncodingType.COL_MAJOR:
+    if order == ArrayEncodingType.COL_MAJOR:
         return _pack_matrix_col_wise(data, batch_size, pad_to_pow2, mode)
-    else:
-        raise ValueError("Unsupported encoding order")
+    raise ValueError(f"Unsupported encoding order: {order}")
 
 
 def _ravel_vector(
@@ -315,7 +476,7 @@ def _ravel_vector(
     """
     target_cols = kwargs.get("target_cols")
     if target_cols is not None and not (isinstance(target_cols, int) and target_cols > 0):
-        raise ONPError(f"target_cols must be positive int or None, got {target_cols!r}.")
+        raise ONPError(f"target_cols must be a positive int or None, got {target_cols!r}.")
 
     pad_value = kwargs.get("pad_value", "tile")
     expand = kwargs.get("expand", "tile")
@@ -330,8 +491,8 @@ def _ravel_vector(
             pad_to_power_of_2=pad_to_pow2,
             pad_value=pad_value,
         )
-    elif order == ArrayEncodingType.COL_MAJOR:
-        return _pack_vector_row_wise(
+    if order == ArrayEncodingType.COL_MAJOR:
+        return _pack_vector_col_wise(
             vector=data,
             batch_size=batch_size,
             target_cols=target_cols,
@@ -340,5 +501,4 @@ def _ravel_vector(
             pad_to_power_of_2=pad_to_pow2,
             pad_value=pad_value,
         )
-    else:
-        raise ONPError("Unsupported encoding order")
+    raise ONPError(f"Unsupported encoding order: {order}")
