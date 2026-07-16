@@ -48,27 +48,39 @@ Compute diagonals for the permutation matrix Sigma.
 B[i,j] = A[i, i +j]
 */
 std::vector<double> GenSigmaDiag(size_t slots, size_t numCols, int32_t k) {
-    // the cast below is necessary as we don't want to mix signed and unsigned integers in calculations
-    int32_t nCols = static_cast<int32_t>(numCols);
-    int32_t n = nCols * nCols;
-    std::vector<double> diag(slots, 0);
+    if (numCols == 0) {
+        OPENFHE_THROW("numCols must be positive");
+    }
 
-    if (k >= 0) {
-        for (int32_t i = 0; i < n; i++) {
-            int32_t tmp = i - nCols * k;
-            if ((0 <= tmp) && (tmp < nCols - k)) {
-                diag[i] = 1;
+    const int32_t d = static_cast<int32_t>(numCols);
+    const size_t n = numCols * numCols;
+
+    if (slots < n || slots % n != 0) {
+        OPENFHE_THROW("slots must be a multiple of numCols * numCols");
+    }
+
+    std::vector<double> diag(slots, 0.0);
+
+    for (size_t t = 0; t < slots / n; ++t) {
+        const size_t base = t * n;
+
+        if (k >= 0) {
+            for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
+                int32_t tmp = i - d * k;
+                if ((0 <= tmp) && (tmp < d - k)) {
+                    diag[base + i] = 1.0;
+                }
+            }
+        } else {
+            for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
+                int32_t tmp = i - (d + k) * d;
+                if ((-k <= tmp) && (tmp < d)) {
+                    diag[base + i] = 1.0;
+                }
             }
         }
     }
-    else {
-        for (int32_t i = 0; i < n; i++) {
-            int32_t tmp = i - (nCols + k) * nCols;
-            if ((-k <= tmp) && (tmp < nCols)) {
-                diag[i] = 1;
-            }
-        }
-    }
+
     return diag;
 }
 
@@ -79,14 +91,29 @@ u_[d.k][k + d*i] = 1 for all 0 <= i < d
 */
 
 std::vector<double> GenTauDiag(size_t totalSlots, size_t numCols, int32_t k) {
-    uint32_t n = numCols * numCols;
-    std::vector<double> diag(totalSlots, 0);
+    if (numCols == 0) {
+        OPENFHE_THROW("numCols must be positive");
+    }
 
-    for (uint32_t t = 0; t < totalSlots / n; t++) {
-        for (uint32_t i = 0; i < numCols; i++) {
-            diag[(t * n) + k + numCols * i] = 1;
+    const size_t n = numCols * numCols;
+
+    if (totalSlots < n || totalSlots % n != 0) {
+        OPENFHE_THROW("slots must be a multiple of numCols * numCols");
+    }
+
+    if (k < 0 || static_cast<size_t>(k) >= numCols) {
+        OPENFHE_THROW("Tau diagonal index k is out of range");
+    }
+
+    std::vector<double> diag(totalSlots, 0.0);
+
+    for (size_t t = 0; t < totalSlots / n; ++t) {
+        const size_t base = t * n;
+        for (size_t i = 0; i < numCols; ++i) {
+            diag[base + static_cast<size_t>(k) + numCols * i] = 1.0;
         }
     }
+
     return diag;
 }
 
@@ -98,19 +125,35 @@ std::vector<double> GenTauDiag(size_t totalSlots, size_t numCols, int32_t k) {
  *diagonal
  */
 std::vector<double> GenPhiDiag(size_t slots, size_t numCols, int32_t k, int type) {
-    uint32_t n = numCols * numCols;
-    std::vector<double> diag(slots, 0);
-
-    if (type == 0) {
-        for (uint32_t i = 0; i < n; i++)
-            if ((i % numCols >= 0) && ((i % numCols) < numCols - k))
-                diag[i] = 1;
+    if (numCols == 0) {
+        OPENFHE_THROW("numCols must be positive");
     }
-    else {
-        for (uint32_t i = 0; i < n; i++)
-            if ((i % numCols >= numCols - k) && (i % numCols < numCols)) {
-                diag[i] = 1;
+
+    const size_t d = numCols;
+    const size_t n = d * d;
+
+    if (slots < n || slots % n != 0) {
+        OPENFHE_THROW("slots must be a multiple of numCols * numCols");
+    }
+
+    std::vector<double> diag(slots, 0.0);
+
+    for (size_t t = 0; t < slots / n; ++t) {
+        const size_t base = t * n;
+
+        if (type == 0) {
+            for (size_t i = 0; i < n; ++i) {
+                if ((i % d) < d - static_cast<size_t>(k)) {
+                    diag[base + i] = 1.0;
+                }
             }
+        } else {
+            for (size_t i = 0; i < n; ++i) {
+                if ((i % d) >= d - static_cast<size_t>(k)) {
+                    diag[base + i] = 1.0;
+                }
+            }
+        }
     }
 
     return diag;

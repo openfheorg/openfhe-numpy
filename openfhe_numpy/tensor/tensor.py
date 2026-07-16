@@ -49,6 +49,7 @@ TPL = TypeVar("Template")
 # Don't implement anything here
 class BaseTensor(ABC, Generic[TPL]):
     is_encrypted: bool = False
+
     @property
     @abstractmethod
     def shape(self) -> Tuple[int, ...]: ...
@@ -129,7 +130,6 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         "_dtype",
         "extra",
     )
-    is_encrypted = False
 
     @overload
     def __init__(
@@ -279,10 +279,6 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             raise ONPError(f"Not support order [f{order}]")
 
     @property
-    def is_encrypted(self) -> int:
-        return "CT" in self.dtype
-
-    @property
     def info(self) -> Dict[str, Any]:
         """Metadata dict for serialization or inspection."""
         return {
@@ -376,7 +372,6 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     def __pow__(self, exponent):
         return self.__tensor_function__("power", (self, exponent))
 
-
     def sum(self, axis=None, keepdims=False):
         """
         Sum tensor entries over all elements or one axis.
@@ -385,10 +380,13 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         if axis is not None:
             if not isinstance(axis, int):
                 raise TypeError(f"axis must be None or an integer, got {type(axis).__name__}.")
+
             if axis < 0:
                 axis += self.ndim
+
             if axis < 0 or axis >= self.ndim:
                 raise ValueError(f"Invalid axis {axis} for tensor with {self.ndim} dimensions.")
+
         return self.__tensor_function__(
             "sum",
             (self,),
@@ -425,47 +423,6 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         CTArray
         """
         raise NotImplementedError()
-
-    # def ensure_compatible_packing(self, other):
-    #     """
-    #     Ensure tensors have compatible packing for operations.
-
-    #     Returns a version of 'other' with matching packing order.
-    #     """
-    #     if not isinstance(other, FHETensor):
-    #         return other
-
-    #     if self.order == other.order:
-    #         return other
-
-    #     return other.convert_packing_order(self.order)
-
-    # def convert_packing_order(self, target_order):
-    #     """
-    #     Convert tensor to a different packing order.
-
-    #     Parameters
-    #     ----------
-    #     target_order : int
-    #         Desired packing order (ROW_MAJOR or COL_MAJOR)
-
-    #     Returns
-    #     -------
-    #     FHETensor
-    #         New tensor with converted packing order
-    #     """
-    #     if self.order == target_order:
-    #         return self.clone()
-
-    #     # Perform conversion
-    #     if self.dtype == "CTArray":
-    #         # For ciphertexts, use transpose operation
-    #         transposed = self._transpose()
-    #         # Update order flag
-    #         transposed._order = target_order
-    #         return transposed
-    #     else:
-    #         pass
 
 
 def copy_tensor(tensor: "FHETensor") -> "FHETensor":

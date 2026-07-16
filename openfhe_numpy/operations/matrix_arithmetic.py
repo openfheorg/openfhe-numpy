@@ -110,28 +110,6 @@ def add_cta_scalar(a, scalar):
     return CTArray(result, a.original_shape, a.batch_size, a.shape, a.order)
 
 
-@register_tensor_function("add", ("scalar", "CTArray"))
-def add_scalar_cta(scalar, a):
-    """Add a scalar to a x."""
-    crypto_context = a.data.GetCryptoContext()
-    result = crypto_context.EvalAdd(a.data, scalar)
-    return CTArray(result, a.original_shape, a.batch_size, a.shape, a.order)
-
-
-@register_tensor_function(
-    "add", [("BlockCTArray", "BlockCTArray"), ("BlockCTArray", "BlockPTArray")]
-)
-def add_block_ct(a, b):
-    """Add two block tensors."""
-    raise NotImplementedError("BlockPTArray and BlockCTArray addition not implemented yet.")
-
-
-@register_tensor_function("add", [("BlockCTArray", "scalar")])
-def add_block_ct_scalar(a, scalar):
-    """Add a scalar to a block x."""
-    raise NotImplementedError("BlockPTArray and scalar addition not implemented yet.")
-
-
 # ------------------------------------------------------------------------------
 # Subtraction Operations
 # ------------------------------------------------------------------------------
@@ -148,7 +126,7 @@ def _eval_sub(lhs, rhs):
         rhs = rhs.data
 
     result = crypto_context.EvalSub(lhs.data, rhs)
-    return lhs.clone(result)
+    return CTArray(result, lhs.original_shape, lhs.batch_size, lhs.shape, lhs.order)
 
 
 @register_tensor_function(
@@ -237,21 +215,6 @@ def multiply_ct_scalar(a, scalar):
     return _eval_multiply(a, scalar)
 
 
-@register_tensor_function(
-    "multiply",
-    [("BlockCTArray", "BlockCTArray"), ("BlockCTArray", "BlockPTArray")],
-)
-def multiply_block_ct(a, b):
-    """Multiply two block tensors element-wise."""
-    raise NotImplementedError("BlockPTArray multiplication not implemented yet.")
-
-
-@register_tensor_function("multiply", [("BlockCTArray", "scalar")])
-def multiply_block_ct_scalar(a, scalar):
-    """Multiply a block tensor by a scalar."""
-    raise NotImplementedError("BlockPTArray and scalar multiplication not implemented yet.")
-
-
 ##############################################################################
 # MATRIX OPERATIONS
 ##############################################################################
@@ -266,8 +229,9 @@ def _eval_matvec_ct(lhs, rhs):
     if lhs.ndim == 2 and rhs.ndim == 1:
         if lhs.original_shape[1] != rhs.original_shape[0]:
             raise ONPIncompatibleShapeError(
-                lhs.original_shape, rhs.original_shape,
-                f"Matrix dimension [{lhs.original_shape}] mismatch with vector dimension [{rhs.shape}]"
+                lhs.original_shape,
+                rhs.original_shape,
+                f"Matrix dimension [{lhs.original_shape}] mismatch with vector dimension [{rhs.shape}]",
             )
 
         if lhs.order == ArrayEncodingType.ROW_MAJOR and rhs.order == ArrayEncodingType.COL_MAJOR:
@@ -283,7 +247,7 @@ def _eval_matvec_ct(lhs, rhs):
 
         elif lhs.order == ArrayEncodingType.COL_MAJOR and rhs.order == ArrayEncodingType.ROW_MAJOR:
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
-            ct_prod = cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], lhs.batch_size * 4)
+            ct_prod = cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], 0)
             return CTArray(
                 ct_prod,
                 (lhs.original_shape[0],),
@@ -291,6 +255,7 @@ def _eval_matvec_ct(lhs, rhs):
                 (lhs.shape[1], lhs.shape[0]),
                 ArrayEncodingType.COL_MAJOR,
             )
+
         else:
             raise ONPError(
                 f"Encoding styles of matrix ({lhs.order}) and vector ({rhs.order}) must be complementary (ROW_MAJOR/COL_MAJOR or vice versa)."
@@ -371,7 +336,11 @@ def transpose_ct(a):
 # Power Operations
 # ------------------------------------------------------------------------------
 def _pow(x, exp: int):
-    """Exponentiate a matrix to power k using homomorphic multiplication."""
+    """Raise a tensor to an integer power element-wise (NumPy ``power`` semantics).
+
+    Each element ``x_i`` is raised to ``exp`` via homomorphic element-wise
+    multiplication (``x * x * ... * x``).
+    """
     if not isinstance(exp, int):
         raise ONPError(f"Exponent must be integer, got {type(exp).__name__}")
 
@@ -379,34 +348,27 @@ def _pow(x, exp: int):
         raise ONPError("Negative exponent not supported in homomorphic encryption")
 
     if exp == 0:
-        # return algebra.eye(tensor))
-        pass
+        raise ONPNotSupportedError("Element-wise power with exponent 0 (all-ones) is not supported")
 
     if exp == 1:
         return x.clone()
 
-    # Binary exponentiation implementation
     base = x.clone()
     result = None
 
     while exp:
         if exp & 1:
-            result = base if result is None else base @ result
-        base = base @ base
+            result = base if result is None else base * result
         exp >>= 1
+        if exp:
+            base = base * base
     return result
 
 
-@register_tensor_function("pow", [("CTArray", "int")])
+@register_tensor_function("power", [("CTArray", "int")])
 def pow_ct(a, exp):
-    """Raise a tensor to an integer power."""
+    """Raise a tensor to an integer power element-wise."""
     return _pow(a, exp)
-
-
-@register_tensor_function("pow", [("BlockCTArray", "int")])
-def pow_block_ct(a, exp):
-    """Raise a block tensor to an integer power."""
-    raise NotImplementedError("BlockPTArray power not implemented yet.")
 
 
 # ------------------------------------------------------------------------------
@@ -415,21 +377,13 @@ def pow_block_ct(a, exp):
 
 
 @register_tensor_function(
-    "cumulative_sum",
+    "cumsum",
     [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")],
 )
-def cumulative_sum_ct(obj, axis=0, keepdims=True):
+def cumsum_ct(obj, axis=0, keepdims=True):
     """Compute cumulative sum of a tensor along specified axis."""
-    # return _cumulative_sum_ct(a, axis, keepdims)
-    return obj.cumulative_sum(axis)
-
-
-@register_tensor_function(
-    "cumulative_sum", [("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")]
-)
-def cumulative_sum_block_ct(obj, axis=0, keepdims=True):
-    """Compute cumulative sum of a block tensor along specified axis."""
-    raise NotImplementedError("BlockPTArray cumulative not implemented yet.")
+    # return _cumsum_ct(a, axis, keepdims)
+    return obj.cumsum(axis)
 
 
 # ------------------------------------------------------------------------------
@@ -467,12 +421,6 @@ def _reduce_ct(a, axis=0, keepdims=False):
 def cumulative_reduce_ct(a, axis=0, keepdims=False):
     """Compute cumulative reduction of a tensor along specified axis."""
     return _reduce_ct(a, axis, keepdims)
-
-
-@register_tensor_function("cumulative_reduce", [("BlockCTArray", "int")])
-def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
-    """Compute cumulative reduction of a block tensor along specified axis."""
-    raise NotImplementedError("BlockPTArray power not implemented yet.")
 
 
 # ------------------------------------------------------------------------------
@@ -535,7 +483,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
     elif axis == 0:
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
-            ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], x.batch_size * 4)
+            ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], 0)
             padded_shape = x.shape
             order = ArrayEncodingType.COL_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
@@ -558,7 +506,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             padded_shape = x.shape
             order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
-            ct_sum = cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], x.batch_size * 4)
+            ct_sum = cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], 0)
             padded_shape = (ncols, nrows)
             order = ArrayEncodingType.COL_MAJOR
         else:
