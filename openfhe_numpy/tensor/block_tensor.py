@@ -548,7 +548,7 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
 
     def __pow__(self, exp):
         """Return matrix power ``self ** exp`` through tensor dispatch."""
-        return self.__tensor_function__("pow", (self, exp))
+        return self.__tensor_function__("power", (self, exp))
 
     @property
     def T(self):
@@ -606,7 +606,7 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
         )
 
     def same_layout(self, other: Any) -> bool:
-        """Return ``True`` if layout metadata and encryption status match."""
+        """Return ``True`` if block/grid layout metadata match."""
         attrs = (
             "original_shape",
             "shape",
@@ -614,7 +614,6 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
             "order",
             "block_shape",
             "grid_shape",
-            "is_encrypted",
         )
         if not all(hasattr(other, attr) for attr in attrs):
             return False
@@ -626,12 +625,15 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
             and self._order == other.order
             and self._block_shape == other.block_shape
             and self._grid_shape == other.grid_shape
-            and self.is_encrypted == other.is_encrypted
         )
 
     def same_metadata(self, other: Any) -> bool:
         """Return ``True`` if layout metadata, encryption status, and dtype match."""
-        return self.same_layout(other) and getattr(other, "dtype", None) == self._dtype
+        return (
+            self.same_layout(other)
+            and getattr(other, "is_encrypted", None) == self.is_encrypted
+            and getattr(other, "dtype", None) == self._dtype
+        )
 
     def __eq__(self, other: Any) -> bool:
         """Return metadata-only equality.

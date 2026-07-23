@@ -28,8 +28,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
-#include "numpy_enc_matrix.h"
 
+#include <limits>
+#include "numpy_enc_matrix.h"
 #include "numpy_utils.h"
 
 using namespace lbcrypto;
@@ -46,23 +47,35 @@ namespace openfhe_numpy {
 * @param numRepeats   Optional offset used by PHI and PSI types.
 * @return std::vector<int32_t> List of rotation indices to be used for EvalRotateKeyGen.
 **/
-static std::vector<int32_t> GenLinTransIndices(uint32_t numCols, LinTransType type, uint32_t numRepeats = 0) {
-    if (numCols < 0) {
+static std::vector<int32_t> GenLinTransIndices(
+    uint32_t numCols,
+    LinTransType type,
+    uint32_t numRepeats = 0
+) {
+    if (numCols == 0) {
         OPENFHE_THROW("numCols must be positive");
     }
 
-    if (numCols > std::numeric_limits<int32_t>::max() / 2 ||  // conservative upper bound
-        numRepeats < 0 || numRepeats > std::numeric_limits<int32_t>::max() / 2) {
+    if (numCols > static_cast<uint32_t>(std::numeric_limits<int32_t>::max() / 2) ||
+        numRepeats > static_cast<uint32_t>(std::numeric_limits<int32_t>::max() / 2)) {
         OPENFHE_THROW("numCols or numRepeats too large");
     }
 
+    const int32_t nCols  = static_cast<int32_t>(numCols);
+    const int32_t repeats = static_cast<int32_t>(numRepeats);
+
+    if (numCols > static_cast<uint32_t>(std::numeric_limits<int32_t>::max() / numCols)) {
+        OPENFHE_THROW("numCols * numCols is too large");
+    }
+
+    const int32_t blockSize = nCols * nCols;
+
     std::vector<int32_t> rotationIndices;
-    int32_t nCols = static_cast<int32_t>(numCols);
 
     switch (type) {
         case LinTransType::SIGMA:
             // Generate indices from -numCols to numCols - 1
-            rotationIndices.reserve(2*nCols);
+            rotationIndices.reserve(2 * nCols);
             for (int32_t k = -nCols; k < nCols; ++k) {
                 rotationIndices.push_back(k);
             }
@@ -70,9 +83,12 @@ static std::vector<int32_t> GenLinTransIndices(uint32_t numCols, LinTransType ty
 
         case LinTransType::TAU:
             // Generate indices: 0, numCols, 2*numCols, ..., (numCols-1)*numCols
-            rotationIndices.reserve(nCols);
+            rotationIndices.reserve(2 * nCols - 1);
             for (int32_t k = 0; k < nCols; ++k) {
                 rotationIndices.push_back(nCols * k);
+                if (k != 0) {
+                    rotationIndices.push_back(nCols * k - blockSize);
+                }
             }
             break;
 
@@ -80,18 +96,22 @@ static std::vector<int32_t> GenLinTransIndices(uint32_t numCols, LinTransType ty
             // Generate indices: numRepeats, numRepeats - numCols
             rotationIndices.reserve(2);
             for (int32_t k = 0; k < 2; ++k) {
-                rotationIndices.push_back(numRepeats - k * nCols);
+                rotationIndices.push_back(repeats - k * nCols);
             }
             break;
 
         case LinTransType::PSI:
             // Generate a single index based on offset
-            rotationIndices.push_back(nCols * numRepeats);
+            rotationIndices.reserve(2);
+            rotationIndices.push_back(nCols * repeats);
+            if (repeats != 0) {
+                rotationIndices.push_back(nCols * repeats - blockSize);
+            }
             break;
 
         case LinTransType::TRANSPOSE:
             // Generate indices for transposing a square matrix via diagonals
-            rotationIndices.reserve(2*nCols);
+            rotationIndices.reserve(2 * nCols);
             for (int32_t k = -nCols + 1; k < nCols; ++k) {
                 rotationIndices.push_back((nCols - 1) * k);
             }
@@ -99,7 +119,6 @@ static std::vector<int32_t> GenLinTransIndices(uint32_t numCols, LinTransType ty
 
         default:
             OPENFHE_THROW("Linear transformation is undefined");
-            break;
     }
 
     return rotationIndices;
@@ -189,7 +208,7 @@ Ciphertext<DCRTPoly> EvalMultMatVec(std::shared_ptr<std::map<uint32_t,
                                     uint32_t numCols,
                                     ConstCiphertext<DCRTPoly>& ctVector,
                                     ConstCiphertext<DCRTPoly>& ctMatrix) {
-    if (numCols < 0) {
+    if (numCols <= 0) {
         OPENFHE_THROW("numCols must be positive");
     }
 
@@ -295,48 +314,192 @@ std::vector<double> EvalLinTransSigma(const std::vector<double>& vector, uint32_
  * @param numCols The number of columns in the transformation matrix.
  * @return The resulting ciphertext after the transformation.
 */
-Ciphertext<DCRTPoly> EvalLinTransTau(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols) {
-    CryptoContext<DCRTPoly>  cc = ctVector->GetCryptoContext();
-    bool flag          = true;
-    Ciphertext<DCRTPoly> ctResult;
 
-    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
+namespace {
 
-    for (size_t k = 0; k < numCols; ++k) {
-        size_t shift = (static_cast<size_t>(numCols) * k) % slots;
-        Ciphertext<DCRTPoly> ctRotated  = cc->EvalRotate(ctVector, shift);
-        Plaintext ptDiagonal = cc->MakeCKKSPackedPlaintext(GenTauDiag(slots, numCols, k));
-        Ciphertext<DCRTPoly> ctProd     = cc->EvalMult(ctRotated, ptDiagonal);
-
-        if (flag) {
-            ctResult = ctProd;
-            flag     = false;
-        }
-        else {
-            cc->EvalAddInPlace(ctResult, ctProd);
-        }
+void ValidateCompactSquareTransform(size_t slots, uint32_t numCols) {
+    if (numCols == 0) {
+        OPENFHE_THROW("numCols must be positive");
     }
-    return ctResult;
+
+    const size_t d = static_cast<size_t>(numCols);
+    const size_t blockSize = d * d;
+
+    if (slots < blockSize || slots % blockSize != 0) {
+        OPENFHE_THROW("slots must be a multiple of numCols * numCols");
+    }
 }
 
+// The ciphertext holds slots/blockSize replicated copies of the matrix
+// (see EncodeMatrix), so the mask must repeat every blockSize entries --
+// matching the tiling already done by GenSigmaDiag/GenTauDiag/GenPhiDiag --
+// otherwise every replica after the first is left zeroed out.
+std::vector<double> GenCompactRowShiftDiag(size_t slots, uint32_t numCols, uint32_t k, bool wrapPart) {
+    ValidateCompactSquareTransform(slots, numCols);
+
+    const size_t d = static_cast<size_t>(numCols);
+    const size_t kk = static_cast<size_t>(k);
+    const size_t n = d * d;
+
+    if (kk >= d) {
+        OPENFHE_THROW("row-shift index k is out of range");
+    }
+
+    std::vector<double> diag(slots, 0.0);
+
+    for (size_t t = 0; t < slots / n; ++t) {
+        const size_t base = t * n;
+        for (size_t row = 0; row < d; ++row) {
+            const bool wraps = (row + kk >= d);
+            if (wraps != wrapPart) {
+                continue;
+            }
+
+            for (size_t col = 0; col < d; ++col) {
+                diag[base + row * d + col] = 1.0;
+            }
+        }
+    }
+
+    return diag;
+}
+
+std::vector<double> GenCompactTauDiag(size_t slots, uint32_t numCols, uint32_t col, bool wrapPart) {
+    ValidateCompactSquareTransform(slots, numCols);
+
+    const size_t d = static_cast<size_t>(numCols);
+    const size_t j = static_cast<size_t>(col);
+    const size_t n = d * d;
+
+    if (j >= d) {
+        OPENFHE_THROW("Tau column index is out of range");
+    }
+
+    std::vector<double> diag(slots, 0.0);
+
+    for (size_t t = 0; t < slots / n; ++t) {
+        const size_t base = t * n;
+        for (size_t row = 0; row < d; ++row) {
+            const bool wraps = (row + j >= d);
+            if (wraps == wrapPart) {
+                diag[base + row * d + j] = 1.0;
+            }
+        }
+    }
+
+    return diag;
+}
+
+std::vector<double> EvalCompactRowShift(const std::vector<double>& vector, uint32_t numCols, uint32_t k) {
+    const size_t slots = vector.size();
+    ValidateCompactSquareTransform(slots, numCols);
+
+    const int32_t d = static_cast<int32_t>(numCols);
+    const int32_t kk = static_cast<int32_t>(k);
+    const int32_t blockSize = d * d;
+
+    std::vector<double> result(slots, 0.0);
+
+    auto addMaskedRotation = [&](int32_t shift, bool wrapPart) {
+        std::vector<double> diag = GenCompactRowShiftDiag(slots, numCols, k, wrapPart);
+        const int32_t signedSlots = static_cast<int32_t>(slots);
+        const int32_t normalizedShift = ((shift % signedSlots) + signedSlots) % signedSlots;
+
+        for (size_t i = 0; i < slots; ++i) {
+            result[i] += vector[(i + normalizedShift) % slots] * diag[i];
+        }
+    };
+
+    addMaskedRotation(d * kk, false);
+
+    if (kk != 0) {
+        addMaskedRotation(d * kk - blockSize, true);
+    }
+
+    return result;
+}
+
+}  // namespace
+
+Ciphertext<DCRTPoly> EvalLinTransTau(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols) {
+    CryptoContext<DCRTPoly> cc = ctVector->GetCryptoContext();
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
+
+    ValidateCompactSquareTransform(slots, numCols);
+
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const int32_t blockSize = nCols * nCols;
+
+    bool flag = true;
+    Ciphertext<DCRTPoly> ctResult;
+
+    for (uint32_t k = 0; k < numCols; ++k) {
+        const int32_t kk = static_cast<int32_t>(k);
+
+        Plaintext ptNoWrap = cc->MakeCKKSPackedPlaintext(
+            GenCompactTauDiag(slots, numCols, k, false)
+        );
+        Ciphertext<DCRTPoly> ctNoWrap = cc->EvalMult(
+            cc->EvalRotate(ctVector, nCols * kk),
+            ptNoWrap
+        );
+
+        if (flag) {
+            ctResult = ctNoWrap;
+            flag = false;
+        } else {
+            cc->EvalAddInPlace(ctResult, ctNoWrap);
+        }
+
+        if (k != 0) {
+            Plaintext ptWrap = cc->MakeCKKSPackedPlaintext(
+                GenCompactTauDiag(slots, numCols, k, true)
+            );
+            Ciphertext<DCRTPoly> ctWrap = cc->EvalMult(
+                cc->EvalRotate(ctVector, nCols * kk - blockSize),
+                ptWrap
+            );
+            cc->EvalAddInPlace(ctResult, ctWrap);
+        }
+    }
+
+    return ctResult;
+}
 
 /**
 * @brief LinTrans on a packed matrix
 */
 std::vector<double> EvalLinTransTau(const std::vector<double>& vector, uint32_t numCols) {
     const size_t slots = vector.size();
-    std::vector<double> result(slots, 0);
+    ValidateCompactSquareTransform(slots, numCols);
 
-    for (size_t k = 0; k < numCols; ++k) {
-        size_t shift = (numCols * k) % slots;
-        std::vector<double> diag = GenTauDiag(slots, numCols, k);
-        for (size_t i = 0; i < slots; ++i) {
-            result[i] += vector[(i + shift) % slots] * diag[i];
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const int32_t blockSize = nCols * nCols;
+
+    std::vector<double> result(slots, 0.0);
+
+    for (uint32_t k = 0; k < numCols; ++k) {
+        const int32_t kk = static_cast<int32_t>(k);
+
+        auto addMaskedRotation = [&](int32_t shift, bool wrapPart) {
+            std::vector<double> diag = GenCompactTauDiag(slots, numCols, k, wrapPart);
+            const int32_t signedSlots = static_cast<int32_t>(slots);
+            const int32_t normalizedShift = ((shift % signedSlots) + signedSlots) % signedSlots;
+
+            for (size_t i = 0; i < slots; ++i) {
+                result[i] += vector[(i + normalizedShift) % slots] * diag[i];
+            }
+        };
+
+        addMaskedRotation(nCols * kk, false);
+
+        if (k != 0) {
+            addMaskedRotation(nCols * kk - blockSize, true);
         }
     }
+
     return result;
 }
-
 Ciphertext<DCRTPoly> EvalLinTransTau(PrivateKey<DCRTPoly>& secretKey,
                                     ConstCiphertext<DCRTPoly>& ciphertext,
                                     uint32_t numCols) {
@@ -355,26 +518,40 @@ Ciphertext<DCRTPoly> EvalLinTransTau(PrivateKey<DCRTPoly>& secretKey,
 *
 * @param numCols   The number of padded cols in the encoded matrix
 */
-Ciphertext<DCRTPoly> EvalLinTransPhi(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols, uint32_t numRepeats) {
+Ciphertext<DCRTPoly> EvalLinTransPhi(
+    ConstCiphertext<DCRTPoly>& ctVector,
+    uint32_t numCols,
+    uint32_t numRepeats
+) {
+    if (numCols == 0) {
+        OPENFHE_THROW("numCols must be positive");
+    }
 
-    CryptoContext<DCRTPoly>  cc = ctVector->GetCryptoContext();
+    CryptoContext<DCRTPoly> cc = ctVector->GetCryptoContext();
     const size_t slots = cc->GetEncodingParams()->GetBatchSize();
 
-    bool flag          = true;
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const int32_t repeats = static_cast<int32_t>(numRepeats);
+
+    bool flag = true;
     Ciphertext<DCRTPoly> ctResult;
 
-    for (size_t i = 0; i < 2; ++i) {
-        int32_t rotateIdx  = numRepeats - i * numCols;
+    for (int32_t i = 0; i < 2; ++i) {
+        const int32_t rotateIdx = repeats - i * nCols;
+
         Plaintext ptDiagonal = cc->MakeCKKSPackedPlaintext(
-                                    GenPhiDiag(slots, numCols, numRepeats, i));
-        Ciphertext<DCRTPoly> ctRotated  = cc->EvalRotate(ctVector, rotateIdx);
-        Ciphertext<DCRTPoly> ctProd  = cc->EvalMult(ctRotated, ptDiagonal);
+            GenPhiDiag(slots, numCols, repeats, i)
+        );
+
+        Ciphertext<DCRTPoly> ctRotated = cc->EvalRotate(ctVector, rotateIdx);
+        Ciphertext<DCRTPoly> ctProd = cc->EvalMult(ctRotated, ptDiagonal);
+
         if (flag) {
             ctResult = ctProd;
-            flag     = false;
-        }
-        else
+            flag = false;
+        } else {
             cc->EvalAddInPlace(ctResult, ctProd);
+        }
     }
 
     return ctResult;
@@ -423,14 +600,39 @@ Ciphertext<DCRTPoly> EvalLinTransPsi(PrivateKey<DCRTPoly>& secretKey,
 const std::vector<double> EvalLinTransPsi(const std::vector<double>& input,
                                            uint32_t numCols,
                                            uint32_t numRepeats) {
-    return RotateVector<std::vector<double>>(input, numCols * numRepeats);
+    return EvalCompactRowShift(input, numCols, numRepeats);
 }
-
 Ciphertext<DCRTPoly> EvalLinTransPsi(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols, uint32_t numRepeats) {
     CryptoContext<DCRTPoly> cc = ctVector->GetCryptoContext();
-    return cc->EvalRotate(ctVector, numCols * numRepeats);
-}
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
 
+    ValidateCompactSquareTransform(slots, numCols);
+
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const int32_t repeats = static_cast<int32_t>(numRepeats);
+    const int32_t blockSize = nCols * nCols;
+
+    Plaintext ptNoWrap = cc->MakeCKKSPackedPlaintext(
+        GenCompactRowShiftDiag(slots, numCols, numRepeats, false)
+    );
+    Ciphertext<DCRTPoly> ctResult = cc->EvalMult(
+        cc->EvalRotate(ctVector, nCols * repeats),
+        ptNoWrap
+    );
+
+    if (numRepeats != 0) {
+        Plaintext ptWrap = cc->MakeCKKSPackedPlaintext(
+            GenCompactRowShiftDiag(slots, numCols, numRepeats, true)
+        );
+        Ciphertext<DCRTPoly> ctWrap = cc->EvalMult(
+            cc->EvalRotate(ctVector, nCols * repeats - blockSize),
+            ptWrap
+        );
+        cc->EvalAddInPlace(ctResult, ctWrap);
+    }
+
+    return ctResult;
+}
 /**
  * @brief Multiplies two square matrices: CT x CT.
  * Implementation is based on https://eprint.iacr.org/2018/1041)
@@ -549,7 +751,7 @@ Ciphertext<DCRTPoly> EvalTranspose(PrivateKey<DCRTPoly>& secretKey,
 }
 Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols) {
     try {
-        if (numCols < 0) {
+        if (numCols <= 0) {
             OPENFHE_THROW("numCols must be positive");
         }
         CryptoContext<DCRTPoly>  cc = ciphertext->GetCryptoContext();
@@ -559,7 +761,7 @@ Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext, uint32
         const int32_t nCols = static_cast<int32_t>(numCols);
 
         for (int32_t index = -nCols + 1; index < nCols; ++index) {
-            int32_t rotationIndex = (numCols - 1) * index;
+            int32_t rotationIndex = (nCols - 1) * index;
             auto diagonalVector   = GenTransposeDiag(slots, numCols, index);
             auto ptDiagonal       = cc->MakeCKKSPackedPlaintext(diagonalVector);
             auto ctRotated        = cc->EvalRotate(ciphertext, rotationIndex);
