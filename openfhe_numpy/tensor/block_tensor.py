@@ -81,8 +81,7 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
     Limitations
     -----------
     - Only 1-D vectors and 2-D matrices are supported.
-    - Logical slicing/rotation/broadcasting is not implemented yet.
-
+    - Logical slicing/rotation is not implemented yet.
     Subclasses declare encryption status using the class attribute:
     ``is_encrypted = True`` for ciphertext block arrays and ``False`` for
     plaintext block arrays.

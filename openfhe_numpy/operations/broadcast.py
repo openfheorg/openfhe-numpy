@@ -28,388 +28,306 @@
 #  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ================================================================================
-"""
-matrix_arithmetic.py
+"""NumPy-style broadcasting for packed plaintext and ciphertext tensors"""
 
-This module implements the core arithmetic operations for encrypted tensors
-using the OpenFHE library. Operations include addition, subtraction, multiplication,
-matrix multiplication, and other mathematical operations.
-"""
+from math import prod
+from operator import index as operator_index
 
-# Third-party imports
 import numpy as np
+
 from ..openfhe_numpy import ArrayEncodingType
-from ..utils.matlib import next_power_of_two
-from ..utils._helper_slots_ops import _create_masking, _duplicate_block
 from ..tensor.constructors import array
+from ..utils._helper_slots_ops import _create_masking, _duplicate_block
+from ..utils.errors import (
+    ONPDimensionError,
+    ONPIncompatibleShapeError,
+    ONPNotImplementedError,
+    ONPValueError,
+)
+from ..utils.matlib import next_power_of_two
 
 
-# ------------------------------------------------------------------------------
-# Utilities functions for broadcasting
-# ------------------------------------------------------------------------------
+_ORDERS = (ArrayEncodingType.ROW_MAJOR, ArrayEncodingType.COL_MAJOR)
 
 
 def broadcast_shapes(x_shape, y_shape):
+    """Return the NumPy broadcast shape of two logical shapes."""
     return np.broadcast_shapes(x_shape, y_shape)
 
 
-# Broadcasting rules: expand operands to a common shape (x, y) -> (a, b)
-#
-# 1. Scalar: () -> (1, 1)
-#    1 + 2                     -> 3
-#    1 + [1, 2, 3]             -> [2, 3, 4]
-#    1 + [[1, 2], [3, 4]]      -> [[6, 7], [8, 9]]
-#
-# 2. Vector: (n,) -> (1, n)
-#    - (n,) + (n,)             -> (n,)
-#      Example: [1, 2, 3] + [10, 20, 30]
-#               -> [11, 22, 33]
-#
-#    - (m, n) + (n,)           -> (m, n)
-#      Example: [[1, 2, 3],
-#                [4, 5, 6]] + [10, 20, 30]
-#               -> [[11, 22, 33],
-#                   [14, 25, 36]]
-#
-# 3. Matrix: (m, n) -> (m, n)
+def _broadcast_spec(source_shape, target_shape):
+    """Return validated ``(source_shape, target_shape, kind)``."""
 
+    def normalize(shape, name):
+        try:
+            shape = (operator_index(shape),)
+        except TypeError:
+            try:
+                shape = tuple(operator_index(dimension) for dimension in shape)
+            except TypeError as exc:
+                raise ONPDimensionError(f"Invalid {name}: {shape!r}.") from exc
 
-# ------------------------------------------------------------------------------
-# Rotation index helpers
-# ------------------------------------------------------------------------------
+        if len(shape) > 2:
+            raise ONPDimensionError(f"broadcast_to supports ranks zero through two; got {shape}.")
+        if any(dimension <= 0 for dimension in shape):
+            raise ONPDimensionError(f"Empty shapes are not supported; got {shape}.")
+        return shape
 
+    source_shape = normalize(source_shape, "source_shape")
+    target_shape = normalize(target_shape, "target_shape")
+    try:
+        result_shape = tuple(np.broadcast_shapes(source_shape, target_shape))
+    except ValueError as exc:
+        raise ONPIncompatibleShapeError(
+            source_shape,
+            target_shape,
+            f"Cannot broadcast {source_shape} to {target_shape}.",
+        ) from exc
 
-def _duplicate_block_indices(duplicate_count, block_size) -> set:
-    """
-    Mirrors the rotation pattern inside _duplicate_block:
-    """
-    indices = set()
-    rotation = block_size
-    while rotation < block_size * duplicate_count:
-        indices.add(-rotation)
-        rotation *= 2
-    return indices
+    if result_shape != target_shape:
+        raise ONPIncompatibleShapeError(
+            source_shape,
+            target_shape,
+            f"Broadcasting produces {result_shape}, not {target_shape}.",
+        )
 
-
-# ------------------------------------------------------------------------------
-# Key generation
-# ------------------------------------------------------------------------------
-
-
-def generate_broadcast_key(secret_key, original_shape, target_shape):
-    """
-    Pre-generate all rotation keys needed by broadcast_to for a given
-    (original_shape, target_shape) pair - for both ROW_MAJOR and COL_MAJOR.
-
-    Broadcasting cases covered:
-      Scalar  ()      -> Vector (n,)
-      Scalar  ()      -> Matrix (m, n)
-      Vector  (n,)    -> Matrix (m, n)
-      ColVec  (m, 1)  -> Matrix (m, n)
-    """
-    if target_shape == ():
-        return
-
-    cc = secret_key.GetCryptoContext()
-    indices = set()
-
-    # --- Scalar -> Vector ---
-    if len(target_shape) == 1:
-        nrow = target_shape[0]
-        if original_shape == ():
-            rotation = 1
-            while rotation < nrow:
-                indices.add(-rotation)
-                rotation *= 2
-
-    # --- Any -> Matrix ---
-    elif len(target_shape) == 2:
-        nrow, ncol = target_shape
-        nrow_pow_2 = next_power_of_two(nrow)
-        ncol_pow_2 = next_power_of_two(ncol)
-
-        if original_shape == ():
-            indices.update(_duplicate_block_indices(nrow, ncol_pow_2))
-            indices.update(_duplicate_block_indices(ncol, 1))
-            indices.update(_duplicate_block_indices(ncol, nrow_pow_2))
-            indices.update(_duplicate_block_indices(nrow, 1))
-
-        elif len(original_shape) == 1:
-            indices.update(_duplicate_block_indices(nrow, ncol_pow_2))
-            for i in range(1, original_shape[0]):
-                indices.add(-i * (nrow_pow_2 - 1))
-            indices.update(_duplicate_block_indices(nrow, 1))
-
-        elif len(original_shape) == 2:
-            indices.update(_duplicate_block_indices(ncol_pow_2, nrow_pow_2))
-            for i in range(1, original_shape[0]):
-                indices.add(-i * (ncol_pow_2 - 1))
-            indices.update(_duplicate_block_indices(ncol, 1))
-
-    cc.EvalRotateKeyGen(secret_key, sorted(indices))
-
-
-# ------------------------------------------------------------------------------
-# Broadcasting
-# ------------------------------------------------------------------------------
-
-
-def broadcast_to(x, target_shape, order=None, cc=None):
-    if x.dtype == "CTArray":
-        return _ct_broadcast_to(x, target_shape, order)
-    elif x.dtype == "PTArray":
-        return _pt_broadcast_to(x, target_shape, order, cc)
+    if source_shape == target_shape:
+        kind = "identity"
+    elif not source_shape or all(dimension == 1 for dimension in source_shape):
+        kind = "scalar"
+    elif len(target_shape) == 2 and (len(source_shape) == 1 or source_shape[0] == 1):
+        kind = "row"
+    elif len(target_shape) == 2 and source_shape[1] == 1:
+        kind = "column"
     else:
-        raise ValueError(f"Broadcast doesn't support {type(x)}")
+        raise ONPNotImplementedError(
+            f"Broadcasting from {source_shape} to {target_shape} is not implemented."
+        )
+    return source_shape, target_shape, kind
 
 
-def _pt_broadcast_to(pta_x, target_shape, order=None, cc=None):
-    target_shape = tuple(target_shape)
+def _padded_shape(shape):
+    return tuple(next_power_of_two(dimension) for dimension in shape)
 
-    if target_shape == pta_x.original_shape:
-        return pta_x
 
-    def _make_array(data):
-        if cc is not None:
-            return array(
-                cc=cc,
-                data=data,
-                batch_size=pta_x.batch_size,
-                order=order,
-                fhe_type="P",
-                mode="zero",
-            )
-        raise ValueError("Broadcasting operation requires a crypto context")
+def _resolve_order(tensor, requested=None):
+    if tensor.order not in _ORDERS:
+        raise ONPValueError(f"Invalid packing order: {tensor.order!r}.")
+    if requested is not None and requested not in _ORDERS:
+        raise ONPValueError(f"Invalid packing order: {requested!r}.")
+    if requested is not None and requested != tensor.order:
+        raise ONPNotImplementedError(
+            "broadcast_to preserves packing order; convert the order separately."
+        )
+    return tensor.order
 
-    packed = pta_x.data.GetRealPackedValue()
 
-    # --- Scalar () -> anything ---
-    if pta_x.original_shape == ():
-        x = np.broadcast_to(np.array(packed[0]), target_shape)
-        return _make_array(x)
-
-    # --- 1D (n,) -> (m, n) ---
-    if len(pta_x.original_shape) == 1:
-        n = pta_x.original_shape[0]
-        x = np.array(packed[:n])  # shape (n,)
-        x_broadcasted = np.broadcast_to(x, target_shape)
-        return _make_array(x_broadcasted)
-
-    # --- 2D (m,1) -> (m,n)  or  (1,n) -> (m,n) ---
-    if len(pta_x.original_shape) == 2:
-        m, n = pta_x.original_shape
-        x = np.array(packed[: m * n]).reshape(pta_x.original_shape)  # restore 2D shape
-        x_broadcasted = np.broadcast_to(x, target_shape)
-        return _make_array(x_broadcasted)
-
-    raise ValueError(
-        f"Incompatible shapes: {pta_x.original_shape} "
-        f"cannot be broadcast to target matrix shape {target_shape}."
+def _vector_layout(kind, source_shape, target_shape, order):
+    """Return count, repetitions, alignment, block stride, and scatter stride."""
+    nrows, ncols = target_shape
+    padded_rows, padded_cols = _padded_shape(target_shape)
+    if kind == "row":
+        return (
+            source_shape[-1],
+            nrows,
+            order == ArrayEncodingType.ROW_MAJOR,
+            padded_cols,
+            padded_rows,
+        )
+    return (
+        source_shape[0],
+        ncols,
+        order == ArrayEncodingType.COL_MAJOR,
+        padded_rows,
+        padded_cols,
     )
 
 
-def _ct_broadcast_to(x, target_shape, order=None):
-    from openfhe_numpy.tensor.ctarray import CTArray
+def _rotation_indices(source_shape, target_shape, kind, order):
+    """Return exactly the rotations used by the ciphertext kernel."""
 
-    target_shape = tuple(target_shape)
-    if target_shape == x.original_shape:
-        return x
+    def duplicate(count, block_size):
+        rotations = set()
+        offset = block_size
+        while offset < block_size * count:
+            rotations.add(-offset)
+            offset *= 2
+        return rotations
 
-    cc = x.data.GetCryptoContext()
+    if kind == "identity":
+        return set()
+    if len(target_shape) == 1:
+        return duplicate(target_shape[0], 1)
+    if kind == "scalar":
+        nrows, ncols = target_shape
+        padded_rows, padded_cols = _padded_shape(target_shape)
+        if order == ArrayEncodingType.ROW_MAJOR:
+            return duplicate(nrows, padded_cols) | duplicate(ncols, 1)
+        return duplicate(ncols, padded_rows) | duplicate(nrows, 1)
 
-    # --- Scalar -> anything ---
-    if x.original_shape == ():
-        if target_shape == ():
-            return x
+    count, repeats, aligned, block_stride, scatter_stride = _vector_layout(
+        kind, source_shape, target_shape, order
+    )
+    if aligned:
+        return duplicate(repeats, block_stride)
+    scatter = {-index * (scatter_stride - 1) for index in range(1, count) if scatter_stride > 1}
+    return scatter | duplicate(repeats, 1)
 
-        # Scalar -> Vector
-        elif len(target_shape) == 1:
-            mask = _create_masking([0], x.batch_size)
-            pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-            ct_res = cc.EvalMult(x.data, pt_mask)
 
-            rotation = 1
-            while rotation < target_shape[0]:
-                ct_rotated = cc.EvalRotate(ct_res, -rotation)
-                ct_res = cc.EvalAdd(ct_res, ct_rotated)
-                rotation *= 2
+def generate_broadcast_key(secret_key, source_shape, target_shape, order=None):
+    """Generate rotation keys for one broadcast.
 
-            mask = _create_masking(list(range(target_shape[0])), x.batch_size)
-            pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-            ct_res = cc.EvalMult(ct_res, pt_mask)
+    ``order=None`` generates keys for both packing orders. Pass an order for the
+    smaller exact key set.
+    """
+    source_shape, target_shape, kind = _broadcast_spec(source_shape, target_shape)
+    if order is not None and order not in _ORDERS:
+        raise ONPValueError(f"Invalid packing order: {order!r}.")
 
-            return CTArray(
-                data=ct_res,
-                original_shape=target_shape,
-                batch_size=x.batch_size,
-                new_shape=(next_power_of_two(target_shape[0]),),
-                order=ArrayEncodingType.ROW_MAJOR,
+    rotations = set()
+    for packing_order in _ORDERS if order is None else (order,):
+        rotations.update(_rotation_indices(source_shape, target_shape, kind, packing_order))
+    if rotations:
+        secret_key.GetCryptoContext().EvalRotateKeyGen(secret_key, sorted(rotations))
+
+
+def generate_block_broadcast_key(secret_key, block_matrix):
+    """Generate row/column broadcast keys shared by all matrix blocks."""
+    if block_matrix.ndim != 2:
+        raise ONPDimensionError("Expected a two-dimensional block matrix.")
+    if block_matrix.order not in _ORDERS:
+        raise ONPValueError(f"Invalid packing order: {block_matrix.order!r}.")
+
+    block_rows, block_cols = block_matrix.block_shape
+    rotations = set()
+    for source_shape in ((block_cols,), (block_rows, 1)):
+        source_shape, target_shape, kind = _broadcast_spec(source_shape, block_matrix.block_shape)
+        rotations.update(_rotation_indices(source_shape, target_shape, kind, block_matrix.order))
+    if rotations:
+        secret_key.GetCryptoContext().EvalRotateKeyGen(secret_key, sorted(rotations))
+
+
+def broadcast_to(tensor, target_shape, order=None, cc=None):
+    """Broadcast ``tensor`` to ``target_shape`` while preserving its order.
+
+    Ciphertexts require keys from :func:`generate_broadcast_key`. Plaintexts
+    require ``cc`` to encode the result. ``order`` is retained for compatibility
+    and must equal ``tensor.order``.
+    """
+    from ..tensor.ctarray import CTArray
+    from ..tensor.ptarray import PTArray
+
+    if isinstance(tensor, CTArray):
+        return _broadcast_ct(tensor, target_shape, order)
+    if isinstance(tensor, PTArray):
+        return _broadcast_pt(tensor, target_shape, order, cc)
+    raise ONPValueError(f"Broadcasting does not support {type(tensor).__name__}.")
+
+
+def _broadcast_pt(tensor, target_shape, requested_order, cc):
+    source_shape, target_shape, kind = _broadcast_spec(tensor.original_shape, target_shape)
+    order = _resolve_order(tensor, requested_order)
+    if kind == "identity":
+        return tensor
+    if cc is None:
+        raise ONPValueError("A crypto context is required for plaintext broadcasting.")
+
+    padded_shape = _padded_shape(target_shape)
+    if prod(padded_shape) > tensor.batch_size:
+        raise ONPDimensionError(
+            f"Padded target {padded_shape} exceeds batch_size={tensor.batch_size}."
+        )
+    source = np.asarray(tensor.decode())
+    if source.shape != source_shape:
+        raise ONPValueError(f"Decoded shape {source.shape} does not match metadata {source_shape}.")
+    return array(
+        cc=cc,
+        data=np.broadcast_to(source, target_shape),
+        batch_size=tensor.batch_size,
+        order=order,
+        fhe_type="P",
+        mode="zero",
+    )
+
+
+def _mask(cc, ciphertext, indices, batch_size):
+    values = _create_masking(indices, batch_size)
+    return cc.EvalMult(ciphertext, cc.MakeCKKSPackedPlaintext(values))
+
+
+def _scatter(cc, ciphertext, count, stride, batch_size):
+    """Move source slot ``i`` to target slot ``i * stride``."""
+    result = None
+    for index in range(count):
+        term = _mask(cc, ciphertext, [index], batch_size)
+        shift = index * (stride - 1)
+        if shift:
+            term = cc.EvalRotate(term, -shift)
+        result = term if result is None else cc.EvalAdd(result, term)
+    return result
+
+
+def _broadcast_ct(tensor, target_shape, requested_order):
+    from ..tensor.ctarray import CTArray
+
+    source_shape, target_shape, kind = _broadcast_spec(tensor.original_shape, target_shape)
+    order = _resolve_order(tensor, requested_order)
+    if kind == "identity":
+        return tensor
+
+    padded_shape = _padded_shape(target_shape)
+    if prod(padded_shape) > tensor.batch_size:
+        raise ONPDimensionError(
+            f"Padded target {padded_shape} exceeds batch_size={tensor.batch_size}."
+        )
+    if kind in ("row", "column"):
+        expected_size = prod(_padded_shape(source_shape))
+        if prod(tuple(tensor.shape)) != expected_size:
+            raise ONPNotImplementedError(
+                "Compact vectors cannot be broadcast; re-encode without target_cols."
             )
 
-        # Scalar -> Matrix
-        elif len(target_shape) == 2:
-            nrow, ncol = target_shape
-            mask = _create_masking([0], x.batch_size)
-            pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-            ct_res = cc.EvalMult(x.data, pt_mask)
-
+    cc = tensor.data.GetCryptoContext()
+    if kind == "scalar":
+        result = _mask(cc, tensor.data, [0], tensor.batch_size)
+        if len(target_shape) == 1:
+            result = _duplicate_block(result, target_shape[0], 1)
+        else:
+            nrows, ncols = target_shape
+            padded_rows, padded_cols = padded_shape
             if order == ArrayEncodingType.ROW_MAJOR:
-                ncol_pow_2 = next_power_of_two(ncol)
-                mask = [0] * x.batch_size
-                for i in range(nrow):
-                    for j in range(ncol):
-                        mask[i * ncol_pow_2 + j] = 1
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = _duplicate_block(ct_res, nrow, ncol_pow_2)
-                ct_res = _duplicate_block(ct_res, ncol, 1, pt_mask)
-
-            elif order == ArrayEncodingType.COL_MAJOR:
-                nrow_pow_2 = next_power_of_two(nrow)
-                mask = [0] * x.batch_size
-                for i in range(ncol):
-                    for j in range(nrow):
-                        mask[i * nrow_pow_2 + j] = 1
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = _duplicate_block(ct_res, ncol, nrow_pow_2)
-                ct_res = _duplicate_block(ct_res, nrow, 1, pt_mask)
-
+                result = _duplicate_block(result, nrows, padded_cols)
+                result = _duplicate_block(result, ncols, 1)
             else:
-                raise ValueError(f"Invalid order ({order})")
+                result = _duplicate_block(result, ncols, padded_rows)
+                result = _duplicate_block(result, nrows, 1)
+    else:
+        count, repeats, aligned, block_stride, scatter_stride = _vector_layout(
+            kind, source_shape, target_shape, order
+        )
+        if aligned:
+            result = _mask(cc, tensor.data, range(count), tensor.batch_size)
+            result = _duplicate_block(result, repeats, block_stride)
+        else:
+            result = _scatter(cc, tensor.data, count, scatter_stride, tensor.batch_size)
+            result = _duplicate_block(result, repeats, 1)
 
-            return CTArray(
-                data=ct_res,
-                original_shape=target_shape,
-                batch_size=x.batch_size,
-                new_shape=(next_power_of_two(nrow), next_power_of_two(ncol)),
-                order=order,
-            )
+    if target_shape != padded_shape:
+        nrows, ncols = target_shape if len(target_shape) == 2 else (1, target_shape[0])
+        padded_rows, padded_cols = padded_shape if len(target_shape) == 2 else (1, padded_shape[0])
+        if len(target_shape) == 1:
+            valid_slots = range(ncols)
+        elif order == ArrayEncodingType.ROW_MAJOR:
+            valid_slots = [row * padded_cols + col for row in range(nrows) for col in range(ncols)]
+        else:
+            valid_slots = [col * padded_rows + row for col in range(ncols) for row in range(nrows)]
+        result = _mask(cc, result, valid_slots, tensor.batch_size)
 
-        raise ValueError(f"Target shape ({target_shape}) is not supported")
-
-    # --- Vector (n,) -> Matrix (m, n) ---
-    if len(x.original_shape) == 1:
-        if len(target_shape) == 2:
-            if target_shape[1] != x.original_shape[0]:
-                raise ValueError(
-                    f"Incompatible shapes: vector length {x.original_shape[0]} "
-                    f"cannot be broadcast to target matrix shape {target_shape}. "
-                    "Only supports broadcasting from (n,) to (m, n)."
-                )
-
-            nrow, ncol = target_shape
-            ncol_pow_2 = next_power_of_two(ncol)
-            nrow_pow_2 = next_power_of_two(nrow)
-
-            if order == ArrayEncodingType.ROW_MAJOR:
-                mask = _create_masking(list(range(x.original_shape[0])), x.batch_size)
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = cc.EvalMult(x.data, pt_mask)
-                ct_res = _duplicate_block(ct_res, nrow, ncol_pow_2)
-
-                return CTArray(
-                    data=ct_res,
-                    original_shape=target_shape,
-                    batch_size=x.batch_size,
-                    new_shape=(nrow_pow_2, ncol_pow_2),
-                    order=order,
-                )
-
-            elif order == ArrayEncodingType.COL_MAJOR:
-                mask = [0] * x.batch_size
-                mask[0] = 1
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = cc.EvalMult(x.data, pt_mask)
-
-                for i in range(1, x.original_shape[0]):
-                    mask[i - 1] = 0
-                    mask[i] = 1
-                    pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                    ct_scalar = cc.EvalMult(x.data, pt_mask)
-                    ct_scalar = cc.EvalRotate(ct_scalar, -(nrow_pow_2 * i - i))
-                    ct_res = cc.EvalAdd(ct_res, ct_scalar)
-                mask[x.original_shape[0] - 1] = 0  # reset
-
-                mask = [0] * x.batch_size
-                for i in range(ncol):
-                    for j in range(nrow):
-                        mask[i * nrow_pow_2 + j] = 1
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = _duplicate_block(ct_res, nrow, 1, pt_mask)
-
-                return CTArray(
-                    data=ct_res,
-                    original_shape=target_shape,
-                    batch_size=x.batch_size,
-                    new_shape=(nrow_pow_2, ncol_pow_2),
-                    order=order,
-                )
-
-            else:
-                raise ValueError(f"Invalid order ({order})")
-
-    # --- ColVec (m, 1) -> Matrix (m, n) ---
-    elif len(x.original_shape) == 2:
-        if len(target_shape) == 2:
-            try:
-                new_shape = np.broadcast_shapes(x.original_shape, target_shape)
-            except ValueError as e:
-                raise ValueError(
-                    f"Incompatible shapes: {x.original_shape} cannot be broadcast "
-                    f"to target shape {target_shape}. "
-                    "Only supports broadcasting from (m,1) to (m,n) or (1,n) to (m,n) "
-                ) from e
-            nrow, ncol = target_shape
-            ncol_pow_2 = next_power_of_two(ncol)
-            nrow_pow_2 = next_power_of_two(nrow)
-
-            if order == ArrayEncodingType.COL_MAJOR:
-                mask = _create_masking(list(range(nrow)), x.batch_size)
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_x_cleared = cc.EvalMult(x.data, pt_mask)
-                ct_x_duplicated = _duplicate_block(ct_x_cleared, ncol_pow_2, nrow_pow_2)
-
-                return CTArray(
-                    data=ct_x_duplicated,
-                    original_shape=target_shape,
-                    batch_size=x.batch_size,
-                    new_shape=(nrow_pow_2, ncol_pow_2),
-                    order=order,
-                )
-
-            elif order == ArrayEncodingType.ROW_MAJOR:
-                mask = [0] * x.batch_size
-                mask[0] = 1
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = cc.EvalMult(x.data, pt_mask)
-
-                for i in range(1, x.original_shape[0]):
-                    mask[i - 1] = 0
-                    mask[i] = 1
-                    pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                    ct_scalar = cc.EvalMult(x.data, pt_mask)
-                    ct_scalar = cc.EvalRotate(ct_scalar, -(ncol_pow_2 * i - i))
-                    ct_res = cc.EvalAdd(ct_res, ct_scalar)
-                mask[x.original_shape[0] - 1] = 0  # reset
-
-                mask = [0] * x.batch_size
-                for i in range(nrow):
-                    for j in range(ncol):
-                        mask[i * ncol_pow_2 + j] = 1
-                pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-                ct_res = _duplicate_block(ct_res, ncol, 1, pt_mask)
-
-                return CTArray(
-                    data=ct_res,
-                    original_shape=target_shape,
-                    batch_size=x.batch_size,
-                    new_shape=(nrow_pow_2, ncol_pow_2),
-                    order=order,
-                )
-
-            else:
-                raise ValueError(f"Invalid order ({order})")
-
-    raise ValueError(
-        f"Incompatible shapes: {x.original_shape} "
-        f"cannot be broadcast to target shape {target_shape}."
+    physical_shape = (padded_shape[0], 1) if len(target_shape) == 1 else padded_shape
+    return CTArray(
+        data=result,
+        original_shape=target_shape,
+        batch_size=tensor.batch_size,
+        new_shape=physical_shape,
+        order=order,
     )

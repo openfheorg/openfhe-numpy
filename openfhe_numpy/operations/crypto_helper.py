@@ -346,3 +346,46 @@ def attach_block_matvec_keys(
         return key_name, key
 
     return None
+
+
+def attach_block_sum_keys(block_matrix, secret_key) -> None:
+    """Generate the keys needed to sum or average a block tensor.
+
+        - ROW_MAJOR: axis=0 uses "rowkey" (sized by block columns), axis=1 uses "colkey".
+        - COL_MAJOR: axis=0 uses "colkey", axis=1 uses "rowkey" (sized by block rows).
+
+        Keys are generated once because all blocks have the same shape. For ``axis=None``,
+    only a standard sum key is needed.
+    """
+
+    if block_matrix.ndim != 2 or len(block_matrix.data) <= 0:
+        raise ONPValueError("attach_block_sum_keys expects a 2-D block matrix.")
+
+    reference = block_matrix.data[0]
+
+    if _is_row_major(reference.order):
+        rowkey = sum_row_keys(secret_key, reference.ncols, reference.batch_size)
+    elif _is_col_major(reference.order):
+        rowkey = sum_row_keys(secret_key, reference.nrows, reference.batch_size)
+    else:
+        raise ONPValueError(f"Unsupported packing order: {reference.order}")
+
+    colkey = sum_col_keys(secret_key, reference.ncols)
+
+    for block in block_matrix.data:
+        block.extra["rowkey"] = rowkey
+        block.extra["colkey"] = colkey
+
+
+def gen_block_transpose_keys(secret_key: openfhe.PrivateKey, block_matrix) -> None:
+    """Generate the keys needed to transpose a block matrix.
+
+    Keys are generated once using the block column count. No keys are needed for
+    1-D block vectors.
+    """
+    if block_matrix.ndim == 1:
+        return
+    if block_matrix.ndim != 2 or len(block_matrix.data) <= 0:
+        raise ONPValueError("gen_block_transpose_keys expects a 2-D block matrix.")
+
+    gen_transpose_keys(secret_key, block_matrix.data[0])

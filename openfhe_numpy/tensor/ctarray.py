@@ -364,6 +364,10 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         shape = self.shape
         original_shape = self.original_shape
 
+        if self.ndim == 1:
+            ciphertext = EvalSumCumCols(self.data, self.shape[0])
+            return CTArray(ciphertext, original_shape, self.batch_size, shape, order)
+
         if axis is None:
             ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
 

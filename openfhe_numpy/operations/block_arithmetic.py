@@ -46,23 +46,20 @@ from .dispatch import register_tensor_function
 
 from ..utils.errors import (
     ONPNotImplementedError,
-    ONPValueError,
-    ONPDimensionError,
 )
 from .block_arithmetic_utils import (
+    _cumsum_block_ct,
+    _cumulative_reduce_block_ct,
     _eval_block_binary,
-    _eval_block_scalar,
-    _eval_scalar_block,
     _eval_block_dot,
     _eval_block_matmul,
+    _eval_block_scalar,
+    _eval_scalar_block,
+    _mean_block_ct,
+    _sum_block_ct,
+    _transpose_block_ct,
 )
-from .matrix_arithmetic import (
-    _pow,
-    _reduce_ct,
-    sum_ct,
-)
-from .arithmetic_utils import _normalize_axis, _normalize_sum_axis
-from ..utils.matlib import _sum_terms
+from .matrix_arithmetic import _pow
 
 # ==============================================================================
 # Basic block arithmetic operations
@@ -167,26 +164,7 @@ def dot_block_ct(a, b):
 @register_tensor_function("transpose", [("BlockCTArray",)])
 def transpose_block_ct(a):
     """Transpose a block ciphertext tensor."""
-    if a.ndim == 1:
-        return a
-
-    if a.ndim != 2:
-        raise ONPDimensionError(f"transpose requires 1D or 2D tensor, got {a.ndim}D.")
-
-    grid_rows, grid_cols = a.grid_shape
-    blocks = []
-    for j in range(grid_cols):
-        for i in range(grid_rows):
-            blocks.append(a.get_block(i, j).transpose())
-
-    return type(a)(
-        data=blocks,
-        grid_shape=(grid_cols, grid_rows),
-        block_shape=(a.block_shape[1], a.block_shape[0]),
-        original_shape=(a.original_shape[1], a.original_shape[0]),
-        batch_size=a.batch_size,
-        order=a.order,
-    )
+    return _transpose_block_ct(a)
 
 
 # ==============================================================================
@@ -210,6 +188,8 @@ def power_block_ct(a, exp):
 # ------------------------------------------------------------------------------
 # Cumulative Operations
 # ------------------------------------------------------------------------------
+
+
 @register_tensor_function(
     "cumsum",
     [("BlockCTArray",), ("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")],
@@ -217,54 +197,16 @@ def power_block_ct(a, exp):
 def cumsum_block_ct(obj, axis=None, keepdims=False):
     """Compute cumulative sums for encrypted block tensors.
 
-    Currently supports:
-    - 1D block tensors across multiple blocks.
-    - 2D block tensors only when the cumulative axis stays inside each block.
+    Supported:
+    - 1-D cumsum across multiple blocks.
+    - 2-D cumsum when the cumulative axis stays within each block.
+
+    Not supported:
+    - 2-D axis=None.
+    - 2-D cumsum across block boundaries.
+    - Compact block-vector packing.
     """
-    if keepdims:
-        raise ONPNotImplementedError("Block cumsum does not support keepdims=True yet.")
-
-    if obj.ndim == 1:
-        if axis is None:
-            axis = 0
-
-        axis = _normalize_axis(axis, obj.ndim)
-
-        blocks = []
-        offset = None
-
-        for block in obj.data:
-            cumulative = block.cumsum(axis=0)
-
-            if offset is not None:
-                cumulative = cumulative + offset
-
-            blocks.append(cumulative)
-
-            block_sum = block.sum()
-            offset = block_sum if offset is None else offset + block_sum
-
-        return obj.clone(data=blocks)
-
-    if obj.ndim == 2:
-        if axis is None:
-            raise ONPNotImplementedError("Block cumsum(axis=None) is not implemented yet.")
-
-        axis = _normalize_axis(axis, obj.ndim)
-
-        if axis == 0 and obj.grid_shape[0] != 1:
-            raise ONPNotImplementedError(
-                "Block cumsum(axis=0) across multiple block rows is not implemented yet."
-            )
-
-        if axis == 1 and obj.grid_shape[1] != 1:
-            raise ONPNotImplementedError(
-                "Block cumsum(axis=1) across multiple block columns is not implemented yet."
-            )
-
-        return obj.clone(data=[block.cumsum(axis=axis) for block in obj.data])
-
-    raise ONPDimensionError(f"cumsum requires 1D or 2D tensor, got {obj.ndim}D.")
+    return _cumsum_block_ct(obj, axis, keepdims)
 
 
 @register_tensor_function(
@@ -273,25 +215,7 @@ def cumsum_block_ct(obj, axis=None, keepdims=False):
 )
 def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
     """Compute cumulative reductions inside each encrypted block."""
-    if keepdims:
-        raise ONPNotImplementedError("Block cumulative_reduce does not support keepdims=True yet.")
-
-    if a.ndim != 2:
-        raise ONPDimensionError(f"cumulative_reduce requires a 2D block tensor, got {a.ndim}D.")
-
-    axis = _normalize_axis(axis, a.ndim)
-
-    if axis == 0 and a.grid_shape[0] != 1:
-        raise ONPNotImplementedError(
-            "Block cumulative_reduce(axis=0) across multiple block rows is not implemented yet."
-        )
-
-    if axis == 1 and a.grid_shape[1] != 1:
-        raise ONPNotImplementedError(
-            "Block cumulative_reduce(axis=1) across multiple block columns is not implemented yet."
-        )
-
-    return a.clone(data=[_reduce_ct(block, axis, keepdims) for block in a.data])
+    return _cumulative_reduce_block_ct(a, axis, keepdims)
 
 
 # ------------------------------------------------------------------------------
@@ -302,58 +226,16 @@ def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
     [("BlockCTArray",), ("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")],
 )
 def sum_block_ct(x: BlockCTArray, axis: Optional[int] = None, keepdims: bool = False):
-    """Sum encrypted block tensor elements."""
-    if keepdims:
-        raise ONPNotImplementedError("Block sum does not support keepdims=True yet.")
+    """Sum encrypted block tensor elements.
 
-    axis = _normalize_sum_axis(axis, x.ndim)
+    Supported:
+    - 1-D sum over all elements.
+    - 2-D sum over all elements.
+    - 2-D sum along axis 0 or axis 1.
 
-    if x.ndim == 1:
-        return _sum_terms(sum_ct(block, None, False) for block in x.data)
-
-    if x.ndim != 2:
-        raise ONPDimensionError(f"sum requires 1D or 2D tensor, got {x.ndim}D.")
-
-    if axis is None:
-        return _sum_terms(sum_ct(block, None, False) for block in x.data)
-
-    if axis == 0:
-        grid_rows, grid_cols = x.grid_shape
-        blocks = []
-        for j in range(grid_cols):
-            col_sum = sum_ct(x.get_block(0, j), axis=0, keepdims=False)
-            for i in range(1, grid_rows):
-                col_sum = col_sum + sum_ct(x.get_block(i, j), axis=0, keepdims=False)
-            blocks.append(col_sum)
-
-        return type(x)(
-            data=blocks,
-            grid_shape=(grid_cols,),
-            block_shape=(x.block_shape[1],),
-            original_shape=(x.original_shape[1],),
-            batch_size=x.batch_size,
-            order=blocks[0].order,
-        )
-
-    if axis == 1:
-        grid_rows, grid_cols = x.grid_shape
-        blocks = []
-        for i in range(grid_rows):
-            row_sum = sum_ct(x.get_block(i, 0), axis=1, keepdims=False)
-            for j in range(1, grid_cols):
-                row_sum = row_sum + sum_ct(x.get_block(i, j), axis=1, keepdims=False)
-            blocks.append(row_sum)
-
-        return type(x)(
-            data=blocks,
-            grid_shape=(grid_rows,),
-            block_shape=(x.block_shape[0],),
-            original_shape=(x.original_shape[0],),
-            batch_size=x.batch_size,
-            order=blocks[0].order,
-        )
-
-    raise ONPValueError(f"Invalid axis {axis}.")
+    Block tensors should be constructed with mode="zero".
+    """
+    return _sum_block_ct(x, axis, keepdims)
 
 
 # ------------------------------------------------------------------------------
@@ -373,30 +255,7 @@ def mean_block_ct(x: BlockCTArray, axis: Optional[int] = None, keepdims: bool = 
     Limitation:
     - keepdims=True is not supported for block tensors yet.
     """
-    if keepdims:
-        raise ONPNotImplementedError("Block mean does not support keepdims=True yet.")
-
-    axis = _normalize_sum_axis(axis, x.ndim)
-    mean_x = sum_block_ct(x, axis, keepdims=False)
-
-    if x.ndim == 1:
-        n = x.original_shape[0]
-
-    elif x.ndim == 2:
-        nrows, ncols = x.original_shape
-        if axis is None:
-            n = nrows * ncols
-        elif axis == 0:
-            n = nrows
-        elif axis == 1:
-            n = ncols
-        else:
-            raise ONPDimensionError(f"Invalid axis {axis} for 2D block tensor.")
-
-    else:
-        raise ONPDimensionError(f"mean requires 1D or 2D tensor, got {x.ndim}D.")
-
-    return mean_x * (1.0 / n)
+    return _mean_block_ct(x, axis, keepdims)
 
 
 # ------------------------------------------------------------------------------

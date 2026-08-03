@@ -42,6 +42,8 @@ All functions use the tensor_function_api decorator to handle different tensor t
 and dispatch to the appropriate backend implementation.
 """
 
+"""Public NumPy-style matrix operations for OpenFHE-NumPy tensors."""
+
 from typing import Optional
 from numpy.typing import ArrayLike
 from .dispatch import tensor_function_api
@@ -52,44 +54,41 @@ from .dispatch import tensor_function_api
 # ===========================
 
 
+@tensor_function_api("add", binary=True)
 def add(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """
-     Element-wise addition of two arrays (or array and scalar).
+    """Add two arrays element-wise.
 
     See Also
     --------
     numpy.add
+
+    Examples
+    --------
+    >>> add([1, 2], [3, 4])
+    array([4, 6])
     """
-    return _add_dispatch(a, b)
-
-
-@tensor_function_api("add", binary=True)
-def _add_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """Dispatch for 'add' operation."""
     pass
 
 
+@tensor_function_api("subtract", binary=True)
 def subtract(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """
-     Element-wise subtraction of two arrays (or array and scalar).
+    """Subtract two arrays element-wise.
 
     See Also
     --------
     numpy.subtract
+
+    Examples
+    --------
+    >>> subtract([5, 7], [2, 3])
+    array([3, 4])
     """
-    return _subtract_dispatch(a, b)
-
-
-@tensor_function_api("subtract", binary=True)
-def _subtract_dispatch(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """Dispatch for 'subtract' operation."""
     pass
 
 
 @tensor_function_api("multiply", binary=True)
 def multiply(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """
-    Element-wise multiplication of two arrays (or array and scalar).
+    """Multiply two arrays element-wise.
 
     Parameters
     ----------
@@ -117,15 +116,10 @@ def multiply(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 
 @tensor_function_api("power", binary=True)
 def power(a: ArrayLike, exponent: int) -> ArrayLike:
-    """Raise each element of a tensor to an integer power (element-wise).
+    """Raise each element of an array to an integer power.
 
-    Matches ``numpy.power``: every element ``a_i`` is raised to ``exponent`` via
-    homomorphic element-wise multiplication. This is *not* matrix power.
-
-    Note
-    ----
-    Only positive integer exponents are supported due to homomorphic-encryption
-    constraints. ``exponent == 0`` (all-ones) is not supported and raises.
+    This operation is element-wise, not a matrix power. Only positive integer
+    exponents are supported.
 
     Parameters
     ----------
@@ -158,18 +152,17 @@ def power(a: ArrayLike, exponent: int) -> ArrayLike:
 
 @tensor_function_api("dot", binary=True)
 def dot(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """
-    Dot product / matrix multiplication.
+    """Compute the dot product of two arrays.
 
-    - 1-D inputs: inner product
-    - 2-D inputs: matrix product
+    One-dimensional inputs produce an inner product; two-dimensional inputs
+    produce a matrix product.
 
     Parameters
     ----------
     a, b : ArrayLike
         Operands.
 
-    returns
+    Returns
     -------
     ArrayLike
         Result of the dot product.
@@ -194,8 +187,7 @@ def dot(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 
 @tensor_function_api("matmul", binary=True)
 def matmul(a: ArrayLike, b: ArrayLike) -> ArrayLike:
-    """
-    Matrix multiply two tensors.
+    """Multiply two arrays as matrices.
 
     Parameters
     ----------
@@ -225,9 +217,10 @@ def matmul(a: ArrayLike, b: ArrayLike) -> ArrayLike:
 
 @tensor_function_api("transpose", binary=False)
 def transpose(a: ArrayLike) -> ArrayLike:
-    """
-    Transpose array axes (for 2-D: swap rows and columns).
-    For 1-D inputs (vectors), the array is returned unchanged.
+    """Transpose a two-dimensional array.
+
+    A one-dimensional array is returned unchanged.
+
     Parameters
     ----------
     a : ArrayLike
@@ -258,58 +251,61 @@ def transpose(a: ArrayLike) -> ArrayLike:
 
 
 @tensor_function_api("cumsum", binary=False)
-def cumsum(x: ArrayLike, /, *, axis: Optional[int] = 0) -> ArrayLike:
-    """
-        Compute the cumulative sum of tensor elements along a specified axis.\
-        - For 1D inputs, axis must be None.
-        - For 2D inputs, axis must be 0 or 1.
-        - The include_initial argument is not supported.
+def cumsum(a: ArrayLike, /, *, axis: Optional[int] = None) -> ArrayLike:
+    """Return cumulative sums along an axis.
 
-        Parameters
-        ----------
-        a : ArrayLike
-            Input tensor.
-        axis : int, optional
-            Axis along which to compute the sum. Default is 0.
-
-        Returns
-        -------
-        out : ArrayLike
-            Cumulative sum along an axis.
-
-        See Also
-        --------
-        numpy.cumsum : Corresponding NumPy function.
-
-        Examples
-        --------
-        >>> import numpy as onp
-        >>> cumsum(np.array([[1, 2], [3, 4]]), axis=1)
-        array([[1, 3],
-               [3, 7]])
-    """
-    pass
-
-
-@tensor_function_api("cumulative_reduce", binary=False)
-def cumulative_reduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
-    """
-    Compute the cumulative reduction of tensor elements along a specified axis.\
-        - For 1D inputs, axis must be None.
-        - For 2D inputs, axis must be 0 or 1.
-        - The include_initial argument is not supported.
+    If ``axis`` is ``None``, the input is flattened before accumulation.
 
     Parameters
     ----------
     a : ArrayLike
         Input tensor.
     axis : int, optional
-        Axis along which to compute the reduction. Default is 0.
+        Axis along which to compute cumulative sums.
 
     Returns
     -------
     out : ArrayLike
-        Cumulative reduction of 'a'.
+        Array of cumulative sums.
+
+    See Also
+    --------
+    numpy.cumsum : Corresponding NumPy function.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> a = np.array([[1, 2],
+                      [3, 4]])
+    >>> cumsum(a)
+    array([ 1,  3,  6, 10])
+    >>> cumsum(a, axis=0)
+    array([[1, 2],
+           [4, 6]])
+    >>> cumsum(a, axis=1)
+    array([[1, 3],
+           [3, 7]])
+    """
+    pass
+
+
+@tensor_function_api("cumulative_reduce", binary=False)
+def cumulative_reduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> ArrayLike:
+    """Compute a cumulative reduction along an axis.
+
+    Parameters
+    ----------
+    a : ArrayLike
+        Input tensor.
+    axis : int, optional
+        Axis along which to compute the reduction.
+    keepdims : bool, optional
+        If ``True``, retain the reduced dimension.
+
+    Returns
+    -------
+    out : ArrayLike
+        Cumulative reduction of ``a``.
 
     See Also
     --------
@@ -327,24 +323,21 @@ def cumulative_reduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> Ar
 
 @tensor_function_api("sum", binary=False)
 def sum(a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False) -> ArrayLike:
-    """
-    Sum of elements over an axis or all.
+    """Sum array elements over an axis.
 
     Parameters
     ----------
     a : ArrayLike
         Input tensor.
     axis : int, optional
-        Axis along which to compute the sum. Default is None.
-        0: sum over rows
-        1: sum over cols
+        Axis along which to sum. If ``None``, sum all elements.
     keepdims : bool, optional
-        If True, retains reduced dimensions. Default is False.
+        If ``True``, retain reduced dimensions.
 
     Returns
     -------
     out : ArrayLike
-        Sum of 'a' elements.
+        Sum of the array elements.
 
     See Also
     --------
@@ -374,25 +367,25 @@ def mean(
     out=None,
     keepdims: bool = False,
 ) -> ArrayLike:
-    """
-    Compute the arithmetic mean along an axis or all elements.
-
-    Returns the average of the array elements. The average is taken over
-    the flattened array by default, otherwise over the specified axis.
+    """Compute the arithmetic mean along an axis.
 
     Parameters
     ----------
     a : ArrayLike
         Input tensor.
     axis : int, optional
-        Axis along which to compute the mean. Default is None.
+        Axis along which to compute the mean. If ``None``, use all elements.
+    dtype : data-type, optional
+        Data type used for the computation.
+    out : ArrayLike, optional
+        Output array.
     keepdims : bool, optional
-        If True, retains reduced dimensions. Default is False.
+        If ``True``, retain reduced dimensions.
 
     Returns
     -------
     out : ArrayLike
-        Mean of 'a' elements.
+        Arithmetic mean of the array elements.
 
     See Also
     --------
@@ -414,10 +407,9 @@ def mean(
 
 @tensor_function_api("roll", binary=False)
 def roll(a: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
-    """
-    Roll packed vector elements.
+    """Roll packed vector elements.
 
-    Elements that roll beyond the last position are re-introduced at the first.
+    Elements shifted beyond the last position wrap to the first position.
 
     Current limitation
     ------------------
@@ -462,48 +454,3 @@ def roll(a: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
     ONPNotSupportedError: roll currently supports only packed vectors with axis=None.
     """
     pass
-
-
-# ===========================
-# Planned Future Functionality
-# ===========================
-
-# Array Creation Functions:
-
-# def zeros(shape, crypto_context, key):
-#     """Create an encrypted array of zeros."""
-#     pass
-
-
-# def ones(shape, crypto_context, key):
-#     """Create an encrypted array of ones."""
-#     pass
-
-
-# def eye(n, crypto_context, key):
-#     """Create an encrypted identity matrix."""
-#     pass
-
-
-# Broadcasting Support:
-
-# def _get_broadcast_shape(self, other):
-#     """Calculate broadcast shape between tensors."""
-#     # Implementation...
-
-
-# def _broadcast_tensor(self, target_shape):
-#     """Broadcast this tensor to target shape."""
-#     # Implementation...
-
-
-# Array Manipulation Methods:
-
-# def reshape(self, new_shape):
-#     """Reshape tensor to new dimensions."""
-#     # Implementation...
-
-
-# def concat(tensors, axis=0):
-#     """Concatenate tensors along specified axis."""
-#     # Implementation...

@@ -194,15 +194,18 @@ def _rotate_vector(vec, k):
 
 
 def _sum_terms(terms: Iterable[Any]) -> Any:
-    """Accumulate a non-empty iterable of encoded terms by addition."""
-    iterator = iter(terms)
+    """Sum a non-empty iterable using a balanced binary tree."""
+    current = list(terms)
 
-    try:
-        acc = next(iterator)
-    except StopIteration:
-        raise ONPValueError("Cannot sum an empty sequence of terms.") from None
+    if not current:
+        raise ONPValueError("Cannot sum an empty sequence of terms.")
 
-    for term in iterator:
-        acc = acc + term
+    while len(current) > 1:
+        next_level = [current[i] + current[i + 1] for i in range(0, len(current) - 1, 2)]
 
-    return acc
+        if len(current) % 2:
+            next_level.append(current[-1])
+
+        current = next_level
+
+    return current[0]
