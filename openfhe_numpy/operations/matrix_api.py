@@ -123,23 +123,23 @@ def power(a: ArrayLike, exponent: int) -> ArrayLike:
 
     Note
     ----
-    This only supports integer exponents due to homomorphic-encryption constraints.
+    Only positive integer exponents are supported due to homomorphic-encryption
+    constraints. ``exponent == 0`` (all-ones) is not supported and raises.
 
     Parameters
     ----------
     a : ArrayLike
         Base tensor.
     exponent : int
-        Non-negative integer exponent.
+        Positive integer exponent (``>= 1``).
 
     Returns
     -------
     out : ArrayLike
-        Element-wise 'a' raised to 'exponent'.
+        Element-wise ``a`` raised to ``exponent``.
 
     See Also
     --------
-
     numpy.power : Corresponding element-wise power function.
 
     Examples
@@ -318,7 +318,7 @@ def cumulative_reduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> Ar
 
     See Also
     --------
-    numpy.cumulative_sum : Similar operation for sum.
+    numpy.cumsum : Similar operation for sum.
 
     Examples
     --------
@@ -340,7 +340,7 @@ def sum(a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False) 
     a : ArrayLike
         Input tensor.
     axis : int, optional
-        Axis along which to compute the sum. Default is 0.
+        Axis along which to compute the sum. Default is None.
         0: sum over rows
         1: sum over cols
     keepdims : bool, optional
@@ -390,7 +390,7 @@ def mean(
     a : ArrayLike
         Input tensor.
     axis : int, optional
-        Axis along which to compute the mean. Default is 0.
+        Axis along which to compute the mean. Default is None.
     keepdims : bool, optional
         If True, retains reduced dimensions. Default is False.
 
@@ -418,29 +418,30 @@ def mean(
 
 
 @tensor_function_api("roll", binary=False)
-def roll(a: ArrayLike, shift, axis: Optional[int] = None) -> ArrayLike:
+def roll(a: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
     """
-    Roll array elements along a given axis.
+    Roll packed vector elements.
 
     Elements that roll beyond the last position are re-introduced at the first.
+
+    Current limitation
+    ------------------
+    This function currently supports only packed vectors with ``axis=None``.
+    Matrix roll, tuple-axis roll, and block tensor roll are not implemented yet.
 
     Parameters
     ----------
     a : ArrayLike
-        Input array.
-    shift : int or tuple of ints
-        The number of places by which elements are shifted. If a tuple, then
-        axis must be a tuple of the same size, and each of the given axes is
-        shifted by the corresponding number. If an int while axis is a tuple
-        of ints, then the same value is used for all given axes.
-    axis : int or tuple of ints, optional
-        Axis or axes along which elements are shifted. By default, the array
-        is flattened before shifting, after which the original shape is restored.
+        Input packed vector.
+    shift : int
+        Number of positions by which elements are shifted.
+    axis : None, optional
+        Must be None in the current implementation.
 
     Returns
     -------
     res : ArrayLike
-        Output array, with the same shape as a.
+        Output vector with the same shape as ``a``.
 
     See Also
     --------
@@ -452,12 +453,17 @@ def roll(a: ArrayLike, shift, axis: Optional[int] = None) -> ArrayLike:
     >>> x = np.arange(10)
     >>> roll(x, 2)
     array([8, 9, 0, 1, 2, 3, 4, 5, 6, 7])
+    >>> roll(x, -2)
+    array([2, 3, 4, 5, 6, 7, 8, 9, 0, 1])
+    >>> roll(x, 0)
+    array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    Unsupported examples
+    --------------------
     >>> x2 = np.reshape(x, (2, 5))
     >>> roll(x2, 1, axis=0)
-    array([[5, 6, 7, 8, 9],
-           [0, 1, 2, 3, 4]])
-    >>> roll(x2, (1, 1), axis=(1, 0))  # Multiple axes
-    array([[9, 5, 6, 7, 8],
-           [4, 0, 1, 2, 3]])
+    Traceback (most recent call last):
+        ...
+    ONPNotSupportedError: roll currently supports only packed vectors with axis=None.
     """
     pass

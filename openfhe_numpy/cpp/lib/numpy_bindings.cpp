@@ -192,6 +192,15 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("numRepeats"));
 
     m.def("EvalMatMulSquare",
+        [](const std::vector<double>& matrixA, ConstCiphertext<DCRTPoly>& matrixB, uint32_t numCols)
+        {
+            return EvalMatMulSquare(matrixA, matrixB, numCols);
+        },
+        py::arg("matrixA"),
+        py::arg("matrixB"),
+        py::arg("numCols"));
+
+    m.def("EvalMatMulSquare",
         [](ConstCiphertext<DCRTPoly>& matrixA, ConstCiphertext<DCRTPoly>& matrixB, uint32_t numCols)
         {
             return EvalMatMulSquare(matrixA, matrixB, numCols);

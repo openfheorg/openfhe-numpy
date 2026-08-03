@@ -44,6 +44,7 @@ class PTArray(FHETensor[Plaintext]):
     """Concrete tensor class for OpenFHE plaintexts."""
 
     is_encrypted = False
+
     def clone(self, data=None):
         return PTArray(
             data or self.data,
@@ -77,6 +78,7 @@ class PTArray(FHETensor[Plaintext]):
         if unpack_type == UnpackType.ORIGINAL:
             return process_packed_data(result, self.info)
         return np.asarray(result)
+
     def __repr__(self) -> str:
         return f"PTArray(meta={self.info})"
 

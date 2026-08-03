@@ -37,7 +37,6 @@ matrix multiplication, and other mathematical operations.
 """
 
 # Third-party imports
-import math
 import numpy as np
 from ..openfhe_numpy import ArrayEncodingType
 from ..utils.matlib import next_power_of_two

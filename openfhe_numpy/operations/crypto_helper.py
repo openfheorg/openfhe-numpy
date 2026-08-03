@@ -36,9 +36,12 @@ This module provides functions for generating rotation, accumulation, and other 
 keys needed for various homomorphic operations in OpenFHE-NumPy.
 """
 
+from typing import Any
 import openfhe
 import openfhe_numpy as backend  # Import from cpp source
-from openfhe_numpy.utils.matlib import next_power_of_two
+from ..utils.packing import _is_row_major, _is_col_major
+from ..utils.matlib import next_power_of_two
+from ..utils.errors import ONPValueError
 
 
 def accumulation_depth(nrows: int, ncols: int, accumulate_by_rows: bool):
@@ -81,7 +84,7 @@ def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0, slots: int = 0)
         Generated sum keys
     """
     context = secret_key.GetCryptoContext()
-    return context.EvalSumRowsKeyGen(secret_key, None, ncols, slots * 4)
+    return context.EvalSumRowsKeyGen(secret_key, None, ncols, 0)
 
 
 def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
@@ -149,7 +152,7 @@ def gen_rotation_keys(secret_key: openfhe.PrivateKey, shifts: list):
     secret_key : PrivateKey
         The private key to use for key generation
     shifts : list
-        List of rotation indices to generate keys for
+        List of rotation indices to generate keys for (negated OpenFHE implementation).
     """
 
     standard_indices = [-x for x in shifts]
@@ -241,15 +244,105 @@ def generate_slicing_key(secret_key, original_shape):
         for i in range(1, max(nrow, ncol)):
             indices.add(-i)
 
-        for res_nrow in range(1, nrow + 1):
-            for res_ncol in range(1, ncol + 1):
-                res_pow_2_r = next_power_of_two(res_nrow)
-                res_pow_2_c = next_power_of_two(res_ncol)
-                for r in range(res_nrow):
-                    for c in range(res_ncol):
-                        indices.add(-(res_pow_2_c * r + c))
-                        indices.add(-(res_pow_2_r * c + r))
+        # Rotation indices to collapse any sub-matrix result back to slot 0.
+        #
+        # The naive enumeration scans every (res_nrow, res_ncol) result shape and
+        # every (r, c) offset within it -- Theta(nrow^2 * ncol^2). Each added value
+        # depends on only one of the two result extents (through its power-of-two
+        # padding), so the identical index set is produced in O(nrow * ncol) by
+        # grouping result extents that share a padding and taking the widest offset
+        # range for that group.
+        def _widest_extent_by_padding(size):
+            """Map next_power_of_two(k) -> largest k in 1..size sharing that padding."""
+            widest = {}
+            for k in range(1, size + 1):
+                widest[next_power_of_two(k)] = k  # k ascends, so this stays the max
+            return widest
 
+        # Column-padded offsets: value depends on res_ncol's padding; rows span 0..nrow.
+        for pad_c, max_c in _widest_extent_by_padding(ncol).items():
+            for r in range(nrow):
+                for c in range(max_c):
+                    indices.add(-(pad_c * r + c))
+
+        # Row-padded offsets: value depends on res_nrow's padding; cols span 0..ncol.
+        for pad_r, max_r in _widest_extent_by_padding(nrow).items():
+            for c in range(ncol):
+                for r in range(max_r):
+                    indices.add(-(pad_r * c + r))
+
+    # NOTE: index 0 is intentionally kept. Element extraction rotates the target
+    # element to slot 0 via EvalRotate(ct, 0) for position-0 elements, which needs
+    # the identity-rotation key (OpenFHE automorphism index 1).
     if indices:
         cc = secret_key.GetCryptoContext()
         cc.EvalRotateKeyGen(secret_key, sorted(indices))
+
+
+##############################################################################
+# BLOCK ARITHMETIC OPERATIONS
+##############################################################################
+
+
+# [CTArray] attach key for mat@vec product
+def attach_matvec_keys(matrix, secret_key, emit: bool = False) -> tuple[str, Any] | None:
+    """Attach the summation key required for matrix-vector multiplication.
+
+    Required keys:
+    - ROW_MAJOR matrix @ COL_MAJOR vector uses extra["colkey"].
+    - COL_MAJOR matrix @ ROW_MAJOR vector uses extra["rowkey"].
+
+    Limitation:
+    - The key is generated from one matrix layout. All blocks in a block matrix
+      are expected to share the same packing order and logical column count.
+    """
+    if matrix.ndim != 2:
+        raise ONPValueError("attach_matvec_keys expects a 2-D matrix.")
+
+    if _is_row_major(matrix.order):
+        key_name = "colkey"
+        key = sum_col_keys(secret_key)
+
+    elif _is_col_major(matrix.order):
+        key_name = "rowkey"
+        key = sum_row_keys(secret_key, matrix.ncols, matrix.batch_size)
+
+    else:
+        raise ONPValueError(f"Unsupported packing order: {matrix.order}")
+
+    matrix.extra[key_name] = key
+
+    if emit:
+        return key_name, key
+
+    return None
+
+
+# [BlockCTArray] attach key for mat@vec product
+def attach_block_matvec_keys(
+    block_matrix, secret_key, emit: bool = False
+) -> tuple[str, Any] | None:
+    """Attach summation keys to encrypted matrix blocks for block matvec.
+
+    Required keys:
+    - ROW_MAJOR matrix @ COL_MAJOR vector uses ``extra["colkey"]``.
+    - COL_MAJOR matrix @ ROW_MAJOR vector uses ``extra["rowkey"]``.
+
+    The key-generation parameters must match the CTArray evaluator:
+    - EvalSumCols(..., lhs.ncols, ...)
+    - EvalSumRows(..., lhs.nrows, ..., lhs.batch_size)
+    """
+
+    if block_matrix.ndim != 2 or len(block_matrix.data) <= 0:
+        raise ONPValueError("attach_matvec_keys expects a 2-D block matrix.")
+
+    reference = block_matrix.data[0]
+    key_name, key = attach_matvec_keys(reference, secret_key, True)
+
+    for block in block_matrix.data:
+        block.extra[key_name] = key
+
+    if emit:
+        return key_name, key
+
+    return None
