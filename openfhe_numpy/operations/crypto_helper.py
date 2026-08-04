@@ -346,3 +346,39 @@ def attach_block_matvec_keys(
         return key_name, key
 
     return None
+
+
+def attach_block_sum_keys(block_matrix, secret_key) -> None:
+    """Attach both axis-reduction keys to every encrypted matrix block.
+
+    All blocks share one physical shape, so the two generated key maps can be
+    reused. For example, after ``attach_block_sum_keys(x, sk)``, both
+    ``x.sum(axis=0)`` and ``x.sum(axis=1)`` are available regardless of packing
+    order.
+    """
+    if block_matrix.ndim != 2 or not block_matrix.data:
+        raise ONPValueError("attach_block_sum_keys expects a non-empty 2-D block matrix.")
+
+    reference = block_matrix.data[0]
+    if _is_row_major(reference.order):
+        row_width = reference.ncols
+    elif _is_col_major(reference.order):
+        row_width = reference.nrows
+    else:
+        raise ONPValueError(f"Unsupported packing order: {reference.order}")
+
+    row_key = sum_row_keys(secret_key, row_width, reference.batch_size)
+    col_key = sum_col_keys(secret_key)
+    for block in block_matrix.data:
+        block.extra["rowkey"] = row_key
+        block.extra["colkey"] = col_key
+
+
+def gen_block_transpose_keys(secret_key: openfhe.PrivateKey, block_matrix) -> None:
+    """Generate transpose keys from one representative matrix block."""
+    if block_matrix.ndim == 1:
+        return
+    if block_matrix.ndim != 2 or not block_matrix.data:
+        raise ONPValueError("gen_block_transpose_keys expects a non-empty 2-D block matrix.")
+
+    gen_transpose_keys(secret_key, block_matrix.data[0])

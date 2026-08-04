@@ -58,7 +58,9 @@ class BlockPTArray(BlockFHETensor[Plaintext]):
         Returns a NumPy array with shape == original_shape.
         """
         if self.ndim == 1:
-            chunks = [np.asarray(block.decode()).reshape(self.block_shape) for block in self.data]
+            chunks = [
+                np.asarray(block.decode()).reshape(block.original_shape) for block in self.data
+            ]
             full = np.concatenate(chunks)
             return full[: self.original_shape[0]]
 
@@ -71,9 +73,10 @@ class BlockPTArray(BlockFHETensor[Plaintext]):
         for gi in range(grid_rows):
             for gj in range(grid_cols):
                 block = self.get_block(gi, gj)
-                plain = np.asarray(block.decode()).reshape(self.block_shape)
+                block_rows, block_cols = block.original_shape
+                plain = np.asarray(block.decode()).reshape(block.original_shape)
                 r0 = gi * br
                 c0 = gj * bc
-                full[r0 : r0 + br, c0 : c0 + bc] = plain
+                full[r0 : r0 + block_rows, c0 : c0 + block_cols] = plain
 
         return full[:rows, :cols]

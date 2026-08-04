@@ -75,7 +75,7 @@ class BlockCTArray(BlockFHETensor[Ciphertext]):
                 raise NotImplementedError("new_shape is not supported for 1-D BlockCTArray.")
             chunks = [
                 np.asarray(block.decrypt(secret_key, unpack_type=unpack_type)).reshape(
-                    self.block_shape
+                    block.original_shape
                 )
                 for block in self.data
             ]
@@ -91,11 +91,12 @@ class BlockCTArray(BlockFHETensor[Ciphertext]):
         for gi in range(grid_rows):
             for gj in range(grid_cols):
                 block = self.get_block(gi, gj)
+                block_rows, block_cols = block.original_shape
                 plain = np.asarray(block.decrypt(secret_key, unpack_type=unpack_type)).reshape(
-                    self.block_shape
+                    block.original_shape
                 )
                 r0, c0 = gi * br, gj * bc
-                full[r0 : r0 + br, c0 : c0 + bc] = plain
+                full[r0 : r0 + block_rows, c0 : c0 + block_cols] = plain
 
         if new_shape is not None:
             return full[:rows, :cols].reshape(new_shape)
