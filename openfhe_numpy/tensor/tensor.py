@@ -314,13 +314,15 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         """
         Copy the tensor, optionally replacing the data payload.
         """
-        return type(self)(
-            data or self.data,
+        result = self.__class__(
+            self.data if data is None else data,
             self.original_shape,
             self.batch_size,
             self.shape,
             self.order,
         )
+        result.extra.update(self.extra)
+        return result
 
     def __eq__(self, other) -> bool:
         """

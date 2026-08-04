@@ -37,6 +37,7 @@ including support for block-based tensor operations.
 """
 
 from __future__ import annotations
+
 # Third‐party imports
 from math import ceil, prod
 from typing import Any, Literal
@@ -77,6 +78,8 @@ def _shape(data: Any) -> tuple[int, ...]:
     if shape is None:
         shape = np.shape(data)
     return tuple(shape)
+
+
 def _compute_block_dimensions(
     shape: tuple[int, ...],
     batch_size: int,
@@ -161,6 +164,22 @@ def _compute_grid_shape(
             f"got original_shape={original_shape}, block_shape={block_shape}."
         )
     return tuple(ceil(s / b) for s, b in zip(original_shape, block_shape))
+
+
+def _pack_block(
+    data: np.ndarray,
+    original_shape: tuple[int, ...],
+    batch_size: int,
+    order: int,
+    mode: str,
+    **kwargs,
+) -> PackedArrayInformation:
+    """Pack a padded block while preserving its logical shape."""
+    package = _pack_array(data, batch_size, order, mode, **kwargs)
+    package.original_shape = original_shape
+    return package
+
+
 def block_array(
     cc,
     data: np.ndarray | list,
@@ -173,20 +192,71 @@ def block_array(
     target_cols: int | None = None,
     compact: bool = False,
 ) -> BlockFHETensor:
-    """Construct a block plaintext/ciphertext tensor.
-    Tiles the input into encoded blocks, zero-pads edge blocks, and
-    returns a BlockCTArray or BlockPTArray.
-    ``compact`` (vectors only) requests the duplicated, square-compatible
-    packing (e.g. ROW_MAJOR -> [x0, x0, x1, x1]) required to pair a block
-    vector with a block matrix for block matrix-vector multiplication.
-    Leave it False (default) for plain block-vector arithmetic
-    (add/sub/multiply/dot/matmul) -- compact packing duplicates each
-    element, which corrupts summation-based ops like dot/matmul if used
-    outside of block matvec. Passing an explicit ``target_cols`` implies
-    ``compact=True``.
-    For advanced users who already have encoded blocks, call
-    BlockCTArray(...) or BlockPTArray(...) directly.
+    """Construct a block-encoded plaintext or ciphertext tensor.
+
+    ``block_shape`` determines the partition. A vector is divided into blocks of
+    ``b`` elements; a matrix is divided into ``br x bc`` tiles. Thus,
+
+    - vector: ``grid_shape = (ceil(n / b),)``;
+    - matrix: ``grid_shape = (ceil(m / br), ceil(n / bc))``.
+
+    Matrix block ``(i, j)`` contains
+    ``data[i*br:(i+1)*br, j*bc:(j+1)*bc]``. Boundary blocks are zero-padded to
+    ``block_shape`` and stored in row-major grid order.
+
+    If ``block_shape`` is omitted, let ``B = batch_size`` and let ``s`` be the
+    largest power of two satisfying ``s**2 <= B``. The defaults are
+
+    - ``(B,)`` for a vector;
+    - ``(s,)`` for a compact vector;
+    - ``(B, 1)`` for a column matrix;
+    - ``(1, B)`` for a row matrix;
+    - ``(s, s)`` for a general matrix.
+
+    Each block is packed into one CKKS plaintext or ciphertext. ``order`` controls
+    the slot order within a block, while ``mode`` controls whether unused slots are
+    tiled or zero-filled.
+
+    For vectors, ``compact=True`` expands each length-``b`` block into the
+    ``b x b`` layout required by block matrix-vector multiplication, with
+    ``b**2 <= batch_size``. Compatible packing orders are
+
+    - ``ROW_MAJOR`` matrix with ``COL_MAJOR`` vector;
+    - ``COL_MAJOR`` matrix with ``ROW_MAJOR`` vector.
+
+    Compact packing replicates vector entries and is unsuitable for ordinary
+    vector arithmetic, dot products, or vector-vector matrix multiplication.
+    Providing ``target_cols`` also enables compact packing.
+
+    Parameters
+    ----------
+    cc
+        OpenFHE crypto context.
+    data
+        Nonempty one- or two-dimensional input.
+    block_shape
+        Shape of each logical block.
+    batch_size
+        CKKS slots per block. Defaults to ``cc.GetBatchSize()``.
+    order
+        Encoding order within each block.
+    mode
+        Unused-slot filling mode: ``"tile"`` or ``"zero"``.
+    fhe_type
+        ``"C"`` for ciphertext or ``"P"`` for plaintext.
+    public_key
+        Required when ``fhe_type="C"``.
+    target_cols
+        Compact vector block length when ``block_shape`` is omitted.
+    compact
+        Enable matrix-vector-compatible vector packing.
+
+    Returns
+    -------
+    BlockFHETensor
+        The resulting ``BlockCTArray`` or ``BlockPTArray``.
     """
+
     if cc is None:
         raise ValueError("CryptoContext is required.")
     if fhe_type not in ("C", "P"):
@@ -221,8 +291,16 @@ def block_array(
             stop = min(start + chunk, original_shape[0])
             tile = np.zeros(block_shape, dtype=arr.dtype)
             tile[: stop - start] = arr[start:stop]
-            # matrix-vector multiplication.
+            # Compact packing repeats vector entries for matrix-vector multiplication.
             vector_target_cols = chunk if is_compact and chunk * chunk <= batch_size else None
+            package = _pack_block(
+                tile,
+                (stop - start,),
+                batch_size,
+                order,
+                mode,
+                target_cols=vector_target_cols,
+            )
             blocks.append(
                 array(
                     cc=cc,
@@ -232,7 +310,7 @@ def block_array(
                     mode=mode,
                     fhe_type=fhe_type,
                     public_key=public_key,
-                    target_cols=vector_target_cols,
+                    package=package,
                 )
             )
     else:
@@ -243,6 +321,13 @@ def block_array(
                 c0, c1 = gj * bc, min((gj + 1) * bc, original_shape[1])
                 tile = np.zeros(block_shape, dtype=arr.dtype)
                 tile[: r1 - r0, : c1 - c0] = arr[r0:r1, c0:c1]
+                package = _pack_block(
+                    tile,
+                    (r1 - r0, c1 - c0),
+                    batch_size,
+                    order,
+                    mode,
+                )
                 blocks.append(
                     array(
                         cc=cc,
@@ -252,6 +337,7 @@ def block_array(
                         mode=mode,
                         fhe_type=fhe_type,
                         public_key=public_key,
+                        package=package,
                     )
                 )
 
@@ -263,7 +349,6 @@ def block_array(
         batch_size=batch_size,
         order=order,
     )
-
 
 
 def _pack_array(

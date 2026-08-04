@@ -37,7 +37,10 @@ from typing import Any, Callable
 from openfhe_numpy import ArrayEncodingType
 from openfhe_numpy.tensor.block_tensor import BlockFHETensor
 from openfhe_numpy.tensor.block_ctarray import BlockCTArray
-from openfhe_numpy.utils.errors import ONPNotImplementedError, ONPValueError
+from openfhe_numpy.utils.errors import (
+    ONPNotImplementedError,
+    ONPValueError,
+)
 from openfhe_numpy.utils.typecheck import Number
 from openfhe_numpy.utils.matlib import _sum_terms
 from openfhe_numpy.operations.arithmetic_utils import (
@@ -46,6 +49,7 @@ from openfhe_numpy.operations.arithmetic_utils import (
     _require_matvec_order,
     _get_matvec_key_name,
 )
+from openfhe_numpy.operations.block_broadcast import _align_block_operands
 
 
 # ------------------------------------------------------------------------------
@@ -111,14 +115,8 @@ def _build_block_result(
 
 
 def _eval_block_binary(a: BlockFHETensor, b: BlockFHETensor, op_name: str) -> BlockFHETensor:
-    """Evaluate a blockwise binary operation on two block tensors."""
-
-    _require(
-        a.same_layout(b),
-        a.original_shape,
-        b.original_shape,
-        f"Block {op_name} requires identical block layout.",
-    )
+    """Evaluate a blockwise operation, broadcasting only compatible layouts"""
+    a, b = _align_block_operands(a, b)
 
     op = _resolve_op(op_name)
     blocks = [op(left, right) for left, right in zip(a.data, b.data)]

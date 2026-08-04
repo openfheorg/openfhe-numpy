@@ -46,13 +46,7 @@ class PTArray(FHETensor[Plaintext]):
     is_encrypted = False
 
     def clone(self, data=None):
-        return PTArray(
-            data or self.data,
-            self.original_shape,
-            self.batch_size,
-            self.shape,
-            self.order,
-        )
+        return super().clone(data)
 
     def encrypt(self, crypto_context: CryptoContext, public_key: PublicKey):
         ciphertext = crypto_context.Encrypt(public_key, self.data)

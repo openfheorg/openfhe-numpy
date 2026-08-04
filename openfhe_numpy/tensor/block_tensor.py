@@ -591,13 +591,15 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
     # ------------------------------------------------------------------
 
     def clone(self, data: list[Any] | None = None) -> BlockFHETensor:
-        """Return a shallow copy, optionally with new block data.
+        """Return a shallow copy, optionally with new block data."""
+        blocks = list(self._data) if data is None else list(data)
+        if data is not None:
+            for source, result in zip(self._data, blocks):
+                if hasattr(result, "extra"):
+                    result.extra.update(getattr(source, "extra", {}))
 
-        Metadata is preserved. Block objects are not deep-copied unless the
-        caller supplies already-copied block data.
-        """
         return self.__class__(
-            data=data if data is not None else list(self._data),
+            data=blocks,
             grid_shape=self._grid_shape,
             block_shape=self._block_shape,
             original_shape=self._original_shape,
@@ -625,6 +627,7 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
             and self._order == other.order
             and self._block_shape == other.block_shape
             and self._grid_shape == other.grid_shape
+            and tuple(self._data[0].shape) == tuple(other.data[0].shape)
         )
 
     def same_metadata(self, other: Any) -> bool:

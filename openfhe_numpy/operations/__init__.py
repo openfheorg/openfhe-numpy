@@ -69,8 +69,12 @@ from .crypto_helper import (
     gen_accumulate_cols_key,
     generate_slicing_key,
     attach_block_matvec_keys,
+    attach_block_sum_keys,
     attach_matvec_keys,
+    gen_block_transpose_keys,
 )
+
+from .block_broadcast import generate_block_broadcast_key
 
 
 # Define public API
@@ -104,4 +108,7 @@ __all__ = [
     "generate_slicing_key",
     "attach_matvec_keys",
     "attach_block_matvec_keys",
+    "attach_block_sum_keys",
+    "gen_block_transpose_keys",
+    "generate_block_broadcast_key",
 ]
