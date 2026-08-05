@@ -11,7 +11,7 @@ def validate_and_print_results(computed, expected, operation_name):
     print(f"\nExpected:\n{expected}")
     print(f"\nDecrypted Result:\n{computed}")
 
-    is_match, error = onp.check_equality(computed, expected)
+    is_match, error = onp.check_equality(computed, expected, eps=1e-6)
     print(f"\nMatch: {is_match}, Total Error: {error}")
     return is_match, error
 
@@ -20,7 +20,7 @@ def main():
     """
     Broadcasting for block matrices.
 
-    A block matrix is a logical matrix tiled into a grid of ciphertext blocks
+    A block matrix is a logical matrix partitioned into ciphertext blocks
     because it is too large to pack into a single ciphertext. This example adds a
     vector to every row and to every column of such a matrix -- the encrypted
     analogue of NumPy broadcasting:
@@ -29,8 +29,8 @@ def main():
         (m, n) + (m, 1)  -> add the column vector to each column
 
     Key points for block broadcasting:
-      1. The vector operand must be tiled so its shared axis lines up with the
-         matrix blocks. Pass block_shape=(block_cols,) for a row vector and
+      1. The vector operand must use blocks that line up with the matrix blocks.
+         Pass block_shape=(block_cols,) for a row vector and
          block_shape=(block_rows, 1) for a column vector, reading block_cols /
          block_rows from the matrix's ``block_shape``.
       2. Each source block is expanded into a matrix block with rotations, so the
@@ -39,6 +39,8 @@ def main():
     """
 
     # --- Cryptographic setup -------------------------------------------------
+    # These small parameters keep the tutorial fast. They are not secure and
+    # must not be used in production.
     ring_dim = 2**7  # 128
     mult_depth = 3  # broadcast mask + one element-wise multiply
     scale_mod_size = 50
@@ -57,18 +59,19 @@ def main():
     cc.Enable(PKESchemeFeature.ADVANCEDSHE)
 
     keys = cc.KeyGen()
+    # Broadcasting uses plaintext masks, and the multiplication example also
+    # multiplies two ciphertexts.
     cc.EvalMultKeyGen(keys.secretKey)
-    cc.EvalSumKeyGen(keys.secretKey)
 
-    batch_size = cc.GetRingDimension() // 2
+    batch_size = cc.GetBatchSize()
 
     # --- Inputs --------------------------------------------------------------
-    # A 12x12 matrix needs 144 entries > 64 slots, so it is tiled into a 2x2 grid
-    # of (8, 8) blocks. The vectors are aligned to that block layout below.
-    rows, cols = 12, 12
+    # A 9x9 matrix needs 81 entries > 64 slots, so it is partitioned into a 2x2
+    # grid of (8, 8) blocks. The vectors are aligned to that block layout below.
+    rows, cols = 9, 9
     matrix = np.arange(1, rows * cols + 1, dtype=float).reshape(rows, cols)
     row_vector = np.arange(1, cols + 1, dtype=float)  # shape (n,)
-    col_vector = np.arange(1, rows + 1, dtype=float).reshape(rows, 1)  # shape (m, 1)
+    col_vector = np.arange(1, rows + 1, dtype=float).reshape(rows, 1)
 
     print(f"\nCKKS ring dimension : {cc.GetRingDimension()}")
     print(f"Slots per ciphertext: {batch_size}")
@@ -79,6 +82,7 @@ def main():
         cc=cc,
         data=matrix,
         batch_size=batch_size,
+        block_shape=(8, 8),
         order=onp.ROW_MAJOR,
         mode="zero",
         fhe_type="C",
@@ -86,11 +90,11 @@ def main():
     )
     block_rows, block_cols = ctm.block_shape
     print(
-        f"\nAuto-selected block_shape = {ctm.block_shape}, "
+        f"\nBlock shape = {ctm.block_shape}, "
         f"grid_shape = {ctm.grid_shape}  ({ctm.num_blocks} ciphertext blocks)"
     )
 
-    # Tile the vectors so their shared axis aligns with the matrix blocks.
+    # Partition the vectors so their shared axes align with the matrix blocks.
     ctv_row = onp.block_array(
         cc=cc,
         data=row_vector,
@@ -112,7 +116,8 @@ def main():
         public_key=keys.publicKey,
     )
 
-    # Rotation keys for the per-block expansion (both row and column directions).
+    # A single matrix-target call generates the rotation keys needed for both
+    # row and column broadcasting.
     onp.generate_block_broadcast_key(keys.secretKey, ctm)
 
     all_ok = True
