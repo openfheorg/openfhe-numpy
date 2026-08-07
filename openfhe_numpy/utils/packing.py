@@ -421,11 +421,12 @@ def _pack_matrix_col_wise(
     flat_array = np.zeros(batch_size)
     index = 0
 
-    for c in range(ncols):
-        for r in range(nrows):
-            if r < rows and c < cols:
-                flat_array[index] = matrix[r][c]
-            index += 1
+    for _ in range(tiles):
+        for c in range(ncols):
+            for r in range(nrows):
+                if r < rows and c < cols:
+                    flat_array[index] = matrix[r][c]
+                index += 1
 
     return flat_array, shape
 

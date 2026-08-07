@@ -76,7 +76,7 @@ import logging
 import os
 import warnings
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Any, Optional
 
 
 # =============================================================================
@@ -229,6 +229,29 @@ class ONPNotSupportedError(ONPError, NotImplementedError):
 
     def __init__(self, message: str = "This feature is not supported.") -> None:
         super().__init__(message)
+
+
+# =============================================================================
+# Validation helper
+# =============================================================================
+
+
+def _require(
+    condition: bool,
+    left: Any,
+    right: Any,
+    message: str,
+    *,
+    error_cls: type[Exception] = ONPIncompatibleShapeError,
+) -> None:
+    """Raise ``error_cls`` when ``condition`` is false."""
+    if condition:
+        return
+
+    if error_cls is ONPIncompatibleShapeError:
+        raise ONPIncompatibleShapeError(left, right, message)
+
+    raise error_cls(message)
 
 
 # =============================================================================

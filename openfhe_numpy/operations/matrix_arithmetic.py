@@ -53,14 +53,16 @@ from openfhe_numpy.utils.errors import (
     ONPValueError,
     ONPDimensionError,
 )
-from openfhe_numpy.utils.typecheck import is_numeric_scalar
 from openfhe_numpy.openfhe_numpy import (
     ArrayEncodingType,
     EvalMatMulSquare,
     EvalReduceCumRows,
     EvalReduceCumCols,
 )
-from openfhe_numpy.operations.broadcast import broadcast_to
+from openfhe_numpy.operations.arithmetic_utils import (
+    _eval_binary,
+    _eval_scalar_binary,
+)
 
 
 ##############################################################################
@@ -71,148 +73,56 @@ from openfhe_numpy.operations.broadcast import broadcast_to
 # ------------------------------------------------------------------------------
 # Addition Operations
 # ------------------------------------------------------------------------------
-def _eval_add(lhs, rhs):
-    """Internal function to evaluate addition between encrypted tensors."""
-    crypto_context = lhs.data.GetCryptoContext()
-    result = crypto_context.EvalAdd(lhs.data, rhs.data)
-    return CTArray(result, lhs.original_shape, lhs.batch_size, lhs.shape, lhs.order)
-
-
 @register_tensor_function("add", [("CTArray", "CTArray"), ("CTArray", "PTArray")])
 def add_ct(a, b):
     """Add two tensors."""
-    if a.shape == ():
-        return _eval_add(b, a)
-    elif b.shape == ():
-        return _eval_add(a, b)
-    elif a.shape == b.shape:
-        return _eval_add(a, b)
-    else:
-        output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
-        if a.is_encrypted:
-            crypto_context = a.data.GetCryptoContext()
-        elif b.is_encrypted:
-            crypto_context = b.data.GetCryptoContext()
-        else:
-            raise ValueError(f"This function needs at least one parameter to be encrypted.")
-        if a.original_shape != output_shape:
-            a = broadcast_to(a, output_shape, a.order, crypto_context)
-        else:
-            b = broadcast_to(b, output_shape, b.order, crypto_context)
-        return _eval_add(a, b)
+    return _eval_binary(a, b, "add")
 
 
 @register_tensor_function("add", ("CTArray", "scalar"))
 def add_cta_scalar(a, scalar):
-    """Add a scalar to a x."""
-    crypto_context = a.data.GetCryptoContext()
-    result = crypto_context.EvalAdd(a.data, scalar)
-    return CTArray(result, a.original_shape, a.batch_size, a.shape, a.order)
+    """Add a scalar to an encrypted tensor's logical slots."""
+    return _eval_scalar_binary(a, scalar, "add")
 
 
 # ------------------------------------------------------------------------------
 # Subtraction Operations
 # ------------------------------------------------------------------------------
-def _eval_sub(lhs, rhs):
-    """Internal function to evaluate subtraction between encrypted tensors."""
-
-    crypto_context = (
-        rhs.data.GetCryptoContext() if rhs.dtype == "CTArray" else lhs.data.GetCryptoContext()
-    )
-
-    if isinstance(rhs, (int, float)):
-        rhs = crypto_context.MakeCKKSPackedPlaintext([rhs] * lhs.batch_size)
-    else:
-        rhs = rhs.data
-
-    result = crypto_context.EvalSub(lhs.data, rhs)
-    return CTArray(result, lhs.original_shape, lhs.batch_size, lhs.shape, lhs.order)
-
-
 @register_tensor_function(
     "subtract",
     [("CTArray", "CTArray"), ("CTArray", "PTArray"), ("PTArray", "CTArray")],
 )
 def subtract_ct(a, b):
     """Subtract two tensors."""
-    if a.shape == b.shape:
-        return _eval_sub(a, b)
-    else:
-        output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
-
-        if a.is_encrypted:
-            crypto_context = a.data.GetCryptoContext()
-        elif b.is_encrypted:
-            crypto_context = b.data.GetCryptoContext()
-        else:
-            raise ValueError(f"This function needs at least one parameter to be encrypted.")
-        if a.original_shape != output_shape:
-            a = broadcast_to(a, output_shape, a.order, crypto_context)
-        else:
-            b = broadcast_to(b, output_shape, b.order, crypto_context)
-
-        return _eval_sub(a, b)
+    return _eval_binary(a, b, "subtract")
 
 
 @register_tensor_function("subtract", [("CTArray", "scalar")])
 def subtract_ct_scalar(a, scalar):
-    crypto_context = a.data.GetCryptoContext()
-    result = crypto_context.EvalSub(a.data, scalar)
-    return a.clone(result)
+    return _eval_scalar_binary(a, scalar, "subtract")
 
 
 @register_tensor_function("subtract", [("scalar", "CTArray")])
 def subtract_scalar_ct(scalar, a):
-    crypto_context = a.data.GetCryptoContext()
-    result = crypto_context.EvalSub(scalar, a.data)
-    return a.clone(result)
+    return _eval_scalar_binary(a, scalar, "subtract", reverse=True)
 
 
 # ------------------------------------------------------------------------------
 # Multiplication Operations
 # ------------------------------------------------------------------------------
-def _eval_multiply(lhs, rhs):
-    """Internal function to evaluate element-wise multiplication."""
-    crypto_context = lhs.data.GetCryptoContext()
-    if is_numeric_scalar(rhs):
-        rhs_data = crypto_context.MakeCKKSPackedPlaintext([rhs] * lhs.batch_size)
-    else:
-        rhs_data = rhs.data
-
-    result = crypto_context.EvalMult(lhs.data, rhs_data)
-    return lhs.clone(result)
-
-
 @register_tensor_function(
     "multiply",
-    [("CTArray", "CTArray"), ("CTArray", "int"), ("CTArray", "PTArray")],
+    [("CTArray", "CTArray"), ("CTArray", "PTArray")],
 )
 def multiply_ct(a, b):
     """Multiply two tensors element-wise."""
-    if is_numeric_scalar(a) or is_numeric_scalar(b):
-        return _eval_multiply(a, b)
-    elif a.shape == b.shape:
-        return _eval_multiply(a, b)
-    else:
-        output_shape = np.broadcast_shapes(a.original_shape, b.original_shape)
-        if a.is_encrypted:
-            crypto_context = a.data.GetCryptoContext()
-        elif b.is_encrypted:
-            crypto_context = b.data.GetCryptoContext()
-        else:
-            raise ValueError(f"This function needs at least one parameter to be encrypted.")
-        if a.original_shape != output_shape:
-            a = broadcast_to(a, output_shape, a.order, crypto_context)
-        else:
-            b = broadcast_to(b, output_shape, b.order, crypto_context)
-
-        return _eval_multiply(a, b)
+    return _eval_binary(a, b, "multiply")
 
 
 @register_tensor_function("multiply", ("CTArray", "scalar"))
 def multiply_ct_scalar(a, scalar):
     """Multiply a tensor by a scalar."""
-    return _eval_multiply(a, scalar)
+    return _eval_scalar_binary(a, scalar, "multiply")
 
 
 ##############################################################################

@@ -332,7 +332,7 @@ def cumulative_reduce(a: ArrayLike, axis: int = 0, keepdims: bool = False) -> Ar
 
 @tensor_function_api("sum", binary=False)
 def sum(a: ArrayLike, /, *, axis: Optional[int] = None, keepdims: bool = False) -> ArrayLike:
-   """
+    """
     Sum of elements over an axis or all.
 
     Parameters
