@@ -31,8 +31,7 @@
 
 from __future__ import annotations
 
-import operator
-from typing import Any, Callable
+from typing import Any
 
 from openfhe_numpy import ArrayEncodingType
 from openfhe_numpy.tensor.block_tensor import BlockFHETensor
@@ -44,41 +43,14 @@ from openfhe_numpy.utils.errors import (
 from openfhe_numpy.utils.typecheck import Number
 from openfhe_numpy.utils.matlib import _sum_terms
 from openfhe_numpy.operations.arithmetic_utils import (
+    _eval_binary,
+    _eval_scalar_binary,
     _result_cls,
     _require,
     _require_matvec_order,
     _get_matvec_key_name,
 )
 from openfhe_numpy.operations.block_broadcast import _align_block_operands
-
-
-# ------------------------------------------------------------------------------
-# Type aliases
-# ------------------------------------------------------------------------------
-
-BlockOp = Callable[[Any, Any], Any]
-
-
-# ------------------------------------------------------------------------------
-# Supported element-wise operators
-# ------------------------------------------------------------------------------
-
-_OPS: dict[str, BlockOp] = {
-    "add": operator.add,
-    "subtract": operator.sub,
-    "multiply": operator.mul,
-}
-
-
-def _resolve_op(op_name: str) -> BlockOp:
-    """Return the blockwise Python operator for ``op_name``."""
-    try:
-        return _OPS[op_name]
-    except KeyError:
-        supported = ", ".join(sorted(_OPS))
-        raise ONPNotImplementedError(
-            f"Unsupported block operation {op_name!r}. Supported operations: {supported}."
-        ) from None
 
 
 # ------------------------------------------------------------------------------
@@ -118,24 +90,26 @@ def _eval_block_binary(a: BlockFHETensor, b: BlockFHETensor, op_name: str) -> Bl
     """Evaluate a blockwise operation, broadcasting only compatible layouts"""
     a, b = _align_block_operands(a, b)
 
-    op = _resolve_op(op_name)
-    blocks = [op(left, right) for left, right in zip(a.data, b.data)]
+    blocks = [
+        _eval_binary(left, right, op_name)
+        for left, right in zip(a.data, b.data)
+    ]
 
     return _build_block_result(a, blocks, result_cls=BlockCTArray)
 
 
-def _eval_block_scalar(a: BlockFHETensor, scalar: Number, op_name: str) -> BlockFHETensor:
-    """Evaluate ``block_tensor op scalar`` blockwise."""
-    op = _resolve_op(op_name)
-    blocks = [op(block, scalar) for block in a.data]
-
-    return _build_block_result(a, blocks)
-
-
-def _eval_scalar_block(scalar: Number, a: BlockFHETensor, op_name: str) -> BlockFHETensor:
-    """Evaluate ``scalar op block_tensor`` blockwise."""
-    op = _resolve_op(op_name)
-    blocks = [op(scalar, block) for block in a.data]
+def _eval_block_scalar(
+    a: BlockFHETensor,
+    scalar: Number,
+    op_name: str,
+    *,
+    reverse: bool = False,
+) -> BlockFHETensor:
+    """Evaluate packed scalar arithmetic independently for every child block."""
+    blocks = [
+        _eval_scalar_binary(block, scalar, op_name, reverse=reverse)
+        for block in a.data
+    ]
 
     return _build_block_result(a, blocks)
 

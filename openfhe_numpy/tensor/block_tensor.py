@@ -89,6 +89,8 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
     """
 
     tensor_priority = 30
+    # Ensure NumPy scalar operators defer to the tensor reverse operators.
+    __array_priority__ = 1000
     is_encrypted: bool = False
     __hash__ = None
 

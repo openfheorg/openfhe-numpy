@@ -52,7 +52,6 @@ from ..utils.errors import (
 from .block_arithmetic_utils import (
     _eval_block_binary,
     _eval_block_scalar,
-    _eval_scalar_block,
     _eval_block_dot,
     _eval_block_matmul,
 )
@@ -111,7 +110,7 @@ def subtract_block_ct_scalar(a, scalar):
 @register_tensor_function("subtract", [("scalar", "BlockCTArray")])
 def subtract_scalar_block_ct(scalar, a):
     """Subtract a block ciphertext tensor from a scalar."""
-    return _eval_scalar_block(scalar, a, "subtract")
+    return _eval_block_scalar(a, scalar, "subtract", reverse=True)
 
 
 # ------------------------------------------------------------------------------

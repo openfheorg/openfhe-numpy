@@ -120,6 +120,9 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         Packing order: only support row-major or column-major.
     """
 
+    # Ensure NumPy scalar operators defer to the tensor reverse operators.
+    __array_priority__ = 1000
+
     __slots__ = (
         "_data",
         "_original_shape",

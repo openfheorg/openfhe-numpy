@@ -1,4 +1,4 @@
-import openfhe
+from operator import index as operator_index
 
 
 def _create_masking(indices, size):
@@ -26,21 +26,33 @@ def _get_single_element(cc, x, idx, batch_size):
     return ct_res
 
 
-def _duplicate_block(x, duplicate_count, block_size, pt_mask=None):
-    """
-    Duplicates a block of 'block_size' slots 'duplicate_count' times.
+def _replication_steps(copies: int, stride: int):
+    """Yield ``(rotation, use_seed)`` for exactly ``copies`` patterns."""
+    copies = operator_index(copies)
+    stride = operator_index(stride)
 
-    """
-    cc = x.GetCryptoContext()
-    rotation = block_size
-    ct_res = x
+    if copies < 1:
+        raise ValueError(f"copies must be positive, got {copies!r}")
+    if stride < 1:
+        raise ValueError(f"stride must be positive, got {stride!r}")
 
-    while rotation < block_size * duplicate_count:
-        ct_rotated = cc.EvalRotate(ct_res, -rotation)
-        ct_res = cc.EvalAdd(ct_res, ct_rotated)
-        rotation *= 2
+    produced = 1
+    for bit in bin(copies)[3:]:
+        yield -(produced * stride), False
+        produced *= 2
 
-    # mask out if needed
-    if pt_mask is not None:
-        ct_res = cc.EvalMult(pt_mask, ct_res)
-    return ct_res
+        if bit == "1":
+            yield -(produced * stride), True
+            produced += 1
+
+
+def _replicate_pattern(seed, copies: int, stride: int):
+    """Replicate an isolated slot pattern exactly ``copies`` times."""
+    cc = seed.GetCryptoContext()
+    result = seed
+
+    for rotation, use_seed in _replication_steps(copies, stride):
+        operand = seed if use_seed else result
+        result = cc.EvalAdd(result, cc.EvalRotate(operand, rotation))
+
+    return result

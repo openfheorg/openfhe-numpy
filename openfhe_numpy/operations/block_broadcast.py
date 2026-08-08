@@ -45,8 +45,11 @@ from typing import Any
 
 import numpy as np
 
-from openfhe_numpy.operations.arithmetic_utils import _require
-from openfhe_numpy.operations.broadcast import broadcast_to, generate_broadcast_key
+from openfhe_numpy.operations.arithmetic_utils import _binary_crypto_context, _require
+from openfhe_numpy.operations.broadcast import (
+    _broadcast_rotation_indices,
+    _broadcast_to_physical_slots,
+)
 from openfhe_numpy.tensor.block_ctarray import BlockCTArray
 from openfhe_numpy.tensor.block_tensor import BlockFHETensor
 from openfhe_numpy.utils.errors import (
@@ -178,55 +181,6 @@ def _block_original_shape(
 
 
 # ----------------------------------------------------------------------------
-# Crypto context
-# ----------------------------------------------------------------------------
-
-
-def _block_crypto_context(a: BlockFHETensor, b: BlockFHETensor):
-    """Return the crypto context shared by the encrypted operands.
-
-    Parameters
-    ----------
-    a, b : BlockFHETensor
-        Operands participating in the block operation.
-
-    Returns
-    -------
-    openfhe.CryptoContext
-        Crypto context associated with the encrypted operand or operands.
-
-    Raises
-    ------
-    ONPValueError
-        If both operands are plaintext or encrypted operands use different
-        crypto contexts or key tags.
-    """
-    encrypted = [tensor for tensor in (a, b) if tensor.is_encrypted]
-    _require(
-        bool(encrypted),
-        a.dtype,
-        b.dtype,
-        "Block arithmetic requires at least one encrypted operand.",
-        error_cls=ONPValueError,
-    )
-
-    first = encrypted[0].data[0].data
-    context = first.GetCryptoContext()
-    key_tag = first.GetKeyTag() if hasattr(first, "GetKeyTag") else None
-    for tensor in encrypted[1:]:
-        current = tensor.data[0].data
-        current_key_tag = current.GetKeyTag() if hasattr(current, "GetKeyTag") else None
-        _require(
-            current.GetCryptoContext() == context and current_key_tag == key_tag,
-            a.dtype,
-            b.dtype,
-            "Encrypted block operands must use the same crypto context and key tag.",
-            error_cls=ONPValueError,
-        )
-    return context
-
-
-# ----------------------------------------------------------------------------
 # Per-block expansion
 # ----------------------------------------------------------------------------
 
@@ -259,48 +213,82 @@ def _source_block(source: BlockFHETensor, kind: str, row: int, column: int):
     return source.get_block(row, 0)
 
 
-def _broadcast_block(source_block, out_original_shape, out_block_shape, order, context, kind):
-    """Expand one encoded source block to a result block.
-
-    Parameters
-    ----------
-    source_block : CTArray or PTArray
-        Encoded row or column block to expand.
-    out_original_shape : tuple[int, int]
-        Unpadded logical shape of the result block.
-    out_block_shape : tuple[int, int]
-        Padded shape of the result block.
-    order : ArrayEncodingType
-        Slot-packing order.
-    context : openfhe.CryptoContext
-        Crypto context used to encode plaintext results.
-    kind : {"row_vector", "row_matrix", "column"}
-        Broadcast direction of ``source_block``.
-
-    Returns
-    -------
-    CTArray or PTArray
-        Expanded encoded block with updated logical-shape metadata.
-    """
-    if kind == "column":
-        full_source_shape = (out_block_shape[0], 1)
-    else:
-        # Row vectors and row matrices share the same packed representation.
-        full_source_shape = (out_block_shape[1],)
-
-    # Edge blocks are already zero-padded. Expanding the full physical block
-    # preserves those zeros, so no separate edge mask is required.
-    full_source = source_block.clone()
-    full_source.original_shape = full_source_shape
-
-    expanded = broadcast_to(full_source, out_block_shape, order=order, cc=context)
-    expanded.original_shape = out_original_shape
-    return expanded
-
-
 # ----------------------------------------------------------------------------
 # Layout-driven broadcast
 # ----------------------------------------------------------------------------
+
+
+def _validate_source_for_layout(
+    source: BlockFHETensor,
+    original_shape: tuple[int, int],
+    block_shape: tuple[int, int],
+    grid_shape: tuple[int, int],
+    batch_size: int,
+    order: Any,
+) -> str:
+    """Validate a row or column source against a result block layout."""
+    _require(
+        len(original_shape) == 2,
+        original_shape,
+        source.original_shape,
+        "Block broadcasting produces a matrix result.",
+        error_cls=ONPNotSupportedError,
+    )
+    result_shape = _broadcast_shape(source.original_shape, original_shape)
+    _require(
+        result_shape == original_shape,
+        source.original_shape,
+        original_shape,
+        f"Broadcasting produces {result_shape}, not target shape {original_shape}.",
+    )
+    _require(
+        source.batch_size == batch_size,
+        source.batch_size,
+        batch_size,
+        f"Block broadcasting requires equal batch_size; got {source.batch_size} and {batch_size}.",
+        error_cls=ONPValueError,
+    )
+    _require(
+        source.order == order,
+        source.order,
+        order,
+        f"Block broadcasting requires matching packing order; got {source.order!r} and {order!r}.",
+        error_cls=ONPValueError,
+    )
+    _require(
+        not all(size == 1 for size in source.original_shape),
+        source.original_shape,
+        original_shape,
+        "Singleton block tensors are not broadcast operands; use a Python scalar.",
+        error_cls=ONPNotImplementedError,
+    )
+    _require(
+        _is_standard_block_layout(source),
+        tuple(source.data[0].shape),
+        source.block_shape,
+        "Block broadcasting requires standard non-compact packing; construct "
+        "vector sources with compact=False.",
+        error_cls=ONPNotSupportedError,
+    )
+
+    kind = _source_kind(source)
+    block_rows, block_cols = block_shape
+    grid_rows, grid_cols = grid_shape
+    expected_block, expected_grid = {
+        "row_vector": ((block_cols,), (grid_cols,)),
+        "row_matrix": ((1, block_cols), (1, grid_cols)),
+        "column": ((block_rows, 1), (grid_rows, 1)),
+    }[kind]
+    _require(
+        source.block_shape == expected_block and source.grid_shape == expected_grid,
+        source.block_shape,
+        block_shape,
+        "Incompatible block layout: result "
+        f"block_shape={block_shape} requires source "
+        f"block_shape={expected_block} and grid_shape={expected_grid}; "
+        f"got block_shape={source.block_shape} and grid_shape={source.grid_shape}.",
+    )
+    return kind
 
 
 def _broadcast_into_layout(
@@ -354,74 +342,40 @@ def _broadcast_into_layout(
     blocks of shape ``(br, bc)``, source blocks must have shape ``(bc,)``,
     ``(1, bc)``, or ``(br, 1)``.
     """
-    _require(
-        len(original_shape) == 2,
+    kind = _validate_source_for_layout(
+        source,
         original_shape,
-        source.original_shape,
-        "Block broadcasting produces a matrix result.",
-        error_cls=ONPNotSupportedError,
-    )
-    _require(
-        source.batch_size == batch_size,
-        source.batch_size,
-        batch_size,
-        f"Block broadcasting requires equal batch_size; got {source.batch_size} and {batch_size}.",
-        error_cls=ONPValueError,
-    )
-    _require(
-        source.order == order,
-        source.order,
-        order,
-        f"Block broadcasting requires matching packing order; got {source.order!r} and {order!r}.",
-        error_cls=ONPValueError,
-    )
-    _require(
-        not all(size == 1 for size in source.original_shape),
-        source.original_shape,
-        original_shape,
-        "Singleton block tensors are not broadcast operands; use a Python scalar.",
-        error_cls=ONPNotImplementedError,
-    )
-    _require(
-        _is_standard_block_layout(source),
-        tuple(source.data[0].shape),
-        source.block_shape,
-        "Block broadcasting requires standard non-compact packing; construct "
-        "vector sources with compact=False.",
-        error_cls=ONPNotSupportedError,
-    )
-
-    kind = _source_kind(source)
-    block_rows, block_cols = block_shape
-    grid_rows, grid_cols = grid_shape
-    # The source must match the result along every non-broadcast block axis.
-    expected_block, expected_grid = {
-        "row_vector": ((block_cols,), (grid_cols,)),
-        "row_matrix": ((1, block_cols), (1, grid_cols)),
-        "column": ((block_rows, 1), (grid_rows, 1)),
-    }[kind]
-    _require(
-        source.block_shape == expected_block and source.grid_shape == expected_grid,
-        source.block_shape,
         block_shape,
-        "Incompatible block layout: result "
-        f"block_shape={block_shape} requires source "
-        f"block_shape={expected_block} and grid_shape={expected_grid}; "
-        f"got block_shape={source.block_shape} and grid_shape={source.grid_shape}.",
+        grid_shape,
+        batch_size,
+        order,
     )
-
-    blocks = [
-        _broadcast_block(
-            _source_block(source, kind, i, j),
-            _block_original_shape(original_shape, block_shape, i, j),
-            block_shape,
-            order,
-            context,
+    cache = {}
+    blocks = []
+    for block_row, block_col in np.ndindex(*grid_shape):
+        source_block = _source_block(
+            source,
             kind,
+            block_row,
+            block_col,
         )
-        for i in range(grid_rows)
-        for j in range(grid_cols)
-    ]
+        logical_shape = _block_original_shape(
+            original_shape,
+            block_shape,
+            block_row,
+            block_col,
+        )
+        key = (id(source_block), logical_shape)
+        if key not in cache:
+            cache[key] = _broadcast_to_physical_slots(
+                source_block.clone(),
+                logical_shape=logical_shape,
+                physical_shape=block_shape,
+                order=order,
+                cc=context,
+            )
+        blocks.append(cache[key].clone())
+
     return result_cls(
         data=blocks,
         grid_shape=grid_shape,
@@ -479,7 +433,7 @@ def _block_broadcast_to(source: BlockFHETensor, target: BlockFHETensor) -> Block
         target.original_shape,
         f"Broadcasting produces {result_shape}, not target shape {target.original_shape}.",
     )
-    context = _block_crypto_context(source, target)
+    context = _binary_crypto_context(source.data[0], target.data[0])
     return _broadcast_into_layout(
         source,
         target.original_shape,
@@ -492,32 +446,12 @@ def _block_broadcast_to(source: BlockFHETensor, target: BlockFHETensor) -> Block
     )
 
 
-def _two_sided_broadcast(
-    a: BlockFHETensor, b: BlockFHETensor, result_shape: tuple[int, int]
-) -> tuple[BlockFHETensor, BlockFHETensor]:
-    """Broadcast a column and a row to a common matrix shape.
-
-    Parameters
-    ----------
-    a, b : BlockFHETensor
-        One column tensor and one row tensor.
-    result_shape : tuple[int, int]
-        Common logical matrix shape.
-
-    Returns
-    -------
-    tuple[BlockFHETensor, BlockFHETensor]
-        Expanded operands in their original order.
-
-    Raises
-    ------
-    ONPIncompatibleShapeError
-        If either source does not match the derived result layout.
-    ONPNotSupportedError
-        If the operands are not one column and one row.
-    ONPValueError
-        If their batch sizes, packing orders, or encryption metadata differ.
-    """
+def _two_sided_layout(
+    a: BlockFHETensor,
+    b: BlockFHETensor,
+    result_shape: tuple[int, int],
+) -> tuple[tuple[int, int], tuple[int, int], int, Any]:
+    """Validate a column-plus-row broadcast and return its common layout."""
     _require(
         len(result_shape) == 2,
         a.original_shape,
@@ -552,18 +486,53 @@ def _two_sided_broadcast(
         error_cls=ONPValueError,
     )
 
-    # The column defines the row partition; the row defines the column partition.
     block_shape = (column.block_shape[0], row.block_shape[-1])
     grid_shape = (column.grid_shape[0], row.grid_shape[-1])
-    context = _block_crypto_context(column, row)
+    return block_shape, grid_shape, column.batch_size, column.order
+
+
+def _two_sided_broadcast(
+    a: BlockFHETensor, b: BlockFHETensor, result_shape: tuple[int, int]
+) -> tuple[BlockFHETensor, BlockFHETensor]:
+    """Broadcast a column and a row to a common matrix shape.
+
+    Parameters
+    ----------
+    a, b : BlockFHETensor
+        One column tensor and one row tensor.
+    result_shape : tuple[int, int]
+        Common logical matrix shape.
+
+    Returns
+    -------
+    tuple[BlockFHETensor, BlockFHETensor]
+        Expanded operands in their original order.
+
+    Raises
+    ------
+    ONPIncompatibleShapeError
+        If either source does not match the derived result layout.
+    ONPNotSupportedError
+        If the operands are not one column and one row.
+    ONPValueError
+        If their batch sizes, packing orders, or encryption metadata differ.
+    """
+    a_is_column = _source_kind(a) == "column"
+    column, row = (a, b) if a_is_column else (b, a)
+    block_shape, grid_shape, batch_size, order = _two_sided_layout(
+        column,
+        row,
+        result_shape,
+    )
+    context = _binary_crypto_context(column.data[0], row.data[0])
 
     column_full = _broadcast_into_layout(
         column,
         result_shape,
         block_shape,
         grid_shape,
-        column.batch_size,
-        column.order,
+        batch_size,
+        order,
         context,
         type(column),
     )
@@ -572,8 +541,8 @@ def _two_sided_broadcast(
         result_shape,
         block_shape,
         grid_shape,
-        column.batch_size,
-        column.order,
+        batch_size,
+        order,
         context,
         type(row),
     )
@@ -737,6 +706,8 @@ def generate_block_broadcast_key(secret_key: Any, *operands: BlockFHETensor) -> 
         )
         _verify_secret_key(secret_key, operand)
 
+    requests = set()
+
     if len(operands) == 1:
         matrix = operands[0]
         _require(
@@ -746,20 +717,120 @@ def generate_block_broadcast_key(secret_key: Any, *operands: BlockFHETensor) -> 
             "A single-operand call must be a block matrix.",
             error_cls=ONPTypeError,
         )
-        block_rows, block_cols = matrix.block_shape
-        target_block = matrix.block_shape
-        source_shapes = {(block_cols,), (block_rows, 1)}
-    else:
-        target_block = _broadcast_shape(*(operand.block_shape for operand in operands))
-        if len(target_block) != 2:
-            return  # operands share a block shape; no broadcast, no keys
-        block_rows, block_cols = target_block
-        source_shapes = set()
-        for operand in operands:
-            if tuple(operand.block_shape) == target_block:
-                continue  # full-size operand needs no expansion keys
-            kind = _source_kind(operand)
-            source_shapes.add((block_rows, 1) if kind == "column" else (block_cols,))
+        result_shape = matrix.original_shape
+        physical_shape = matrix.block_shape
+        grid_shape = matrix.grid_shape
+        order = matrix.order
 
-    for source_shape in source_shapes:
-        generate_broadcast_key(secret_key, source_shape, target_block)
+        for block_row, block_col in np.ndindex(*grid_shape):
+            logical_shape = _block_original_shape(
+                result_shape,
+                physical_shape,
+                block_row,
+                block_col,
+            )
+            logical_rows, logical_cols = logical_shape
+
+            # Row vectors and row matrices use the same packed-slot kernel.
+            requests.add(((logical_cols,), logical_shape))
+            requests.add(((logical_rows, 1), logical_shape))
+
+    else:
+        result_shape = _broadcast_shape(*(operand.original_shape for operand in operands))
+        if len(result_shape) != 2:
+            return
+
+        full_operands = [operand for operand in operands if operand.original_shape == result_shape]
+        if full_operands:
+            target = full_operands[0]
+            for other in full_operands[1:]:
+                _require(
+                    target.same_layout(other),
+                    target.block_shape,
+                    other.block_shape,
+                    "Full matrix operands use different layouts; broadcasting cannot re-tile them.",
+                )
+
+            physical_shape = target.block_shape
+            grid_shape = target.grid_shape
+            batch_size = target.batch_size
+            order = target.order
+
+        else:
+            classified = [(operand, _source_kind(operand)) for operand in operands]
+            column = next(
+                (operand for operand, kind in classified if kind == "column"),
+                None,
+            )
+            row = next(
+                (operand for operand, kind in classified if kind != "column"),
+                None,
+            )
+            _require(
+                column is not None and row is not None,
+                tuple(operand.original_shape for operand in operands),
+                result_shape,
+                "Two-sided block broadcasting needs at least one column and one row "
+                "when no full matrix operand defines the result layout.",
+                error_cls=ONPNotSupportedError,
+            )
+            physical_shape, grid_shape, batch_size, order = _two_sided_layout(
+                column,
+                row,
+                result_shape,
+            )
+
+        for operand in operands:
+            if operand.original_shape == result_shape:
+                # Full operands define this layout and require no expansion.
+                continue
+
+            kind = _validate_source_for_layout(
+                operand,
+                result_shape,
+                physical_shape,
+                grid_shape,
+                batch_size,
+                order,
+            )
+            for block_row, block_col in np.ndindex(*grid_shape):
+                logical_shape = _block_original_shape(
+                    result_shape,
+                    physical_shape,
+                    block_row,
+                    block_col,
+                )
+                source_block = _source_block(
+                    operand,
+                    kind,
+                    block_row,
+                    block_col,
+                )
+
+                # A logical match alone does not prove packed-slot identity.
+                if (
+                    tuple(source_block.original_shape) == logical_shape
+                    and tuple(source_block.shape) == physical_shape
+                    and source_block.order == order
+                ):
+                    continue
+
+                requests.add((tuple(source_block.original_shape), logical_shape))
+
+    indices = set()
+    for source_shape, logical_shape in requests:
+        indices.update(
+            _broadcast_rotation_indices(
+                source_shape=source_shape,
+                logical_shape=logical_shape,
+                physical_shape=physical_shape,
+                order=order,
+            )
+        )
+
+    indices.discard(0)
+    if indices:
+        secret_key.GetCryptoContext().EvalRotateKeyGen(
+            secret_key,
+            sorted(indices),
+        )

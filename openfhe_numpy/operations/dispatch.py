@@ -33,6 +33,8 @@ from typing import Tuple, Callable, Any
 import functools
 import os
 
+from openfhe_numpy.utils.typecheck import is_numeric_scalar
+
 
 # Operation registry - stores implementations keyed by (operation_name, signature)
 TENSOR_FUNCTIONS = {}
@@ -102,8 +104,11 @@ def dispatch_tensor_function(
             print(f"DEBUG: Found exact match! Calling {TENSOR_FUNCTIONS[key]}")
         return TENSOR_FUNCTIONS[key](*args, **kwargs)
 
-    # Step 3: Normalize scalars to 'scalar'
-    normalized_sig = tuple("scalar" if t in {"int", "float", "complex", "bool"} else t for t in sig)
+    # Step 3: Normalize every supported Python/NumPy scalar to 'scalar'.
+    normalized_sig = tuple(
+        "scalar" if is_numeric_scalar(arg) else type_name
+        for arg, type_name in zip(args, sig)
+    )
     key = (func_name, normalized_sig)
     if key in TENSOR_FUNCTIONS:
         return TENSOR_FUNCTIONS[key](*args, **kwargs)
