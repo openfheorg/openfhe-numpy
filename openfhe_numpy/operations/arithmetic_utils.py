@@ -42,7 +42,10 @@ from typing import Any
 import numpy as np
 
 from openfhe_numpy.openfhe_numpy import ArrayEncodingType
-from openfhe_numpy.operations.broadcast import broadcast_to
+from openfhe_numpy.operations.broadcast import (
+    _broadcast_to_physical_slots,
+    broadcast_to,
+)
 from openfhe_numpy.tensor.tensor import BaseTensor
 from openfhe_numpy.utils.errors import (
     ONPDimensionError,
@@ -300,10 +303,29 @@ def _align_binary_operands(a, b):
     )
 
     crypto_context = _binary_crypto_context(a, b)
-    if source_a != output_shape:
-        a = broadcast_to(a, output_shape, order=a.order, cc=crypto_context)
-    if source_b != output_shape:
-        b = broadcast_to(b, output_shape, order=b.order, cc=crypto_context)
+    matrix_result = len(output_shape) == 2
+    if matrix_result and source_a == output_shape:
+        if source_b != output_shape:
+            b = _broadcast_to_physical_slots(
+                b,
+                logical_shape=output_shape,
+                physical_shape=a.shape,
+                order=a.order,
+                cc=crypto_context,
+            )
+    elif matrix_result and source_b == output_shape:
+        a = _broadcast_to_physical_slots(
+            a,
+            logical_shape=output_shape,
+            physical_shape=b.shape,
+            order=b.order,
+            cc=crypto_context,
+        )
+    else:
+        if source_a != output_shape:
+            a = broadcast_to(a, output_shape, order=a.order, cc=crypto_context)
+        if source_b != output_shape:
+            b = broadcast_to(b, output_shape, order=b.order, cc=crypto_context)
 
     _require(
         tuple(a.shape) == tuple(b.shape),
