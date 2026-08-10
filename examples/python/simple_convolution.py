@@ -1,6 +1,5 @@
 import numpy as np
-from openfhe import CCParamsCKKSRNS, FIXEDAUTO, \
-  HYBRID, GenCryptoContext, PKESchemeFeature
+from openfhe import CCParamsCKKSRNS, FIXEDAUTO, HYBRID, GenCryptoContext, PKESchemeFeature
 import openfhe_numpy as onp
 
 
@@ -26,7 +25,7 @@ def get_next_power_of_two(n: int) -> int:
     return p
 
 
-def numpy_conv1d(signal, kernel, mode='valid'):
+def numpy_conv1d(signal, kernel, mode="valid"):
     """
     Compute 1D convolution using NumPy.
 
@@ -62,10 +61,10 @@ def validate_and_print_results(computed, expected, operation_name):
     difference = expected - computed
     squared_difference = difference**2
     mse = np.mean(squared_difference)
-    print(f"\nMean Squared Error (MSE): " f"{mse}")
+    print(f"\nMean Squared Error (MSE): {mse}")
 
 
-def openfhe_conv1d(signal, kernel, cc, keys, batch_size, mode='valid'):
+def openfhe_conv1d(signal, kernel, cc, keys, batch_size, mode="valid"):
     """
     Compute 1D convolution using OpenFHE-NumPy.
 
@@ -80,9 +79,11 @@ def openfhe_conv1d(signal, kernel, cc, keys, batch_size, mode='valid'):
     Returns:
         Decrypted convolved signal
     """
-    if mode != 'valid':
-        raise NotImplementedError("Only 'valid' mode implemented \
-          for OpenFHE convolution")
+    if mode != "valid":
+        raise NotImplementedError(
+            "Only 'valid' mode implemented \
+          for OpenFHE convolution"
+        )
 
     signal_len = len(signal)
     kernel_len = len(kernel)
@@ -156,8 +157,7 @@ def openfhe_conv1d(signal, kernel, cc, keys, batch_size, mode='valid'):
             mode="zero",
             public_key=keys.publicKey,
         )
-        onp_ct_convolution_result = onp_ct_convolution_result + \
-            onp_pt_mask * sum_term_j
+        onp_ct_convolution_result = onp_ct_convolution_result + onp_pt_mask * sum_term_j
 
     # Decryption
     decrypted_array = onp_ct_convolution_result.decrypt(keys.secretKey)
@@ -190,7 +190,8 @@ def main():
     params = CCParamsCKKSRNS()
     params.SetScalingModSize(scale_mod_size)
     params.SetFirstModSize(60)
-    params.SetMultiplicativeDepth(2)
+    # Two multiplications plus one level for FIXEDAUTO alignment.
+    params.SetMultiplicativeDepth(3)
     params.SetBatchSize(get_next_power_of_two(signal_length))
     params.SetScalingTechnique(FIXEDAUTO)
     params.SetKeySwitchTechnique(HYBRID)
@@ -204,7 +205,7 @@ def main():
     cc.EvalMultKeyGen(keys.secretKey)
     cc.EvalSumKeyGen(keys.secretKey)
 
-    rotations = list(range(-(signal_length-kernel_length+1), 1, 1))
+    rotations = list(range(-(signal_length - kernel_length + 1), 1, 1))
     cc.EvalRotateKeyGen(keys.secretKey, rotations)
 
     ring_dim = cc.GetRingDimension()
@@ -213,22 +214,24 @@ def main():
     print(f"Available slots: {batch_size}")
 
     if signal_length > batch_size:
-        print(f"Warning: Signal length {signal_length} \
-            is larger than available slots {batch_size}.")
-        print("The signal will be truncated or \
-            wrapped around by openfhe-numpy.")
+        print(
+            f"Warning: Signal length {signal_length} \
+            is larger than available slots {batch_size}."
+        )
+        print(
+            "The signal will be truncated or \
+            wrapped around by openfhe-numpy."
+        )
 
     # Convolution
     try:
         # Compute ground truth result using numpy (unencrypted)
-        expected_conv = numpy_conv1d(signal, kernel, mode='valid')
+        expected_conv = numpy_conv1d(signal, kernel, mode="valid")
 
         # Compute convolution with OpenFHE (encrypted)
-        openfhe_result = openfhe_conv1d(signal, kernel, cc,
-                                        keys, batch_size, mode='valid')
+        openfhe_result = openfhe_conv1d(signal, kernel, cc, keys, batch_size, mode="valid")
 
-        validate_and_print_results(openfhe_result, expected_conv,
-                                   "OpenFHE Convolution")
+        validate_and_print_results(openfhe_result, expected_conv, "OpenFHE Convolution")
 
     except Exception as e:
         print(f"Error in OpenFHE convolution: {e}")

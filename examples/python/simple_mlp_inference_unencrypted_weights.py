@@ -227,7 +227,7 @@ def onp_forward_pass(X, W1, b1, W2, b2, cc, keys, batch_size):
         cc=cc,
         data=b2,
         batch_size=batch_size,
-        order=onp.COL_MAJOR,
+        order=onp.ROW_MAJOR,
         fhe_type="P",
         mode="tile",
         public_key=keys.publicKey,
@@ -311,4 +311,3 @@ if __name__ == '__main__':
     print(f"\nonp_forward_pass took {elapsed_time:.4f} seconds.")
     
     validate_and_print_results(onp_probabilities[0][0], np_probabilities[0][0], "MLP")
-    

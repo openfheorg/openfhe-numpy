@@ -18,13 +18,8 @@ def validate_and_print_results(computed, expected, operation_name):
 def run_row_accumulation_example(cc, keys, ctm_x, matrix):
     """Run homomorphic row accumulation example."""
 
-    # Generate rotation keys for row operations
-    if ctm_x.order == onp.ROW_MAJOR:
-        onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.ncols)
-    elif ctm_x.order == onp.COL_MAJOR:
-        onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.nrows)
-    else:
-        raise ValueError("Invalid order.")
+    # Generate the exact rotations used by this packed geometry and axis.
+    onp.gen_cumsum_key(keys.secretKey, ctm_x, axis=0)
 
     # Perform homomorphic row accumulation
     ctm_result = onp.cumsum(ctm_x, axis=0)
@@ -41,13 +36,7 @@ def run_row_accumulation_example(cc, keys, ctm_x, matrix):
 def run_column_accumulation_example(cc, keys, ctm_x, matrix):
     """Run homomorphic column accumulation example."""
 
-    # Generate rotation keys for column operations
-    if ctm_x.order == onp.ROW_MAJOR:
-        onp.gen_accumulate_cols_key(keys.secretKey, ctm_x.ncols)
-    elif ctm_x.order == onp.COL_MAJOR:
-        onp.gen_accumulate_rows_key(keys.secretKey, ctm_x.nrows)
-    else:
-        raise ValueError("Invalid order.")
+    onp.gen_cumsum_key(keys.secretKey, ctm_x, axis=1)
 
     # Perform homomorphic column accumulation
     ctm_result = onp.cumsum(ctm_x, axis=1)
