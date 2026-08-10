@@ -426,20 +426,37 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
             ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], 0)
-            padded_shape = x.shape
-            order = ArrayEncodingType.COL_MAJOR
+            input_repeats = x.geometry.repeats if x.geometry is not None else 1
+            if input_repeats > 1:
+                ct_sum = cc.EvalMult(ct_sum, 1.0 / input_repeats)
+
+            active = (1, cols) if keepdims else (cols, 1)
+            shape = active if keepdims else (cols,)
+            padded_shape = (1, ncols) if keepdims else (ncols, 1)
+            return CTArray(
+                ct_sum,
+                shape,
+                x.batch_size,
+                padded_shape,
+                order,
+                geometry=FramePacking(
+                    active=active,
+                    padding="zero",
+                    repeats=x.batch_size // ncols,
+                ),
+            )
         elif order == ArrayEncodingType.COL_MAJOR:
             ct_sum = cc.EvalSumCols(fhe_data, nrows, x.extra["colkey"])
-            padded_shape = (ncols, nrows)
-            order = ArrayEncodingType.ROW_MAJOR
+            if keepdims:
+                shape = (1, cols)
+                padded_shape = x.shape
+            else:
+                shape = (cols,)
+                padded_shape = (ncols, nrows)
+                order = ArrayEncodingType.ROW_MAJOR
 
         else:
             raise ONPNotSupportedError(f"Not support the current encoding [{order}] ")
-
-        if keepdims:
-            shape = (cols, 1)
-        else:
-            shape = (cols,)
 
     elif axis == 1:
         # Sum across each column of a packed_encoded matrix ciphertext: fhe_data
