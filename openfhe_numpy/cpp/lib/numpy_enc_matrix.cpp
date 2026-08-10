@@ -38,6 +38,47 @@ using namespace lbcrypto;
 
 namespace openfhe_numpy {
 
+namespace {
+
+std::vector<double> GenCumsumStageMask(
+    uint32_t numFrameRows,
+    uint32_t numFrameCols,
+    uint32_t numActiveRows,
+    uint32_t numParticipatingCols,
+    uint32_t numRepeats,
+    uint32_t axis,
+    uint32_t offset,
+    ArrayEncodingType order,
+    uint32_t slots) {
+    std::vector<double> mask(slots, 0.0);
+    const uint64_t frameSize =
+        static_cast<uint64_t>(numFrameRows) * numFrameCols;
+
+    for (uint32_t frame = 0; frame < numRepeats; ++frame) {
+        const uint64_t base = static_cast<uint64_t>(frame) * frameSize;
+        for (uint32_t row = 0; row < numActiveRows; ++row) {
+            for (uint32_t col = 0; col < numParticipatingCols; ++col) {
+                const uint32_t coordinate = axis == 0 ? row : col;
+                if (coordinate < offset) {
+                    continue;
+                }
+                const uint64_t index =
+                    order == ArrayEncodingType::ROW_MAJOR
+                        ? base + static_cast<uint64_t>(row) * numFrameCols + col
+                        : base + static_cast<uint64_t>(col) * numFrameRows + row;
+                if (index >= slots) {
+                    OPENFHE_THROW(
+                        "GenCumsumStageMask generated an invalid slot index.");
+                }
+                mask[static_cast<size_t>(index)] = 1.0;
+            }
+        }
+    }
+    return mask;
+}
+
+}  // namespace
+
 /**
 * @brief Generate rotation indices required for linear transformation based on transformation
 * type.
@@ -908,6 +949,120 @@ Ciphertext<DCRTPoly> EvalSumCumRows(ConstCiphertext<DCRTPoly>& ciphertext,
     }
     return ctSum;
 };
+
+Ciphertext<DCRTPoly> EvalCumSum(
+    ConstCiphertext<DCRTPoly>& ciphertext,
+    uint32_t numFrameRows,
+    uint32_t numFrameCols,
+    uint32_t numActiveRows,
+    uint32_t numParticipatingCols,
+    uint32_t numRepeats,
+    uint32_t axis,
+    ArrayEncodingType order,
+    uint32_t slots) {
+    if (!ciphertext) {
+        OPENFHE_THROW("EvalCumSum received a null ciphertext.");
+    }
+    const auto cc = ciphertext->GetCryptoContext();
+    if (!cc) {
+        OPENFHE_THROW("EvalCumSum received a ciphertext without a context.");
+    }
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(
+        ciphertext->GetCryptoParameters());
+    if (!cryptoParams) {
+        OPENFHE_THROW("EvalCumSum requires CKKS RNS crypto parameters.");
+    }
+    if (ciphertext->GetEncodingType() != CKKS_PACKED_ENCODING) {
+        OPENFHE_THROW("EvalCumSum supports only CKKS packed encoding.");
+    }
+    if (numFrameRows == 0 || numFrameCols == 0 ||
+        numActiveRows == 0 || numParticipatingCols == 0 ||
+        numRepeats == 0 || slots == 0) {
+        OPENFHE_THROW("EvalCumSum geometry and slots must be positive.");
+    }
+    if (numActiveRows > numFrameRows) {
+        OPENFHE_THROW("numActiveRows exceeds numFrameRows.");
+    }
+    if (numParticipatingCols > numFrameCols) {
+        OPENFHE_THROW("numParticipatingCols exceeds numFrameCols.");
+    }
+    if (axis > 1) {
+        OPENFHE_THROW("EvalCumSum axis must be 0 or 1.");
+    }
+    if (order != ArrayEncodingType::ROW_MAJOR &&
+        order != ArrayEncodingType::COL_MAJOR) {
+        OPENFHE_THROW("EvalCumSum supports ROW_MAJOR and COL_MAJOR only.");
+    }
+
+    const uint64_t frameSize =
+        static_cast<uint64_t>(numFrameRows) * numFrameCols;
+    if (frameSize > slots || numRepeats > slots / frameSize) {
+        OPENFHE_THROW("Repeated cumsum frames exceed slots.");
+    }
+
+    const uint32_t length =
+        axis == 0 ? numActiveRows : numParticipatingCols;
+    const uint32_t stride =
+        order == ArrayEncodingType::ROW_MAJOR
+            ? (axis == 0 ? numFrameCols : 1)
+            : (axis == 0 ? 1 : numFrameRows);
+
+    const uint64_t largestRotation =
+        static_cast<uint64_t>(length - 1) * stride;
+    if (largestRotation >
+        static_cast<uint64_t>(std::numeric_limits<int32_t>::max())) {
+        OPENFHE_THROW("EvalCumSum rotation exceeds int32_t.");
+    }
+
+    if (length == 1) {
+        return ciphertext->Clone();
+    }
+
+    const bool fixedManual =
+        cryptoParams->GetScalingTechnique() == FIXEDMANUAL;
+    auto result = ciphertext->Clone();
+    if (fixedManual) {
+        if (result->GetNoiseScaleDeg() < 1) {
+            OPENFHE_THROW("EvalCumSum received an invalid noise-scale degree.");
+        }
+        while (result->GetNoiseScaleDeg() > 1) {
+            cc->ModReduceInPlace(result);
+        }
+    }
+    for (uint32_t offset = 1; offset < length;) {
+        auto mask = GenCumsumStageMask(
+            numFrameRows,
+            numFrameCols,
+            numActiveRows,
+            numParticipatingCols,
+            numRepeats,
+            axis,
+            offset,
+            order,
+            slots);
+
+        const int32_t rotation = -static_cast<int32_t>(
+            static_cast<uint64_t>(offset) * stride);
+        auto rotated = cc->EvalRotate(result, rotation);
+        auto plaintextMask = cc->MakeCKKSPackedPlaintext(
+            mask, 1, result->GetLevel(), nullptr, slots);
+        auto contribution = cc->EvalMult(rotated, plaintextMask);
+        if (fixedManual) {
+            auto alignedResult = cc->EvalMult(result, 1.0);
+            cc->ModReduceInPlace(alignedResult);
+            cc->ModReduceInPlace(contribution);
+            result = alignedResult;
+        }
+        cc->EvalAddInPlace(result, contribution);
+
+        if (offset > length / 2) {
+            break;
+        }
+        offset <<= 1;
+    }
+
+    return result;
+}
 
 Ciphertext<DCRTPoly> EvalReduceCumRows(ConstCiphertext<DCRTPoly>& ciphertext,
                                       uint32_t numCols,

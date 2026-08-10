@@ -29,20 +29,19 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # ==================================================================================
 
-import io
 from typing import Optional, Tuple, Union, Callable, Any
 import numpy as np
 import openfhe
 
 
-from ..openfhe_numpy import EvalSumCumCols, EvalSumCumRows, EvalTranspose, ArrayEncodingType
-from ..utils.matlib import next_power_of_two
+from ..openfhe_numpy import EvalCumSum, EvalTranspose, ArrayEncodingType
+from ..utils.matlib import is_power_of_two, next_power_of_two
 from ..utils.constants import UnpackType
-from ..utils.errors import ONPError
+from ..utils.errors import ONPDimensionError, ONPError
 from ..utils.packing import process_packed_data
-from ..utils._helper_slots_ops import _get_single_element
+from ..utils._helper_slots_ops import _get_single_element, _get_slot_index
 
-from .tensor import FHETensor
+from .tensor import FHETensor, FramePacking
 
 
 class CTArray(FHETensor[openfhe.Ciphertext]):
@@ -140,26 +139,31 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             data=ct,
             original_shape=(),
             batch_size=self.batch_size,
-            new_shape=(),
+            new_shape=(1, 1),
             order=self.order,
+            geometry=FramePacking(
+                active=(1, 1),
+                padding="zero",
+                repeats=1,
+            ),
         )
 
-    def _cta_from_1d(self, cts):
-        """Combine a list of single ciphertexts into one 1D CTArray"""
+    def _cta_from_1d(self, cts, *, frame_rows=None):
+        """Combine single-slot ciphertexts into one packed 1-D CTArray."""
         cc = self.crypto_context
         N = len(cts)
-        NN = next_power_of_two(N)
+
+        if N == 0:
+            raise ONPError("Cannot assemble an empty encrypted vector.")
+
+        NN = next_power_of_two(N) if frame_rows is None else frame_rows
+
+        if not is_power_of_two(NN) or N > NN:
+            raise ONPError(f"N={N} does not fit frame_rows={NN}.")
+        if NN > self.batch_size:
+            raise ONPError(f"frame_rows={NN} exceeds batch_size={self.batch_size}.")
 
         ct_res = cts[0]
-        if N == 1:
-            return CTArray(
-                data=ct_res,
-                original_shape=(N,),
-                batch_size=self.batch_size,
-                new_shape=(NN,),
-                order=self.order,
-            )
-
         for i in range(1, N):
             ct_res = cc.EvalAdd(ct_res, cc.EvalRotate(cts[i], -i))
 
@@ -167,8 +171,13 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             data=ct_res,
             original_shape=(N,),
             batch_size=self.batch_size,
-            new_shape=(NN,),
+            new_shape=(NN, 1),
             order=self.order,
+            geometry=FramePacking(
+                active=(N, 1),
+                padding="zero",
+                repeats=1,
+            ),
         )
 
     def _cta_from_2d(self, matrix):
@@ -199,6 +208,11 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             batch_size=self.batch_size,
             new_shape=(power_2_r, power_2_c),
             order=self.order,
+            geometry=FramePacking(
+                active=(nrow, ncol),
+                padding="zero",
+                repeats=1,
+            ),
         )
 
     def _get_element_1D(self, key):
@@ -209,12 +223,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         return _get_single_element(self.crypto_context, self.data, key, self.batch_size)
 
     def _get_element_2D(self, r, c):
-        if self.order == ArrayEncodingType.ROW_MAJOR:
-            idx = r * self.shape[1] + c
-        elif self.order == ArrayEncodingType.COL_MAJOR:
-            idx = c * self.shape[0] + r
-        else:
-            raise TypeError(f"Unsupported packing type: {self.order}")
+        idx = _get_slot_index(r, c, self.shape, self.order)
         return _get_single_element(self.crypto_context, self.data, idx, self.batch_size)
 
     def decrypt(
@@ -264,52 +273,6 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
 
         return result
 
-    def serialize(self) -> dict:
-        """
-        Serialize ciphertext and metadata to a dictionary.
-        """
-        stream = io.BytesIO()
-        if not openfhe.Serialize(self.data, stream):
-            raise ONPError("Failed to serialize ciphertext.")
-
-        return {
-            "type": self.type,
-            "original_shape": self.original_shape,
-            "batch_size": self.batch_size,
-            "ncols": self.ncols,
-            "order": self.order,
-            "ciphertext": stream.getvalue().hex(),
-        }
-
-    @classmethod
-    def deserialize(cls, obj: dict) -> "CTArray":
-        """
-        Deserialize a dictionary back into a CTArray.
-        """
-        required_keys = [
-            "ciphertext",
-            "original_shape",
-            "batch_size",
-            "ncols",
-            "order",
-        ]
-        for key in required_keys:
-            if key not in obj:
-                raise ONPError(f"Missing required key '{key}' in serialized object.")
-
-        stream = io.BytesIO(bytes.fromhex(obj["ciphertext"]))
-        ciphertext = openfhe.Ciphertext()
-        if not openfhe.Deserialize(ciphertext, stream):
-            raise ONPError("Failed to deserialize ciphertext.")
-
-        return cls(
-            ciphertext,
-            tuple(obj["original_shape"]),
-            obj["batch_size"],
-            obj["ncols"],
-            obj["order"],
-        )
-
     def __neg__(self) -> "CTArray":
         """Return the homomorphic negation of this ciphertext array."""
         cc = self.data.GetCryptoContext()
@@ -324,6 +287,15 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
                 self.original_shape[0],
             )
             padded_shape = (self.shape[1], self.shape[0])
+            geometry = (
+                None
+                if self.geometry is None
+                else FramePacking(
+                    active=(self.geometry.active[1], self.geometry.active[0]),
+                    padding=self.geometry.padding,
+                    repeats=self.geometry.repeats,
+                )
+            )
         elif self.ndim == 1:
             return self
         else:
@@ -334,16 +306,17 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.batch_size,
             padded_shape,
             self.order,
+            geometry=geometry,
         )
 
-    def cumsum(self, axis: int = 0) -> "CTArray":
-        """
-        Compute the cumulative sum of tensor elements along a given axis.
+    def cumsum(self, axis=None) -> "CTArray":
+        """Compute cumulative sums using the logical tensor geometry.
 
         Parameters
         ----------
         axis : int, optional
-            Axis along which the cumulative sum is computed. Default is 0.
+            Axis along which the cumulative sum is computed. ``None`` scans a
+            vector directly and flattens a matrix in logical C order.
 
         Returns
         -------
@@ -351,46 +324,92 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             A new tensor with cumulative sums along the specified axis.
         """
 
-        if self.ndim != 1 and self.ndim != 2:
-            raise ONPError(f"Dimension of array {self.ndim} is illegal ")
+        from ..operations.arithmetic_utils import _normalize_axis
 
-        if self.ndim != 1 and axis is None:
-            raise ONPError("axis=None not allowed for >1D")
+        from ..operations.block_cumsum import (
+            _can_flatten_ctarray_without_slot_moves,
+            _get_cumsum_lane_parameters,
+        )
 
-        if self.ndim == 2 and axis not in (0, 1):
-            raise ONPError("Axis must be 0 or 1 for cumulative sum operation")
+        if self.geometry is None:
+            raise ONPError("cumsum requires packed geometry; construct the tensor with array().")
 
-        order = self.order
-        shape = self.shape
-        original_shape = self.original_shape
+        if self.ndim not in (0, 1, 2):
+            raise ONPDimensionError(
+                f"cumsum requires a scalar, vector, or matrix; got {self.ndim}D."
+            )
 
-        if axis is None:
-            ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
+        axis_ndim = 1 if self.ndim <= 1 else self.ndim
+        normalized_axis = _normalize_axis(
+            "cumsum",
+            axis,
+            axis_ndim,
+        )
+        if self.ndim <= 1 and normalized_axis is None:
+            normalized_axis = 0
 
-        # cumsum over rows
-        elif axis == 0:
-            if self.order == ArrayEncodingType.ROW_MAJOR:
-                ciphertext = EvalSumCumRows(self.data, self.ncols, self.original_shape[1])
+        if self.ndim == 2 and normalized_axis is None:
+            if _can_flatten_ctarray_without_slot_moves(self):
+                logical_size = self.original_shape[0] * self.original_shape[1]
+                frame_rows, frame_cols = self.shape
+                flattened = CTArray(
+                    data=self.data,
+                    original_shape=(logical_size,),
+                    batch_size=self.batch_size,
+                    new_shape=(frame_rows * frame_cols, 1),
+                    order=self.order,
+                    geometry=FramePacking(
+                        active=(logical_size, 1),
+                        padding="zero",
+                        repeats=self.geometry.repeats,
+                    ),
+                )
+                return flattened.cumsum(axis=0)
 
-            elif self.order == ArrayEncodingType.COL_MAJOR:
-                ciphertext = EvalSumCumCols(self.data, self.nrows)
+            ciphertexts = [
+                self._get_element_2D(row, col)
+                for row in range(self.original_shape[0])
+                for col in range(self.original_shape[1])
+            ]
+            return self._cta_from_1d(
+                ciphertexts,
+                frame_rows=next_power_of_two(len(ciphertexts)),
+            ).cumsum(axis=0)
 
-            else:
-                raise ONPError(f"Not support this packing order [{self.order}].")
-
-        # cumsum over cols
-        elif axis == 1:
-            if self.order == ArrayEncodingType.ROW_MAJOR:
-                ciphertext = EvalSumCumCols(self.data, self.ncols)
-
-            elif self.order == ArrayEncodingType.COL_MAJOR:
-                ciphertext = EvalSumCumRows(self.data, self.nrows, self.original_shape[0])
-
-            else:
-                raise ONPError(f"Not support this packing order[{self.order}].")
+        lane_size, num_lanes, _ = _get_cumsum_lane_parameters(
+            self,
+            normalized_axis,
+        )
+        if normalized_axis == 0:
+            active_rows = lane_size
+            participating_cols = num_lanes
         else:
-            raise ONPError(f"Invalid axis [{axis}].")
-        return CTArray(ciphertext, original_shape, self.batch_size, shape, order)
+            active_rows = num_lanes
+            participating_cols = lane_size
+
+        frame_rows, frame_cols = self.shape
+        ciphertext = EvalCumSum(
+            self.data,
+            frame_rows,
+            frame_cols,
+            active_rows,
+            participating_cols,
+            self.geometry.repeats,
+            normalized_axis,
+            self.order,
+            self.batch_size,
+        )
+
+        if self.ndim == 0:
+            return CTArray(
+                data=ciphertext,
+                original_shape=(1,),
+                batch_size=self.batch_size,
+                new_shape=(1, 1),
+                order=self.order,
+                geometry=self.geometry,
+            )
+        return self.clone(data=ciphertext)
 
     def apply(self, func: Callable, *args: Any, **kwargs: Any) -> "CTArray":
         """Apply a ciphertext-level function to the underlying ciphertext.

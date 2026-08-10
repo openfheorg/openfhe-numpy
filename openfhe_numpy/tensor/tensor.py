@@ -32,7 +32,7 @@
 # Standard Library Imports
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from typing import overload, Any, Dict, Generic, Optional, Tuple, TypeVar, Union
+from typing import overload, Any, Dict, Generic, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 
@@ -92,14 +92,24 @@ class BaseTensor(ABC, Generic[TPL]):
 # -----------------------------------------------------------
 # FHETensor - Generic Tensor with Metadata
 # -----------------------------------------------------------
+@dataclass(frozen=True)
+class FramePacking:
+    """Physical participation metadata for one packed vector or matrix frame."""
+
+    active: tuple[int, int]
+    padding: Literal["tile", "zero"]
+    repeats: int
+
+
 @dataclass
 class PackedArrayInformation:
     data: list | np.ndarray | TPL
-    original_shape: tuple[int, int]
+    original_shape: tuple[int, ...]
     ndim: int
     batch_size: int
     shape: tuple[int, int]
     order: int
+    geometry: FramePacking | None = None
 
 
 class FHETensor(BaseTensor[TPL], Generic[TPL]):
@@ -130,6 +140,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         "_batch_size",
         "_ndim",
         "_order",
+        "_geometry",
         "_dtype",
         "extra",
     )
@@ -138,10 +149,12 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     def __init__(
         self,
         data: TPL,
-        original_shape: Tuple[int, int],
+        original_shape: Tuple[int, ...],
         batch_size: int,
         new_shape: Tuple[int, int],
         order: int = 0,
+        *,
+        geometry: FramePacking | None = None,
     ) -> None: ...
 
     @overload
@@ -150,12 +163,13 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
     def __init__(
         self,
         data: Union[list, np.ndarray, PackedArrayInformation],
-        original_shape: Tuple[int, int],
+        original_shape: Tuple[int, ...],
         batch_size: int,
         new_shape: Tuple[int, int],
         order: int = 0,
+        *,
+        geometry: FramePacking | None = None,
     ) -> None:
-
         if isinstance(data, PackedArrayInformation):
             self._data = data.data
             self._original_shape = data.original_shape
@@ -163,6 +177,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             self._batch_size = data.batch_size
             self._ndim = data.ndim
             self._order = data.order
+            self._geometry = data.geometry
             self._dtype = self.__class__.__name__
             self.extra = {}
         else:
@@ -179,6 +194,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             if self._ndim > 2 or self._ndim < 0:
                 raise ONPError("Dimension is invalid!!!")
             self._order = order
+            self._geometry = geometry
             self._dtype = self.__class__.__name__
             self._zeros = None
             self.extra = {}
@@ -282,6 +298,11 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             raise ONPError(f"Not support order [f{order}]")
 
     @property
+    def geometry(self) -> FramePacking | None:
+        """Packed-frame participation metadata, when available."""
+        return self._geometry
+
+    @property
     def info(self) -> Dict[str, Any]:
         """Metadata dict for serialization or inspection."""
         return {
@@ -323,6 +344,7 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             self.batch_size,
             self.shape,
             self.order,
+            geometry=self.geometry,
         )
         result.extra.update(self.extra)
         return result
@@ -382,16 +404,6 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
         Sum tensor entries over all elements or one axis.
         Remark: Tuple axes are not supported
         """
-        if axis is not None:
-            if not isinstance(axis, int):
-                raise TypeError(f"axis must be None or an integer, got {type(axis).__name__}.")
-
-            if axis < 0:
-                axis += self.ndim
-
-            if axis < 0 or axis >= self.ndim:
-                raise ValueError(f"Invalid axis {axis} for tensor with {self.ndim} dimensions.")
-
         return self.__tensor_function__(
             "sum",
             (self,),

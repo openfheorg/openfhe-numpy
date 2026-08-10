@@ -62,6 +62,7 @@ from openfhe_numpy.openfhe_numpy import (
 from openfhe_numpy.operations.arithmetic_utils import (
     _eval_binary,
     _eval_scalar_binary,
+    _normalize_axis,
 )
 
 
@@ -288,12 +289,16 @@ def pow_ct(a, exp):
 
 @register_tensor_function(
     "cumsum",
-    [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")],
+    [
+        ("CTArray",),
+        ("CTArray", "NoneType"),
+        ("CTArray", "int"),
+        ("CTArray", "scalar"),
+    ],
 )
-def cumsum_ct(obj, axis=0, keepdims=True):
+def cumsum_ct(obj, axis=None):
     """Compute cumulative sum of a tensor along specified axis."""
-    # return _cumsum_ct(a, axis, keepdims)
-    return obj.cumsum(axis)
+    return obj.cumsum(axis=axis)
 
 
 # ------------------------------------------------------------------------------
@@ -330,6 +335,7 @@ def _reduce_ct(a, axis=0, keepdims=False):
 @register_tensor_function("cumulative_reduce", [("CTArray", "int", "bool")])
 def cumulative_reduce_ct(a, axis=0, keepdims=False):
     """Compute cumulative reduction of a tensor along specified axis."""
+    axis = _normalize_axis("cumulative_reduce", axis, a.ndim)
     return _reduce_ct(a, axis, keepdims)
 
 
@@ -438,7 +444,7 @@ def _ct_sum_vector(
     axis: Optional[int] = None,
 ):
     crypto_context = x.data.GetCryptoContext()
-    if axis is not None:
+    if axis not in (None, 0):
         raise ONPDimensionError(f"The dimension is invalid axis = {axis}")
     ct_sum = crypto_context.EvalSum(x.data, x.shape[0])
     return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
@@ -446,12 +452,13 @@ def _ct_sum_vector(
 
 @register_tensor_function("sum", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")])
 def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
+    if x.ndim not in (1, 2):
+        raise ONPDimensionError(f"sum requires a vector or matrix; got {x.ndim}D.")
+
+    axis = _normalize_axis("sum", axis, x.ndim)
     if x.ndim == 2:
         return _ct_sum_matrix(x, axis, keepdims)
-    elif x.ndim == 1:
-        return _ct_sum_vector(x, axis)
-    else:
-        raise ONPDimensionError(f"The dimension is invalid = {x.ndims}")
+    return _ct_sum_vector(x, axis)
 
 
 # ------------------------------------------------------------------------------
@@ -461,17 +468,25 @@ def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
 
 @register_tensor_function("mean", [("CTArray",), ("CTArray", "int"), ("CTArray", "int", "bool")])
 def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
+    if x.ndim not in (1, 2):
+        raise ONPDimensionError(f"mean requires a vector or matrix; got {x.ndim}D.")
+
+    axis = _normalize_axis("mean", axis, x.ndim)
     cc = x.data.GetCryptoContext()
-    nrows, ncols = x.original_shape
     sum_x = sum_ct(x, axis, keepdims)
-    if axis is None:
-        ct_mean = cc.EvalMult(sum_x.data, 1.0 / (nrows * ncols))
-    elif axis == 0:  # sum over rows
-        ct_mean = cc.EvalMult(sum_x.data, 1.0 / nrows)
-    elif axis == 1:  # sum over cols
-        ct_mean = cc.EvalMult(sum_x.data, 1.0 / ncols)
+
+    if x.ndim == 1:
+        count = x.original_shape[0]
     else:
-        raise ONPDimensionError(f"The dimension is invalid axis = {axis}")
+        nrows, ncols = x.original_shape
+        if axis is None:
+            count = nrows * ncols
+        elif axis == 0:
+            count = nrows
+        else:
+            count = ncols
+
+    ct_mean = cc.EvalMult(sum_x.data, 1.0 / count)
 
     return CTArray(
         ct_mean,
@@ -487,12 +502,24 @@ def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
 # ------------------------------------------------------------------------------
 
 
-@register_tensor_function("roll", [("CTArray", "int"), ("CTArray", "int", "int")])
+@register_tensor_function(
+    "roll",
+    [
+        ("CTArray", "int"),
+        ("CTArray", "int", "int"),
+        ("CTArray", "scalar", "scalar"),
+    ],
+)
 def roll(x: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
-    if axis is None:
-        return _ct_vector_rotation(x, -shift)
-    else:
-        raise ONPError(f"This function only supports packed vector")
+    if x.ndim != 1:
+        raise ONPNotSupportedError("roll currently supports only packed vectors.")
+
+    axis = _normalize_axis("roll", axis, x.ndim)
+    if axis is not None:
+        raise ONPNotSupportedError(
+            "roll currently supports only packed vectors with axis=None."
+        )
+    return _ct_vector_rotation(x, -shift)
 
 
 def _ct_vector_rotation(ctv: CTArray, shift: int):

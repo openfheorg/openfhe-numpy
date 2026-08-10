@@ -60,7 +60,7 @@ from .matrix_arithmetic import (
     _reduce_ct,
     sum_ct,
 )
-from .arithmetic_utils import _normalize_axis, _normalize_sum_axis
+from .arithmetic_utils import _normalize_axis
 from ..utils.matlib import _sum_terms
 
 # ==============================================================================
@@ -207,68 +207,33 @@ def power_block_ct(a, exp):
 
 
 # ------------------------------------------------------------------------------
-# Cumulative Operations
+# Cumulative Reduction Operations
 # ------------------------------------------------------------------------------
 @register_tensor_function(
     "cumsum",
-    [("BlockCTArray",), ("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")],
+    [
+        ("BlockCTArray",),
+        ("BlockCTArray", "NoneType"),
+        ("BlockCTArray", "int"),
+        ("BlockCTArray", "scalar"),
+    ],
 )
-def cumsum_block_ct(obj, axis=None, keepdims=False):
-    """Compute cumulative sums for encrypted block tensors.
+def cumsum_block_ct(obj, axis=None):
+    """Compute NumPy-style cumulative sums with exact cross-block carry."""
+    from .block_cumsum import _eval_block_cumsum
 
-    Currently supports:
-    - 1D block tensors across multiple blocks.
-    - 2D block tensors only when the cumulative axis stays inside each block.
-    """
-    if keepdims:
-        raise ONPNotImplementedError("Block cumsum does not support keepdims=True yet.")
-
-    if obj.ndim == 1:
-        if axis is None:
-            axis = 0
-
-        axis = _normalize_axis(axis, obj.ndim)
-
-        blocks = []
-        offset = None
-
-        for block in obj.data:
-            cumulative = block.cumsum(axis=0)
-
-            if offset is not None:
-                cumulative = cumulative + offset
-
-            blocks.append(cumulative)
-
-            block_sum = block.sum()
-            offset = block_sum if offset is None else offset + block_sum
-
-        return obj.clone(data=blocks)
-
-    if obj.ndim == 2:
-        if axis is None:
-            raise ONPNotImplementedError("Block cumsum(axis=None) is not implemented yet.")
-
-        axis = _normalize_axis(axis, obj.ndim)
-
-        if axis == 0 and obj.grid_shape[0] != 1:
-            raise ONPNotImplementedError(
-                "Block cumsum(axis=0) across multiple block rows is not implemented yet."
-            )
-
-        if axis == 1 and obj.grid_shape[1] != 1:
-            raise ONPNotImplementedError(
-                "Block cumsum(axis=1) across multiple block columns is not implemented yet."
-            )
-
-        return obj.clone(data=[block.cumsum(axis=axis) for block in obj.data])
-
-    raise ONPDimensionError(f"cumsum requires 1D or 2D tensor, got {obj.ndim}D.")
+    return _eval_block_cumsum(obj, axis)
 
 
 @register_tensor_function(
     "cumulative_reduce",
-    [("BlockCTArray",), ("BlockCTArray", "int"), ("BlockCTArray", "int", "bool")],
+    [
+        ("BlockCTArray",),
+        ("BlockCTArray", "int"),
+        ("BlockCTArray", "scalar"),
+        ("BlockCTArray", "int", "bool"),
+        ("BlockCTArray", "scalar", "bool"),
+    ],
 )
 def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
     """Compute cumulative reductions inside each encrypted block."""
@@ -278,7 +243,7 @@ def cumulative_reduce_block_ct(a, axis=0, keepdims=False):
     if a.ndim != 2:
         raise ONPDimensionError(f"cumulative_reduce requires a 2D block tensor, got {a.ndim}D.")
 
-    axis = _normalize_axis(axis, a.ndim)
+    axis = _normalize_axis("cumulative_reduce", axis, a.ndim)
 
     if axis == 0 and a.grid_shape[0] != 1:
         raise ONPNotImplementedError(
@@ -305,7 +270,7 @@ def sum_block_ct(x: BlockCTArray, axis: Optional[int] = None, keepdims: bool = F
     if keepdims:
         raise ONPNotImplementedError("Block sum does not support keepdims=True yet.")
 
-    axis = _normalize_sum_axis(axis, x.ndim)
+    axis = _normalize_axis("sum", axis, x.ndim)
 
     if x.ndim == 1:
         return _sum_terms(sum_ct(block, None, False) for block in x.data)
@@ -375,7 +340,7 @@ def mean_block_ct(x: BlockCTArray, axis: Optional[int] = None, keepdims: bool = 
     if keepdims:
         raise ONPNotImplementedError("Block mean does not support keepdims=True yet.")
 
-    axis = _normalize_sum_axis(axis, x.ndim)
+    axis = _normalize_axis("mean", axis, x.ndim)
     mean_x = sum_block_ct(x, axis, keepdims=False)
 
     if x.ndim == 1:

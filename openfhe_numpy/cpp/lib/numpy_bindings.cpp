@@ -283,6 +283,38 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("numCols"),
         py::arg("subringDim") = 0);
 
+    m.def(
+        "EvalCumSum",
+        [](ConstCiphertext<DCRTPoly>& ciphertext,
+           uint32_t numFrameRows,
+           uint32_t numFrameCols,
+           uint32_t numActiveRows,
+           uint32_t numParticipatingCols,
+           uint32_t numRepeats,
+           uint32_t axis,
+           ArrayEncodingType order,
+           uint32_t slots) {
+            return EvalCumSum(
+                ciphertext,
+                numFrameRows,
+                numFrameCols,
+                numActiveRows,
+                numParticipatingCols,
+                numRepeats,
+                axis,
+                order,
+                slots);
+        },
+        py::arg("ciphertext"),
+        py::arg("numFrameRows"),
+        py::arg("numFrameCols"),
+        py::arg("numActiveRows"),
+        py::arg("numParticipatingCols"),
+        py::arg("numRepeats"),
+        py::arg("axis"),
+        py::arg("order"),
+        py::arg("slots"));
+
     m.def("EvalReduceCumRows",
         [](ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols, uint32_t numRows, uint32_t slots) {
             return EvalReduceCumRows(ciphertext, numCols, numRows, slots);

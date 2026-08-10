@@ -56,6 +56,7 @@ class PTArray(FHETensor[Plaintext]):
             self.batch_size,
             self.shape,
             self.order,
+            geometry=self.geometry,
         )
 
     def decrypt(self, *args, **kwargs):
@@ -75,10 +76,3 @@ class PTArray(FHETensor[Plaintext]):
 
     def __repr__(self) -> str:
         return f"PTArray(meta={self.info})"
-
-    def serialize(self) -> dict:
-        raise NotImplementedError("Serialize not implemented for plaintext")
-
-    @classmethod
-    def deserialize(cls, obj: dict) -> "PTArray":
-        raise NotImplementedError("Deserialize not implemented for plaintext")

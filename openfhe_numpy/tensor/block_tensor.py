@@ -561,9 +561,9 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
         """Sum block tensor entries through tensor dispatch."""
         return self.__tensor_function__("sum", (self,), {"axis": axis, "keepdims": keepdims})
 
-    def cumsum(self, axis=None, keepdims: bool = False):
+    def cumsum(self, axis=None):
         """Compute cumulative sums through tensor dispatch."""
-        return self.__tensor_function__("cumsum", (self,), {"axis": axis, "keepdims": keepdims})
+        return self.__tensor_function__("cumsum", (self,), {"axis": axis})
 
     def transpose(self):
         """Transpose the block tensor through tensor dispatch.

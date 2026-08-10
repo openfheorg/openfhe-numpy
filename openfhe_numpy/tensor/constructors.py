@@ -47,7 +47,7 @@ from openfhe import CryptoContext, PublicKey
 # Package-level imports
 from openfhe_numpy.openfhe_numpy import ArrayEncodingType
 from openfhe_numpy.utils.errors import ONPError
-from openfhe_numpy.utils.matlib import is_power_of_two
+from openfhe_numpy.utils.matlib import is_power_of_two, next_power_of_two
 from openfhe_numpy.utils.packing import (
     _pack_matrix_col_wise,
     _pack_matrix_row_wise,
@@ -62,7 +62,7 @@ from openfhe_numpy.utils.typecheck import (
 
 
 # Tensor imports
-from .tensor import FHETensor, PackedArrayInformation
+from .tensor import FHETensor, PackedArrayInformation, FramePacking
 from .ctarray import CTArray
 from .ptarray import PTArray
 from .block_tensor import BlockFHETensor
@@ -84,25 +84,15 @@ def _compute_block_dimensions(
     shape: tuple[int, ...],
     batch_size: int,
     block_shape: tuple[int, ...] | None = None,
-    order: int = ArrayEncodingType.ROW_MAJOR,
     target_cols: int | None = None,
-    compact: bool = False,
 ) -> tuple[int, ...]:
-    """Choose block dimensions if block_shape is None.
+    """Compute block dimensions or choose the largest size by default.
     Default rules:
-        Vector  (n,)    -> (batch_size,), or (side,) where
-                           side = 2^floor(log2(batch_size)/2) if compact=True
-        Column  (m, 1)  -> (batch_size, 1)
-        Row     (1, n)  -> (1, batch_size)
-        General (m, n)  -> (side, side) where side = 2^floor(log2(batch_size)/2)
-    ``compact=True`` requests the smaller, square-compatible vector block
-    size required to pair a block vector with a block matrix for block
-    matrix-vector multiplication (see ``block_array``'s ``compact``
-    parameter). Plain block vectors used for vector-vector arithmetic
-    (add/sub/multiply/dot/matmul) should use the default, non-compact sizing.
-    TODO:
-    [OPTIONAL] For rectangular matrices where one dimension fits in a single
-    block, use rectangular block_shape to reduce wasted slots.
+    Vector  (n,)    -> (batch_size,), or (side,) where
+                       side = 2^floor(log2(batch_size)/2) if compact=True
+    Column  (m, 1)  -> (batch_size, 1)
+    Row     (1, n)  -> (1, batch_size)
+    General (m, n)  -> (side, side) where side = 2^floor(log2(batch_size)/2)
     """
     if len(shape) not in (1, 2):
         raise ValueError(f"Only 1-D or 2-D shapes are supported; got {shape}.")
@@ -110,6 +100,17 @@ def _compute_block_dimensions(
         raise ValueError(f"batch_size must be positive; got {batch_size}.")
     if any(dim <= 0 for dim in shape):
         raise ValueError(f"shape must be positive; got {shape}.")
+
+    physical_cols = 1
+    if target_cols is not None:
+        if len(shape) != 1:
+            raise ValueError("target_cols is only valid for block vectors.")
+        if not isinstance(target_cols, int) or target_cols <= 0:
+            raise ValueError(f"target_cols must be a positive integer, got {target_cols!r}.")
+        physical_cols = next_power_of_two(target_cols)
+        if physical_cols > batch_size:
+            raise ValueError(f"target_cols={target_cols} exceeds batch_size={batch_size}.")
+
     if block_shape is not None:
         block_shape = tuple(block_shape)
         if len(block_shape) != len(shape):
@@ -119,9 +120,14 @@ def _compute_block_dimensions(
             )
         if any(dim <= 0 for dim in block_shape):
             raise ValueError(f"block_shape must be positive; got {block_shape}.")
-        if prod(block_shape) > batch_size:
+
+        required_slots = prod(block_shape)
+        if len(shape) == 1:
+            required_slots = next_power_of_two(block_shape[0]) * physical_cols
+
+        if required_slots > batch_size:
             raise ValueError(
-                f"block_shape={block_shape} uses {prod(block_shape)} slots, "
+                f"block_shape={block_shape} uses {required_slots} slots, "
                 f"but batch_size={batch_size}."
             )
         if len(block_shape) == 2:
@@ -131,19 +137,10 @@ def _compute_block_dimensions(
                     f"Matrix block dimensions must be powers of two; got block_shape={block_shape}."
                 )
         return block_shape
-    if target_cols is not None:
-        if len(shape) != 1:
-            raise ValueError("target_cols is only valid for block vectors.")
-        if not isinstance(target_cols, int) or target_cols <= 0:
-            raise ValueError(f"target_cols must be a positive integer, got {target_cols!r}.")
-        if target_cols > batch_size:
-            raise ValueError(f"target_cols={target_cols} exceeds batch_size={batch_size}.")
-        return (target_cols,)
+
     if len(shape) == 1:
-        if not compact:
-            return (batch_size,)
-        side = 1 << ((batch_size.bit_length() - 1) // 2)
-        return (side,)
+        return (batch_size // physical_cols,)
+
     m, n = shape
     if n == 1:
         return (batch_size, 1)
@@ -176,7 +173,16 @@ def _pack_block(
 ) -> PackedArrayInformation:
     """Pack a padded block while preserving its logical shape."""
     package = _pack_array(data, batch_size, order, mode, **kwargs)
+    original_shape = tuple(original_shape)
+    ndim = len(original_shape)
+    active = (original_shape[0], package.geometry.active[1]) if ndim == 1 else original_shape
     package.original_shape = original_shape
+    package.ndim = ndim
+    package.geometry = FramePacking(
+        active=active,
+        padding=package.geometry.padding,
+        repeats=package.geometry.repeats,
+    )
     return package
 
 
@@ -186,70 +192,47 @@ def block_array(
     block_shape: tuple | None = None,
     batch_size: int | None = None,
     order: int = ArrayEncodingType.ROW_MAJOR,
-    mode: str = "tile",
+    mode: str = "zero",
     fhe_type: Literal["C", "P"] = "C",
     public_key=None,
     target_cols: int | None = None,
-    compact: bool = False,
+    expand: Literal["tile", "zero"] = "tile",
+    pad_value: Literal["tile", "zero"] = "zero",
 ) -> BlockFHETensor:
     """Construct a block-encoded plaintext or ciphertext tensor.
 
-    ``block_shape`` determines the partition. A vector is divided into blocks of
-    ``b`` elements; a matrix is divided into ``br x bc`` tiles. Thus,
+    The input is divided into blocks of ``block_shape``. Boundary blocks are
+    zero-padded, and each block is packed into one CKKS plaintext or ciphertext.
+    When ``block_shape`` is omitted, a suitable shape is selected from
+    ``batch_size``.
 
-    - vector: ``grid_shape = (ceil(n / b),)``;
-    - matrix: ``grid_shape = (ceil(m / br), ceil(n / bc))``.
-
-    Matrix block ``(i, j)`` contains
-    ``data[i*br:(i+1)*br, j*bc:(j+1)*bc]``. Boundary blocks are zero-padded to
-    ``block_shape`` and stored in row-major grid order.
-
-    If ``block_shape`` is omitted, let ``B = batch_size`` and let ``s`` be the
-    largest power of two satisfying ``s**2 <= B``. The defaults are
-
-    - ``(B,)`` for a vector;
-    - ``(s,)`` for a compact vector;
-    - ``(B, 1)`` for a column matrix;
-    - ``(1, B)`` for a row matrix;
-    - ``(s, s)`` for a general matrix.
-
-    Each block is packed into one CKKS plaintext or ciphertext. ``order`` controls
-    the slot order within a block, while ``mode`` controls whether unused slots are
-    tiled or zero-filled.
-
-    For vectors, ``compact=True`` expands each length-``b`` block into the
-    ``b x b`` layout required by block matrix-vector multiplication, with
-    ``b**2 <= batch_size``. Compatible packing orders are
-
-    - ``ROW_MAJOR`` matrix with ``COL_MAJOR`` vector;
-    - ``COL_MAJOR`` matrix with ``ROW_MAJOR`` vector.
-
-    Compact packing replicates vector entries and is unsuitable for ordinary
-    vector arithmetic, dot products, or vector-vector matrix multiplication.
-    Providing ``target_cols`` also enables compact packing.
+    For vectors, ``target_cols`` creates a matrix-compatible frame. ``expand``
+    controls value replication, while ``pad_value`` controls padded columns.
 
     Parameters
     ----------
-    cc
+    cc : CryptoContext
         OpenFHE crypto context.
-    data
-        Nonempty one- or two-dimensional input.
-    block_shape
-        Shape of each logical block.
-    batch_size
+    data : array-like
+        Nonempty vector or matrix.
+    block_shape : tuple, optional
+        Block dimensions. Selected automatically when omitted.
+    batch_size : int, optional
         CKKS slots per block. Defaults to ``cc.GetBatchSize()``.
-    order
-        Encoding order within each block.
-    mode
-        Unused-slot filling mode: ``"tile"`` or ``"zero"``.
-    fhe_type
-        ``"C"`` for ciphertext or ``"P"`` for plaintext.
-    public_key
+    order : ArrayEncodingType
+        Slot order within each block.
+    mode : {"tile", "zero"}
+        Repeat each block frame or zero-fill unused slots.
+    fhe_type : {"C", "P"}
+        Ciphertext or plaintext output.
+    public_key : PublicKey, optional
         Required when ``fhe_type="C"``.
-    target_cols
-        Compact vector block length when ``block_shape`` is omitted.
-    compact
-        Enable matrix-vector-compatible vector packing.
+    target_cols : int, optional
+        Active columns in an expanded vector block.
+    expand : {"tile", "zero"}
+        Repeat vector values across columns or use only the first column.
+    pad_value : {"tile", "zero"}
+        Repeat values into padded columns or leave them zero.
 
     Returns
     -------
@@ -272,14 +255,17 @@ def block_array(
         raise ValueError("Scalar input not supported. Use array() instead.")
     if arr.ndim > 2:
         raise ValueError(f"Only 1-D and 2-D supported; got shape {arr.shape}.")
-    is_compact = compact or target_cols is not None
+    if expand not in ("tile", "zero"):
+        raise ValueError("expand must be 'tile' or 'zero'.")
+    if pad_value not in ("tile", "zero"):
+        raise ValueError("pad_value must be 'tile' or 'zero'.")
+    if arr.ndim != 1 and (expand != "tile" or pad_value != "zero"):
+        raise ValueError("expand and pad_value are valid only for block vectors.")
     block_shape = _compute_block_dimensions(
         original_shape,
         batch_size,
         block_shape,
-        order=order,
         target_cols=target_cols,
-        compact=is_compact,
     )
     grid_shape = _compute_grid_shape(original_shape, block_shape)
     block_cls = BlockCTArray if fhe_type == "C" else BlockPTArray
@@ -291,15 +277,15 @@ def block_array(
             stop = min(start + chunk, original_shape[0])
             tile = np.zeros(block_shape, dtype=arr.dtype)
             tile[: stop - start] = arr[start:stop]
-            # Compact packing repeats vector entries for matrix-vector multiplication.
-            vector_target_cols = chunk if is_compact and chunk * chunk <= batch_size else None
             package = _pack_block(
                 tile,
                 (stop - start,),
                 batch_size,
                 order,
                 mode,
-                target_cols=vector_target_cols,
+                target_cols=target_cols,
+                expand=expand,
+                pad_value=pad_value,
             )
             blocks.append(
                 array(
@@ -382,33 +368,67 @@ def _pack_array(
       - shape          : tuple (rows, cols)
       - order          : int
     """
-    if batch_size < 0:
-        raise ONPError("The batch size cannot be negative.")
+    if batch_size <= 0:
+        raise ONPError("The batch size must be positive.")
     if not is_power_of_two(batch_size):
         raise ONPError(f"Batch size [{batch_size}] must be a power of two.")
+    if mode not in ("zero", "tile"):
+        raise ONPError(f"Invalid padding mode: {mode!r}.")
 
     data = np.asarray(data)
 
     if is_numeric_scalar(data):
+        if kwargs:
+            raise ONPError("target_cols, expand, and pad_value are valid only for vectors.")
+
         if mode == "zero":
             packed = np.zeros(batch_size, dtype=data.dtype)
             packed[0] = data
-        elif mode == "tile":
-            packed = np.full(batch_size, data)
         else:
-            raise ONPError(f"Invalid padding mode: '{mode}'. Use 'zero' or 'tile'.")
-        shape = (batch_size, 1)
+            packed = np.full(batch_size, data)
+
+        shape = (1, 1)
+        active = (1, 1)
+        padding = "zero"
+
+    elif is_numeric_arraylike(data) and data.ndim == 1:
+        target_cols = kwargs.get("target_cols")
+        expand = kwargs.get("expand", "tile")
+        pad_value = kwargs.get("pad_value", "tile")
+
+        if expand not in ("tile", "zero"):
+            raise ONPError("expand must be 'tile' or 'zero'.")
+        if pad_value not in ("tile", "zero"):
+            raise ONPError("pad_value must be 'tile' or 'zero'.")
+
+        packed, shape = _ravel_vector(data, batch_size, order, True, mode, **kwargs)
+
+        if target_cols is None:
+            active = (len(data), 1)
+            padding = "zero"
+        elif expand == "tile":
+            active = (len(data), target_cols)
+            padding = pad_value if target_cols < shape[1] else "zero"
+        else:
+            active = (len(data), 1)
+            padding = "zero"
+
+    elif is_numeric_arraylike(data) and data.ndim == 2:
+        if kwargs:
+            raise ONPError("target_cols, expand, and pad_value are valid only for vectors.")
+
+        packed, shape = _ravel_matrix(data, batch_size, order, True, mode)
+        active = tuple(data.shape)
+        padding = "zero"
 
     elif is_numeric_arraylike(data):
-        if data.ndim == 2:
-            packed, shape = _ravel_matrix(data, batch_size, order, True, mode, **kwargs)
-        elif data.ndim == 1:
-            packed, shape = _ravel_vector(data, batch_size, order, True, mode, **kwargs)
-        else:
-            raise ONPError(f"Unsupported data dimension [{data.ndim}].")
+        raise ONPError(f"Unsupported data dimension [{data.ndim}].")
 
     else:
         raise ONPError("Input is not numeric.")
+
+    frame_size = shape[0] * shape[1]
+    repeats = 1 if mode == "zero" else batch_size // frame_size
 
     return PackedArrayInformation(
         data=packed,
@@ -417,6 +437,11 @@ def _pack_array(
         batch_size=batch_size,
         shape=shape,
         order=order,
+        geometry=FramePacking(
+            active=active,
+            padding=padding,
+            repeats=repeats,
+        ),
     )
 
 
@@ -436,25 +461,70 @@ def array(
 
     Parameters
     ----------
-    cc         : CryptoContext
-    data       : matrix | vector | scalar
-    batch_size : Optional[int]
-    order      : ArrayEncodingType
-    fhe_type   : "C" (ciphertext) or "P" (plaintext)
-    package    : dict from `_pack_array` (optional)
-    public_key : required if type == "C"
+    cc : CryptoContext
+        OpenFHE crypto context.
+    data : array-like
+        Scalar, vector, or matrix to pack.
+    batch_size : int, optional
+        Number of CKKS slots. Defaults to ``cc.GetBatchSize()``.
+    order : ArrayEncodingType
+        ``ROW_MAJOR`` or ``COL_MAJOR``. Default is ``ROW_MAJOR``.
+    fhe_type : {"C", "P"}
+        Ciphertext or plaintext output. Default is ``"P"``.
+    mode : {"tile", "zero"}, optional
+        Repeat the packed frame or zero-fill unused slots. Default is ``"tile"``.
+    package : PackedArrayInformation, optional
+        Prepacked data used internally by ``block_array``.
+    public_key : PublicKey, optional
+        Required for ``fhe_type="C"``.
+    **kwargs
+        Vector packing options: ``target_cols``, ``expand``, and ``pad_value``.
 
     Returns
     -------
     FHETensor
+        ``CTArray`` for ``"C"`` or ``PTArray`` for ``"P"``.
+
+    Examples
+    --------
+    Use the matrix and logical column vector::
+
+        matrix = [[1, 2, 3],
+                  [4, 5, 6],
+                  [7, 8, 9]]
+        vector = [1, 2, 3]
+
+    Their dimensions pad from 3 to 4. With one frame and zero tail::
+
+        >>> array(cc, matrix, batch_size=32, order=ROW_MAJOR, mode="zero")
+        # 1 2 3 0 | 4 5 6 0 | 7 8 9 0 | 0 0 0 0 | then 16 zeros
+
+        >>> array(cc, matrix, batch_size=32, order=COL_MAJOR, mode="zero")
+        # 1 4 7 0 | 2 5 8 0 | 3 6 9 0 | 0 0 0 0 | then 16 zeros
+
+        >>> array(cc, vector, batch_size=32, mode="zero")
+        # 1 2 3 0 | then 28 zeros
+
+    ``target_cols=3`` creates a ``4 x 4`` physical vector frame::
+
+        >>> array(cc, vector, batch_size=32, target_cols=3, mode="zero")
+        # 1 1 1 1 | 2 2 2 2 | 3 3 3 3 | 0 0 0 0 | then 16 zeros
+
+        >>> array(cc, vector, batch_size=32, target_cols=3,
+        ...       pad_value="zero", mode="zero")
+        # 1 1 1 0 | 2 2 2 0 | 3 3 3 0 | 0 0 0 0 | then 16 zeros
+
+        >>> array(cc, vector, batch_size=32, target_cols=3,
+        ...       expand="zero", mode="zero")
+        # 1 0 0 0 | 2 0 0 0 | 3 0 0 0 | 0 0 0 0 | then 16 zeros
+
+    ``mode="tile"`` repeats the padded frame to fill all slots.
     """
     if cc is None:
         raise ONPError("CryptoContext does not exist")
 
     if batch_size is None:
         batch_size = cc.GetBatchSize()
-    if not isinstance(batch_size, int) or batch_size < 0:
-        raise ONPError(f"batch_size must be a non-negative int or None, got {batch_size}.")
 
     if package is None:
         package = _pack_array(data, batch_size, order, mode, **kwargs)
@@ -471,6 +541,7 @@ def array(
             package.batch_size,  # batch_size
             package.shape,  # new_shape
             package.order,  # order
+            geometry=package.geometry,
         )
     elif fhe_type == "C":
         if public_key is None:
@@ -483,6 +554,7 @@ def array(
                 package.batch_size,  # batch_size
                 package.shape,  # new_shape
                 package.order,  # order
+                geometry=package.geometry,
             )
         except Exception as e:
             raise ONPError(f"Failed to encrypt: {e}")

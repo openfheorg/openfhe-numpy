@@ -55,6 +55,7 @@ from .matrix_api import (
 
 from . import matrix_arithmetic
 from . import block_arithmetic
+from . import block_cumsum
 
 # Import crypto context utilities
 from .crypto_helper import (
@@ -75,6 +76,7 @@ from .crypto_helper import (
 )
 
 from .block_broadcast import generate_block_broadcast_key
+from .block_cumsum import gen_cumsum_key, gen_block_cumsum_keys
 
 
 # Define public API
@@ -102,6 +104,8 @@ __all__ = [
     "gen_square_matmult_key",
     "gen_accumulate_rows_key",
     "gen_accumulate_cols_key",
+    "gen_cumsum_key",
+    "gen_block_cumsum_keys",
     # broadcasting operations
     "broadcast_to",
     "generate_broadcast_key",

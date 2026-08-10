@@ -38,6 +38,7 @@ import numpy as np
 from ..openfhe_numpy import ArrayEncodingType
 from ..tensor.constructors import _pack_block, array
 from ..tensor.ctarray import CTArray
+from ..tensor.tensor import FramePacking
 from ..utils._helper_slots_ops import (
     _create_masking,
     _replicate_pattern,
@@ -295,9 +296,7 @@ def _broadcast_rotation_indices(
     indices = set()
 
     def add_replication(copies, stride):
-        indices.update(
-            rotation for rotation, _ in _replication_steps(copies, stride)
-        )
+        indices.update(rotation for rotation, _ in _replication_steps(copies, stride))
 
     if len(logical_shape) == 1:
         _require(
@@ -331,23 +330,19 @@ def _broadcast_rotation_indices(
         add_replication(logical_shape[0], 1)
         return indices
 
-    source_shape, logical_shape, physical_shape = (
-        _validate_matrix_broadcast_geometry(
-            source_shape=source_shape,
-            logical_shape=logical_shape,
-            physical_shape=physical_shape,
-            order=order,
-            allow_order_union=True,
-        )
+    source_shape, logical_shape, physical_shape = _validate_matrix_broadcast_geometry(
+        source_shape=source_shape,
+        logical_shape=logical_shape,
+        physical_shape=physical_shape,
+        order=order,
+        allow_order_union=True,
     )
     source_kind = _slot_source_kind(source_shape)
 
     logical_rows, logical_cols = logical_shape
     physical_rows, physical_cols = physical_shape
     orders = (
-        (ArrayEncodingType.ROW_MAJOR, ArrayEncodingType.COL_MAJOR)
-        if order is None
-        else (order,)
+        (ArrayEncodingType.ROW_MAJOR, ArrayEncodingType.COL_MAJOR) if order is None else (order,)
     )
 
     for current_order in orders:
@@ -364,10 +359,7 @@ def _broadcast_rotation_indices(
             if current_order == ArrayEncodingType.ROW_MAJOR:
                 add_replication(logical_rows, physical_cols)
             else:
-                indices.update(
-                    -i * (physical_rows - 1)
-                    for i in range(1, source_cols)
-                )
+                indices.update(-i * (physical_rows - 1) for i in range(1, source_cols))
                 add_replication(logical_rows, 1)
 
         elif source_kind == "column":
@@ -375,10 +367,7 @@ def _broadcast_rotation_indices(
             if current_order == ArrayEncodingType.COL_MAJOR:
                 add_replication(logical_cols, physical_rows)
             else:
-                indices.update(
-                    -i * (physical_cols - 1)
-                    for i in range(1, source_rows)
-                )
+                indices.update(-i * (physical_cols - 1) for i in range(1, source_rows))
                 add_replication(logical_cols, 1)
 
     indices.discard(0)
@@ -527,6 +516,11 @@ def _broadcast_to_vector(x, logical_shape, order=None, cc=None):
             batch_size=x.batch_size,
             new_shape=physical_shape,
             order=resolved_order,
+            geometry=FramePacking(
+                active=(logical_length, 1),
+                padding="zero",
+                repeats=1,
+            ),
         )
 
     if x.dtype == "PTArray":
@@ -596,14 +590,12 @@ def _broadcast_to_physical_slots(
     ONPValueError
         If the order, batch capacity, or plaintext context is invalid.
     """
-    source_shape, logical_shape, physical_shape = (
-        _validate_matrix_broadcast_geometry(
-            source_shape=x.original_shape,
-            logical_shape=logical_shape,
-            physical_shape=physical_shape,
-            order=order,
-            allow_order_union=False,
-        )
+    source_shape, logical_shape, physical_shape = _validate_matrix_broadcast_geometry(
+        source_shape=x.original_shape,
+        logical_shape=logical_shape,
+        physical_shape=physical_shape,
+        order=order,
+        allow_order_union=False,
     )
 
     _require(
@@ -615,11 +607,7 @@ def _broadcast_to_physical_slots(
     )
 
     # Packed identity requires logical, physical, and order equality.
-    if (
-        source_shape == logical_shape
-        and tuple(x.shape) == physical_shape
-        and x.order == order
-    ):
+    if source_shape == logical_shape and tuple(x.shape) == physical_shape and x.order == order:
         return x
 
     source_kind = _slot_source_kind(source_shape)
@@ -746,6 +734,11 @@ def _ct_broadcast_to(x, logical_shape, physical_shape, order, source_kind):
         batch_size=x.batch_size,
         new_shape=physical_shape,
         order=order,
+        geometry=FramePacking(
+            active=logical_shape,
+            padding="zero",
+            repeats=1,
+        ),
     )
 
 

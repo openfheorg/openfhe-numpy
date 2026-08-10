@@ -1,5 +1,37 @@
 from operator import index as operator_index
 
+from .packing import _is_col_major, _is_row_major
+
+
+def _get_slot_index(row, col, shape, order) -> int:
+    """Return the slot index for ``(row, col)`` within one packed frame."""
+    row = operator_index(row)
+    col = operator_index(col)
+    num_rows, num_cols = shape
+
+    if not (0 <= row < num_rows and 0 <= col < num_cols):
+        raise IndexError(f"matrix position ({row}, {col}) is outside packed shape {shape}.")
+    if _is_row_major(order):
+        return row * num_cols + col
+    if _is_col_major(order):
+        return col * num_rows + row
+    raise ValueError(f"unsupported packing order {order!r}.")
+
+
+def _get_cell_index(slot, shape, order) -> tuple[int, int]:
+    """Return ``(row, col)`` for a slot within one packed frame."""
+    slot = operator_index(slot)
+    num_rows, num_cols = shape
+
+    if not 0 <= slot < num_rows * num_cols:
+        raise IndexError(f"slot index {slot} is outside packed shape {shape}.")
+    if _is_row_major(order):
+        return divmod(slot, num_cols)
+    if _is_col_major(order):
+        col, row = divmod(slot, num_rows)
+        return row, col
+    raise ValueError(f"unsupported packing order {order!r}.")
+
 
 def _create_masking(indices, size):
     """
@@ -22,7 +54,8 @@ def _get_single_element(cc, x, idx, batch_size):
     mask = _create_masking([idx], batch_size)
     pt_mask = cc.MakeCKKSPackedPlaintext(mask)
     ct_res = cc.EvalMult(x, pt_mask)
-    ct_res = cc.EvalRotate(ct_res, idx)
+    if idx:
+        ct_res = cc.EvalRotate(ct_res, idx)
     return ct_res
 
 
