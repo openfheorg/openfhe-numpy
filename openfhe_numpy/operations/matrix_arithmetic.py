@@ -46,12 +46,14 @@ from .dispatch import register_tensor_function
 
 
 from openfhe_numpy.tensor.ctarray import CTArray
+from openfhe_numpy.tensor.tensor import FramePacking
 from openfhe_numpy.utils.errors import (
     ONPError,
     ONPIncompatibleShapeError,
     ONPNotSupportedError,
     ONPValueError,
     ONPDimensionError,
+    _require,
 )
 from openfhe_numpy.openfhe_numpy import (
     ArrayEncodingType,
@@ -178,15 +180,38 @@ def _eval_matvec_ct(lhs, rhs):
 
 
 def _matmul_ct(lhs, rhs):
-    """Internal function to evaluate matrix multiplication."""
+    """Multiply matrices stored in matching square physical frames."""
     # matrix @ matrix
-    if lhs.ndim == 2 and lhs.original_shape == rhs.original_shape:
+    if lhs.ndim == 2 and rhs.ndim == 2:
+        _require(
+            lhs.original_shape[1] == rhs.original_shape[0],
+            lhs.original_shape,
+            rhs.original_shape,
+            "Matrix multiplication requires matching inner dimensions.",
+        )
+        _require(
+            lhs.shape == rhs.shape and lhs.nrows == lhs.ncols,
+            lhs.shape,
+            rhs.shape,
+            "Matrix multiplication requires matching square physical frames.",
+            error_cls=ONPValueError,
+        )
+        result_shape = (lhs.original_shape[0], rhs.original_shape[1])
+        geometry = None
+        if lhs.geometry is not None and rhs.geometry is not None:
+            geometry = FramePacking(
+                active=result_shape,
+                padding="zero",
+                repeats=min(lhs.geometry.repeats, rhs.geometry.repeats),
+            )
+
         return CTArray(
             EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols),
-            lhs.original_shape,
+            result_shape,
             lhs.batch_size,
             lhs.shape,
             lhs.order,
+            geometry=geometry,
         )
 
     # matrix @ vector
@@ -194,7 +219,8 @@ def _matmul_ct(lhs, rhs):
         return _eval_matvec_ct(lhs, rhs)
     else:
         raise ValueError(
-            f"Dimension mismatch for multiplication ({lhs.original_shape} @ {rhs.original_shape})"
+            f"Dimension mismatch for multiplication "
+            f"({lhs.original_shape} @ {rhs.original_shape})"
         )
 
 
@@ -400,20 +426,37 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
             ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], 0)
-            padded_shape = x.shape
-            order = ArrayEncodingType.COL_MAJOR
+            input_repeats = x.geometry.repeats if x.geometry is not None else 1
+            if input_repeats > 1:
+                ct_sum = cc.EvalMult(ct_sum, 1.0 / input_repeats)
+
+            active = (1, cols) if keepdims else (cols, 1)
+            shape = active if keepdims else (cols,)
+            padded_shape = (1, ncols) if keepdims else (ncols, 1)
+            return CTArray(
+                ct_sum,
+                shape,
+                x.batch_size,
+                padded_shape,
+                order,
+                geometry=FramePacking(
+                    active=active,
+                    padding="zero",
+                    repeats=x.batch_size // ncols,
+                ),
+            )
         elif order == ArrayEncodingType.COL_MAJOR:
             ct_sum = cc.EvalSumCols(fhe_data, nrows, x.extra["colkey"])
-            padded_shape = (ncols, nrows)
-            order = ArrayEncodingType.ROW_MAJOR
+            if keepdims:
+                shape = (1, cols)
+                padded_shape = x.shape
+            else:
+                shape = (cols,)
+                padded_shape = (ncols, nrows)
+                order = ArrayEncodingType.ROW_MAJOR
 
         else:
             raise ONPNotSupportedError(f"Not support the current encoding [{order}] ")
-
-        if keepdims:
-            shape = (cols, 1)
-        else:
-            shape = (cols,)
 
     elif axis == 1:
         # Sum across each column of a packed_encoded matrix ciphertext: fhe_data

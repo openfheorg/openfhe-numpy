@@ -38,8 +38,8 @@ def main():
 
     The block_shape=(2, 2) splits the matrix across multiple ciphertext
     blocks, each holding a 2x2 sub-matrix in batch_size=4 slots.
-    compact=True on the vector produces the duplicated, square-compatible
-    packing required for block matvec; do NOT use compact for plain
+    target_cols=2 expands the vector into the matrix-compatible frame required
+    for block matvec; omit target_cols for plain
     vector arithmetic (add/sub/dot).
     """
 
@@ -101,9 +101,9 @@ def main():
     #
     #   1 2 3 0 | 4 5 6 0   (two 2x2 blocks packed as [row0|row1])
     #
-    # The vector is encoded with compact=True (duplicated packing):
+    # The vector is expanded to target_cols=2:
     #
-    #   1 1 1 1 | 0 0 0 0   (compact COL_MAJOR block vector)
+    #   1 1 1 1 | 0 0 0 0   (expanded COL_MAJOR block vector)
     #
     # The result lands in ROW_MAJOR order, one entry per row of the matrix.
 
@@ -113,22 +113,20 @@ def main():
         batch_size=batch_size,
         block_shape=block_shape,
         order=onp.ROW_MAJOR,
-        mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
     )
 
-    # compact=True: produce duplicated block packing required by block matvec.
+    # target_cols matches the matrix block's physical row count.
     ctv_cm = onp.block_array(
         cc=cc,
         data=vector,
         batch_size=batch_size,
-        block_shape=None,
+        block_shape=(block_shape[1],),
         order=onp.COL_MAJOR,
-        mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
-        compact=True,
+        target_cols=block_shape[0],
     )
 
     # Attach summation keys to every matrix block before the product.
@@ -136,7 +134,7 @@ def main():
     onp.attach_block_matvec_keys(ctm_rm, keys.secretKey)
 
     print_block_metadata("Block matrix (ROW_MAJOR)", ctm_rm)
-    print_block_metadata("Block vector (COL_MAJOR, compact)", ctv_cm)
+    print_block_metadata("Block vector (COL_MAJOR, expanded)", ctv_cm)
 
     ctv_result_rm = ctm_rm @ ctv_cm
     res_rm = ctv_result_rm.decrypt(keys.secretKey, unpack_type="original")
@@ -152,7 +150,7 @@ def main():
     # =========================================================
     #
     # Column-wise packing interleaves the matrix columns across slots.
-    # The vector uses compact=True (ROW_MAJOR), producing duplicated
+    # The vector uses target_cols=2 (ROW_MAJOR), producing expanded
     # per-element blocks compatible with the COL_MAJOR matrix blocks.
     #
     # The result lands in COL_MAJOR order, one entry per row of the matrix.
@@ -163,22 +161,20 @@ def main():
         batch_size=batch_size,
         block_shape=block_shape,
         order=onp.COL_MAJOR,
-        mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
     )
 
-    # compact=True: produce duplicated block packing required by block matvec.
+    # target_cols matches the matrix block's physical row count.
     ctv_rm = onp.block_array(
         cc=cc,
         data=vector,
         batch_size=batch_size,
-        block_shape=None,
+        block_shape=(block_shape[1],),
         order=onp.ROW_MAJOR,
-        mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
-        compact=True,
+        target_cols=block_shape[0],
     )
 
     # Attach summation keys to every matrix block before the product.
@@ -186,7 +182,7 @@ def main():
     onp.attach_block_matvec_keys(ctm_cm, keys.secretKey)
 
     print_block_metadata("Block matrix (COL_MAJOR)", ctm_cm)
-    print_block_metadata("Block vector (ROW_MAJOR, compact)", ctv_rm)
+    print_block_metadata("Block vector (ROW_MAJOR, expanded)", ctv_rm)
 
     ctv_result_cm = ctm_cm @ ctv_rm
     res_cm = ctv_result_cm.decrypt(keys.secretKey, unpack_type="original")

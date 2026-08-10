@@ -37,7 +37,7 @@ ctm_a = onp.array(
 )
 print("ctm_a.ncols (padded):", ctm_a.ncols, "original_shape:", ctm_a.original_shape)
 
-onp.gen_accumulate_rows_key(keys.secretKey, ctm_a.ncols)
+onp.gen_cumsum_key(keys.secretKey, ctm_a, axis=0)
 
 try:
     res = ctm_a.cumsum(axis=0)
@@ -49,7 +49,7 @@ except Exception as e:
 
 
 # ------------------------------------------------------------------
-# R1: 1-D vector cumsum -- this is the one that actually crashes.
+# 1-D vector cumsum.
 # ------------------------------------------------------------------
 print("\n--- 1-D vector cumsum ---")
 v = np.array([1.0, 2.0, 3.0, 4.0])
@@ -69,10 +69,10 @@ print(
     "ctm_v.ndim:", ctm_v.ndim, "ctm_v.ncols:", ctm_v.ncols, "original_shape:", ctm_v.original_shape
 )
 
-onp.gen_accumulate_cols_key(keys.secretKey, ctm_v.ncols)
+onp.gen_cumsum_key(keys.secretKey, ctm_v)
 
 try:
-    res_v = ctm_v.cumsum()  # default axis=0 -- same crash as axis=None
+    res_v = ctm_v.cumsum()
     decrypted_v = res_v.decrypt(keys.secretKey, unpack_type="original")
     print("cumsum() result:", decrypted_v)
 except Exception as e:

@@ -33,15 +33,11 @@ def main():
 
     Operations shown:
       - 1-D cumulative sum across multiple ciphertext blocks
-      - 2-D row-wise cumulative sum along axis=1
+      - 2-D cumulative sum across matrix block rows along axis=0
+      - 2-D cumulative sum across matrix block columns along axis=1
 
-    For a 1-D block vector, the total from each block is carried into the next
-    block.
-
-    For a 2-D block matrix, the cumulative axis must currently stay inside each
-    block. The matrix below has grid_shape=(4, 1), so axis=1 is supported because
-    there is only one block column. axis=0 would cross block rows and is not yet
-    supported.
+    In both cases, the terminal cumulative value from one block is carried into
+    the next block along the cumulative axis.
     """
 
     # --- Cryptographic setup -------------------------------------------------
@@ -70,7 +66,7 @@ def main():
     # --- Inputs --------------------------------------------------------------
     # Both inputs contain more entries than one ciphertext can hold.
     vector = np.arange(1, 41, dtype=float)
-    matrix = np.arange(1, 65, dtype=float).reshape(16, 4)
+    matrix = np.arange(1, 65, dtype=float).reshape(8, 8)
 
     print(f"\nCKKS ring dimension : {cc.GetRingDimension()}")
     print(f"Slots per ciphertext: {batch_size}")
@@ -88,9 +84,8 @@ def main():
     print(matrix)
 
     # --- Build encrypted block tensors ---------------------------------------
-    # Cumsum depth grows with the local block length. Using blocks of length 8
-    # keeps the required depth manageable and produces five ciphertext blocks.
     vector_block_shape = (8,)
+    matrix_block_shape = (4, 4)
 
     ctv = onp.block_array(
         cc=cc,
@@ -98,29 +93,23 @@ def main():
         batch_size=batch_size,
         block_shape=vector_block_shape,
         order=onp.ROW_MAJOR,
-        mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
     )
 
-    # Auto-selection gives block_shape=(4, 4) and grid_shape=(4, 1).
     ctm = onp.block_array(
         cc=cc,
         data=matrix,
         batch_size=batch_size,
-        block_shape=None,
+        block_shape=matrix_block_shape,
         order=onp.ROW_MAJOR,
-        mode="zero",
         fhe_type="C",
         public_key=keys.publicKey,
     )
 
-    # The 1-D path uses EvalSum to obtain each block's total.
-    onp.gen_sum_key(keys.secretKey)
-
-    # Generate the rotation keys needed by cumulative sums inside each block.
-    onp.gen_accumulate_cols_key(keys.secretKey, ctv.block_shape[0])
-    onp.gen_accumulate_cols_key(keys.secretKey, ctm.block_shape[1])
+    onp.gen_block_cumsum_keys(keys.secretKey, ctv)
+    onp.gen_block_cumsum_keys(keys.secretKey, ctm, axis=0)
+    onp.gen_block_cumsum_keys(keys.secretKey, ctm, axis=1)
 
     print_block_metadata("Encrypted block vector", ctv)
     print_block_metadata("Encrypted block matrix", ctm)
@@ -139,8 +128,21 @@ def main():
     )
     all_ok = all_ok and is_match
 
-    # 2) Row-wise matrix cumsum.
-    # grid_shape[1] == 1, so axis=1 never crosses a block boundary.
+    # 2) Matrix cumsum down each column, across both block rows.
+    # axis=0 means that values accumulate from top to bottom.
+    res_matrix = onp.cumsum(ctm, axis=0).decrypt(
+        keys.secretKey,
+        unpack_type="original",
+    )
+    is_match, _ = validate_and_print_results(
+        res_matrix,
+        np.cumsum(matrix, axis=0),
+        "Block matrix cumulative sum (axis=0)",
+    )
+    all_ok = all_ok and is_match
+
+    # 3) Matrix cumsum across each row, across both block columns.
+    # axis=1 means that values accumulate from left to right.
     res_matrix = onp.cumsum(ctm, axis=1).decrypt(
         keys.secretKey,
         unpack_type="original",
