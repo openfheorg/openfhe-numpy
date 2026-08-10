@@ -8,10 +8,11 @@ import openfhe_numpy as onp
 
 def demo():
     """
-    Run a demonstration of homomorphic matrix multiplication using OpenFHE-NumPy.
+    Demonstrate square and rectangular homomorphic matrix transpose.
     """
 
     params = CCParamsCKKSRNS()
+    params.SetMultiplicativeDepth(3)
     cc = GenCryptoContext(params)
     cc.Enable(PKESchemeFeature.PKE)
     cc.Enable(PKESchemeFeature.LEVELEDSHE)
@@ -35,11 +36,7 @@ def demo():
 
     print("Matrix:\n", matrix)
 
-    batch_size = (
-        params.GetBatchSize()
-        if params.GetBatchSize()
-        else cc.GetRingDimension() // 2
-    )
+    batch_size = params.GetBatchSize() if params.GetBatchSize() else cc.GetRingDimension() // 2
 
     # Encrypt matrix A
     ctm_x = onp.array(
@@ -67,6 +64,38 @@ def demo():
     print(f"\nDecrypted Result:\n{result}")
 
     is_match, error = onp.check_equality(result, expected)
+    print(f"\nMatch: {is_match}, Total Error: {error}")
+
+    rectangular_matrix = np.arange(1, 16, dtype=float).reshape(3, 5)
+    print("\n" + "*" * 60)
+    print("* RECTANGULAR TRANSPOSE + ORDER TRANSFORM + ADDITION")
+    print("*" * 60)
+    print(f"\nRectangular matrix:\n{rectangular_matrix}")
+
+    ctm_rectangular = onp.array(
+        cc=cc,
+        data=rectangular_matrix,
+        batch_size=batch_size,
+        order=onp.ROW_MAJOR,
+        fhe_type="C",
+        mode="zero",
+        public_key=keys.publicKey,
+    )
+
+    onp.gen_transpose_keys(keys.secretKey, ctm_rectangular)
+    ctm_rectangular_transposed = ctm_rectangular.transpose()
+
+    # Transform changes only the packed order. The logical matrix is unchanged.
+    onp.gen_transform_keys(keys.secretKey, ctm_rectangular_transposed)
+    ctm_col_major = ctm_rectangular_transposed.transform(onp.COL_MAJOR)
+    ctm_combined = ctm_col_major + 2.0
+
+    combined_result = ctm_combined.decrypt(keys.secretKey)
+    combined_expected = rectangular_matrix.T + 2.0
+    print(f"\nExpected:\n{combined_expected}")
+    print(f"\nDecrypted Result:\n{combined_result}")
+
+    is_match, error = onp.check_equality(combined_result, combined_expected)
     print(f"\nMatch: {is_match}, Total Error: {error}")
 
 

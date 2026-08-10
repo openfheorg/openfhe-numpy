@@ -106,6 +106,20 @@ class BlockCTArray(BlockFHETensor[Ciphertext]):
         """Return the blockwise homomorphic negation."""
         return self.clone(data=[-block for block in self.data])
 
+    def transform(self, order: int) -> BlockCTArray:
+        """Change the packing order of every matrix block."""
+        if order == self.order or self.ndim < 2:
+            return self
+
+        return type(self)(
+            data=[block.transform(order) for block in self.data],
+            grid_shape=self.grid_shape,
+            block_shape=self.block_shape,
+            original_shape=self.original_shape,
+            batch_size=self.batch_size,
+            order=order,
+        )
+
     def apply(self, func: Callable, *args: Any, **kwargs: Any) -> "BlockCTArray":
         """Apply a ciphertext-level function to every encrypted block.
 

@@ -31,7 +31,9 @@
 #include "numpy_utils.h"
 #include "utils/exception.h"
 
+#include <algorithm>
 #include <cmath>
+#include <limits>
 
 void RoundVector(std::vector<double>& vector) {
     for (double& e : vector)
@@ -193,4 +195,31 @@ std::vector<double> GenTransposeDiag(size_t totalSlots, size_t numCols, int32_t 
         }
     }
     return diag;
+}
+std::vector<int32_t> GenTransposeRotationIndices(uint32_t numRows, uint32_t numCols) {
+    if (numRows == 0 || numCols == 0) {
+        OPENFHE_THROW("numRows and numCols must be positive");
+    }
+
+    const uint64_t matrixSize64 = static_cast<uint64_t>(numRows) * numCols;
+    if (matrixSize64 > static_cast<uint64_t>(std::numeric_limits<int32_t>::max())) {
+        OPENFHE_THROW("numRows * numCols is too large");
+    }
+
+    const uint32_t matrixSize = static_cast<uint32_t>(matrixSize64);
+    std::vector<int32_t> rotationIndices;
+    rotationIndices.reserve(matrixSize);
+    for (uint32_t targetSlot = 0; targetSlot < matrixSize; ++targetSlot) {
+        const uint32_t outputRow = targetSlot / numRows;
+        const uint32_t outputCol = targetSlot % numRows;
+        const int32_t sourceSlot = static_cast<int32_t>(outputCol * numCols + outputRow);
+        const int32_t rotationIndex = sourceSlot - static_cast<int32_t>(targetSlot);
+        rotationIndices.push_back(rotationIndex);
+    }
+
+    std::sort(rotationIndices.begin(), rotationIndices.end());
+    rotationIndices.erase(
+        std::unique(rotationIndices.begin(), rotationIndices.end()),
+        rotationIndices.end());
+    return rotationIndices;
 }

@@ -208,12 +208,31 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
     ctm_matrix : CTArray
         The ciphertext matrix to transpose
     """
-    if ctm_matrix.ndim == 1:
-        ncols = 1
-    else:
-        ncols = ctm_matrix.ncols
+    if ctm_matrix.ndim < 2:
+        return
 
-    backend.EvalLinTransKeyGen(secret_key, ncols, backend.LinTransType.TRANSPOSE)
+    rows, cols = ctm_matrix.shape
+    if rows == 1 or cols == 1:
+        return
+    backend.EvalTransposeKeyGen(secret_key, rows, cols)
+
+
+def gen_transform_keys(secret_key: openfhe.PrivateKey, tensor):
+    """Generate the keys needed to transform a matrix in either direction."""
+    if tensor.ndim < 2:
+        return
+
+    from ..tensor.block_ctarray import BlockCTArray
+
+    if isinstance(tensor, BlockCTArray):
+        tensor = tensor.data[0]
+    if tensor.order not in (
+        backend.ArrayEncodingType.ROW_MAJOR,
+        backend.ArrayEncodingType.COL_MAJOR,
+    ):
+        raise ValueError("Order transform supports only ROW_MAJOR and COL_MAJOR.")
+
+    gen_transpose_keys(secret_key, tensor)
 
 
 def generate_slicing_key(secret_key, original_shape):

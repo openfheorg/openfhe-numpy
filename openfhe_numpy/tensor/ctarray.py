@@ -281,7 +281,13 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
     def _transpose(self) -> "CTArray":
         """Internal function to evaluate transpose of an encrypted array."""
         if self.ndim == 2:
-            ciphertext = EvalTranspose(self.data, self.ncols)
+            rows, cols = self.shape
+            if rows == 1 or cols == 1:
+                ciphertext = self.data
+            else:
+                if self.order == ArrayEncodingType.COL_MAJOR:
+                    rows, cols = cols, rows
+                ciphertext = EvalTranspose(self.data, rows, cols)
             pre_padded_shape = (
                 self.original_shape[1],
                 self.original_shape[0],
@@ -307,6 +313,32 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             padded_shape,
             self.order,
             geometry=geometry,
+        )
+
+    def transform(self, order: int) -> "CTArray":
+        """Convert COL_MAJOR to ROW_MAJOR and vice versal"""
+        if order not in (
+            ArrayEncodingType.ROW_MAJOR,
+            ArrayEncodingType.COL_MAJOR,
+        ):
+            raise ValueError("Order must be ROW_MAJOR or COL_MAJOR.")
+        if order == self.order or self.ndim < 2:
+            return self
+
+        from ..operations.arithmetic_utils import _eval_transform
+
+        ciphertext = _eval_transform(
+            self.data,
+            self.shape,
+            self.order,
+        )
+        return CTArray(
+            ciphertext,
+            self.original_shape,
+            self.batch_size,
+            self.shape,
+            order,
+            geometry=self.geometry,
         )
 
     def cumsum(self, axis=None) -> "CTArray":

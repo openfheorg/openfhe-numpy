@@ -34,25 +34,22 @@ def main():
     so it *cannot* be packed into a single ciphertext. openfhe-numpy tiles it into a
     grid of small blocks, each of which fits in one ciphertext.
 
-    Operations shown (all elementwise, so any block shape works):
+    Operations shown:
       - block matrix addition (CT + CT)
       - block matrix subtraction (CT - CT)
       - block matrix elementwise multiplication (CT * CT)
       - block matrix scalar multiplication (CT * scalar)
       - block matrix mixed addition (CT + PT)
+      - block matrix transpose with rectangular blocks
+      - packed-order transform followed by addition
     """
 
     # --- Cryptographic setup -------------------------------------------------
     ring_dim = 2**6  # 64
-    mult_depth = 1  # elementwise mul needs depth 1; increase for chained ops
+    mult_depth = 3  # transpose + transform + logical-slot arithmetic
     scale_mod_size = 50
 
-    # block_shape is OPTIONAL. Leave it None and openfhe-numpy auto-selects the
-    # largest square block that fits in one ciphertext:
-    #     side = 2 ** floor((batch_size.bit_length() - 1) / 2),  batch_size = ring_dim // 2
-    # For batch_size = 32 that gives a (4, 4) block. Pass an explicit tuple
-    # (e.g. (4, 4) or (2, 2)) to choose it yourself.
-    block_shape = None
+    block_shape = (2, 4)
 
     params = CCParamsCKKSRNS()
     params.SetRingDim(ring_dim)
@@ -92,9 +89,8 @@ def main():
     print(matrix_b)
 
     # --- Build encrypted block matrices --------------------------------------
-    # With block_shape=None the 8x8 matrix is auto-tiled into a 2x2 grid of (4,4)
-    # blocks; each block is one ciphertext. (Non-divisible sizes zero-pad the edge
-    # blocks.)
+    # The 8x8 matrix is tiled into a 4x2 grid of (2,4) blocks. Each block is one
+    # ciphertext. Non-divisible sizes would zero-pad the edge blocks.
     ctm_a = onp.block_array(
         cc=cc,
         data=matrix_a,
@@ -129,7 +125,7 @@ def main():
     )
 
     print(
-        f"\nAuto-selected block_shape = {ctm_a.block_shape}, "
+        f"\nSelected block_shape = {ctm_a.block_shape}, "
         f"grid_shape = {ctm_a.grid_shape}  ({ctm_a.num_blocks} ciphertext blocks)"
     )
 
@@ -173,6 +169,29 @@ def main():
         res_add_plain, matrix_a + matrix_b, "Block matrix mixed addition (CT + PT)"
     )
     all_ok = all_ok and is_match
+
+    # 6) Transpose a block matrix whose individual blocks are rectangular.
+    onp.gen_block_transpose_keys(keys.secretKey, ctm_a)
+    ctm_transposed = ctm_a.transpose()
+    res_transposed = ctm_transposed.decrypt(keys.secretKey, unpack_type="original")
+    is_match, _ = validate_and_print_results(res_transposed, matrix_a.T, "Block matrix transpose")
+    all_ok = all_ok and is_match
+    print_block_metadata("Transposed block matrix", ctm_transposed)
+
+    # 7) Change the packing order, then continue with ordinary arithmetic.
+    onp.gen_transform_keys(keys.secretKey, ctm_transposed)
+    ctm_col_major = ctm_transposed.transform(onp.COL_MAJOR)
+    res_transformed_add = (ctm_col_major + 2.0).decrypt(
+        keys.secretKey,
+        unpack_type="original",
+    )
+    is_match, _ = validate_and_print_results(
+        res_transformed_add,
+        matrix_a.T + 2.0,
+        "Block transpose + COL_MAJOR transform + scalar addition",
+    )
+    all_ok = all_ok and is_match
+    print_block_metadata("Column-major transposed block matrix", ctm_col_major)
 
     print("\n" + "=" * 60)
     print(f"All checks passed: {all_ok}")

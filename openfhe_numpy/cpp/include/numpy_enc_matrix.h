@@ -114,11 +114,17 @@ Ciphertext<DCRTPoly> EvalMatMulSquare(const std::vector<double>& rMatA,
                                       ConstCiphertext<DCRTPoly>& ctMatB,
                                       uint32_t numCols);
 
-Ciphertext<DCRTPoly> EvalTranspose(PrivateKey<DCRTPoly>& secretKey,
-                                  ConstCiphertext<DCRTPoly>& ciphertext,
-                                  uint32_t numCols);
-
 Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols);
+
+Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext,
+                                   uint32_t numRows,
+                                   uint32_t numCols);
+
+void EvalTransposeKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols);
+
+void EvalTransposeKeyGen(PrivateKey<DCRTPoly>& secretKey,
+                         uint32_t numRows,
+                         uint32_t numCols);
 
 Ciphertext<DCRTPoly> EvalSumCumRows(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,

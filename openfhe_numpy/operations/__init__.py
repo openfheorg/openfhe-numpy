@@ -65,6 +65,7 @@ from .crypto_helper import (
     gen_rotation_keys,
     gen_lintrans_keys,
     gen_transpose_keys,
+    gen_transform_keys,
     gen_square_matmult_key,
     gen_accumulate_rows_key,
     gen_accumulate_cols_key,
@@ -106,6 +107,7 @@ __all__ = [
     "gen_accumulate_cols_key",
     "gen_cumsum_key",
     "gen_block_cumsum_keys",
+    "gen_transform_keys",
     # broadcasting operations
     "broadcast_to",
     "generate_broadcast_key",
