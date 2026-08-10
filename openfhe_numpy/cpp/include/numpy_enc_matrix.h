@@ -129,6 +129,17 @@ Ciphertext<DCRTPoly> EvalSumCumCols(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t subringDim = 0);
 
+Ciphertext<DCRTPoly> EvalCumSum(
+    ConstCiphertext<DCRTPoly>& ciphertext,
+    uint32_t numFrameRows,
+    uint32_t numFrameCols,
+    uint32_t numActiveRows,
+    uint32_t numParticipatingCols,
+    uint32_t numRepeats,
+    uint32_t axis,
+    ArrayEncodingType order,
+    uint32_t slots);
+
 Ciphertext<DCRTPoly> EvalReduceCumRows(ConstCiphertext<DCRTPoly>& ciphertext,
                                           uint32_t numCols,
                                           uint32_t numRows = 0,

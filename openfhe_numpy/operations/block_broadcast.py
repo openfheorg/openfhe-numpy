@@ -33,7 +33,7 @@
 
 Broadcasting follows NumPy rules for logical shapes while preserving existing
 block boundaries. Supported sources have shape ``(n,)``, ``(1, n)``, or
-``(m, 1)``. Re-tiling and compact vector packing are not supported, and at least
+``(m, 1)``. Re-tiling and expanded vector frames are not supported, and at least
 one operand must be encrypted.
 
 Use :func:`generate_block_broadcast_key` to generate the required rotation keys.
@@ -95,7 +95,7 @@ def _broadcast_shape(*shapes: tuple[int, ...]) -> tuple[int, ...]:
 
 
 def _is_standard_block_layout(tensor: BlockFHETensor) -> bool:
-    """Check whether a tensor uses standard block packing.
+    """Check whether a tensor uses unexpanded block packing.
 
     Parameters
     ----------
@@ -109,11 +109,10 @@ def _is_standard_block_layout(tensor: BlockFHETensor) -> bool:
 
     Notes
     -----
-    A standard vector block of logical shape ``(b,)`` has physical shape
-    ``(b, 1)``. Compact vector blocks use a square physical layout.
+    An unexpanded vector block of logical shape ``(b,)`` has physical shape
+    ``(b, 1)``. Expanded vector blocks use a wider physical layout.
     """
     block_shape = tensor.block_shape
-    # Standard 1-D packing has physical shape (b, 1); compact packing is square.
     standard = (block_shape[0], 1) if len(block_shape) == 1 else block_shape
     return tuple(tensor.data[0].shape) == standard
 
@@ -266,8 +265,8 @@ def _validate_source_for_layout(
         _is_standard_block_layout(source),
         tuple(source.data[0].shape),
         source.block_shape,
-        "Block broadcasting requires standard non-compact packing; construct "
-        "vector sources with compact=False.",
+        "Block broadcasting requires an unexpanded vector source "
+        "(target_cols=None).",
         error_cls=ONPNotSupportedError,
     )
 
@@ -665,7 +664,7 @@ def generate_block_broadcast_key(secret_key: Any, *operands: BlockFHETensor) -> 
     ONPIncompatibleShapeError
         If operand block shapes are not broadcast-compatible.
     ONPNotSupportedError
-        If an operand has compact packing or an unsupported source shape.
+        If an operand has expanded vector packing or an unsupported source shape.
     ONPValueError
         If no operand is given or the key does not match an encrypted operand.
 
@@ -701,7 +700,7 @@ def generate_block_broadcast_key(secret_key: Any, *operands: BlockFHETensor) -> 
             _is_standard_block_layout(operand),
             tuple(operand.data[0].shape),
             operand.block_shape,
-            "Block broadcast key generation requires standard (non-compact) block layout.",
+            "Block broadcast key generation requires an unexpanded vector layout.",
             error_cls=ONPNotSupportedError,
         )
         _verify_secret_key(secret_key, operand)

@@ -133,7 +133,9 @@ def _pack_vector_row_wise(
         raise ONPError(f"Padded vector [{nrows} x{ncols}] is longer than the batch size [{batch_size}]")
 
     flattened = np.zeros(expanded_size, dtype=np.asarray(vector).dtype)
-    if expand == "tile":
+    if target_cols is None:
+        flattened[:n] = vector
+    elif expand == "tile":
         if pad_value == "zero":
             for i in range(n):
                 flattened[i * ncols : i * ncols + target_cols] = vector[i]
@@ -143,7 +145,7 @@ def _pack_vector_row_wise(
         else:
             raise ONPError(f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'.")
     elif expand == "zero":
-        flattened[np.arange(n) * target_cols] = vector
+        flattened[np.arange(n) * ncols] = vector
     else:
         raise ONPError(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
 
@@ -235,14 +237,19 @@ def _pack_vector_col_wise(
     padded[:n] = vector
     flattened = np.zeros(expanded_size, dtype=padded.dtype)
 
-    if expand == "tile":
+    if target_cols is None:
+        flattened[:n] = vector
+    elif expand == "tile":
         if pad_value == "tile":
             flattened = np.tile(padded, ncols)
         elif pad_value == "zero":
             for col in range(target_cols):
-                flattened[col::ncols] = padded
+                start = col * nrows
+                flattened[start : start + nrows] = padded
+        else:
+            raise ONPError(f"Invalid pad_value: '{pad_value}'. Valid options are 'zero' or 'tile'.")
     elif expand == "zero":
-        flattened[: n * ncols : ncols] = vector
+        flattened[:n] = vector
     else:
         raise ONPError(f"Invalid expand mode: '{expand}'. Valid options are 'zero' or 'tile'.")
 
@@ -598,10 +605,34 @@ def process_packed_data(
     ndarray
         Reshaped array to its desired shape
     """
-    if info["ndim"] == 2:
-        return _extract_matrix(data, info)
+    raw = np.asarray(data)
+    ndim = info["ndim"]
+    original_shape = tuple(info["original_shape"])
+    shape = tuple(info["shape"])
+    order = info["order"]
+
+    if ndim == 0:
+        values = np.asarray(raw[0]).reshape(())
+    elif ndim == 1:
+        if len(shape) == 1:
+            values = raw[: original_shape[0]]
+        else:
+            values = [
+                raw[row * shape[1] if order == ArrayEncodingType.ROW_MAJOR else row]
+                for row in range(original_shape[0])
+            ]
+    elif ndim == 2:
+        frame = np.reshape(
+            raw[: shape[0] * shape[1]],
+            shape,
+            order="C" if order == ArrayEncodingType.ROW_MAJOR else "F",
+        )
+        values = frame[: original_shape[0], : original_shape[1]]
     else:
-        return _extract_vector(data, info)
+        raise ONPError(f"Unsupported packed rank {ndim}.")
+    return np.asarray(values)
+
+
 def _is_row_major(order: Any) -> bool:
     """Return True if ``order`` is row-major packing."""
     return order == ArrayEncodingType.ROW_MAJOR

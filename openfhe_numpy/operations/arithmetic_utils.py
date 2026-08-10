@@ -36,6 +36,7 @@ tensor operations.
 
 from __future__ import annotations
 
+from operator import index as operator_index
 from typing import Any
 
 import numpy as np
@@ -47,6 +48,7 @@ from openfhe_numpy.utils.errors import (
     ONPDimensionError,
     ONPIncompatibleShapeError,
     ONPNotImplementedError,
+    ONPNotSupportedError,
     ONPValueError,
     _require,
 )
@@ -110,29 +112,59 @@ def _get_matvec_key_name(matrix_order: Any) -> str:
 # ------------------------------------------------------------------------------
 
 
-def _normalize_axis(axis, ndim: int) -> int:
-    """Normalize integer axis.
+_AXIS_SUPPORT = {
+    "cumsum": frozenset({"none", "integer"}),
+    "sum": frozenset({"none", "integer"}),
+    "mean": frozenset({"none", "integer"}),
+    "roll": frozenset({"none"}),
+    "cumulative_reduce": frozenset({"integer"}),
+}
 
-    Tuple axes and NumPy integer types are not supported.
+
+def _normalize_axis(
+    operation: str,
+    axis,
+    ndim: int,
+) -> int | None:
+    """Validate and normalize an axis for one registered operation.
+
+    Axis tuples are intentionally rejected until multi-axis runtimes exist.
     """
-    if type(axis) is not int:
-        raise ONPDimensionError(f"axis must be an integer, got {type(axis).__name__}.")
+    try:
+        supported = _AXIS_SUPPORT[operation]
+    except KeyError as exc:
+        raise ValueError(f"unknown axis operation {operation!r}.") from exc
+
+    if axis is None:
+        if "none" in supported:
+            return None
+        raise TypeError(f"{operation} requires an integer axis.")
+
+    if isinstance(axis, tuple):
+        if "tuple" not in supported:
+            raise ONPNotSupportedError(
+                f"{operation} does not support tuple axes."
+            )
+        raise ONPNotImplementedError(
+            f"tuple-axis normalization is not implemented for {operation}."
+        )
+
+    if "integer" not in supported:
+        raise ONPNotSupportedError(
+            f"{operation} currently supports only axis=None."
+        )
+
+    if isinstance(axis, (bool, np.bool_)):
+        raise TypeError("axis must be an integer, not boolean.")
+    try:
+        axis = operator_index(axis)
+    except TypeError as exc:
+        raise TypeError(f"axis must be an integer, got {type(axis).__name__}.") from exc
 
     if axis < -ndim or axis >= ndim:
         raise ONPDimensionError(f"axis {axis} is out of bounds for tensor with {ndim} dimensions.")
 
     return axis + ndim if axis < 0 else axis
-
-
-def _normalize_sum_axis(axis, ndim: int) -> int | None:
-    """Normalize a single reduction axis or None.
-
-    Tuple axes are not supported.
-    """
-    if axis is None:
-        return None
-
-    return _normalize_axis(axis, ndim)
 
 
 # ------------------------------------------------------------------------------
@@ -301,7 +333,8 @@ def _logical_slot_indices(tensor):
     -------
     list[int]
         Active slot indices in the tensor's packing order. Physical padding and
-        the batch tail are excluded; replicated vector lanes are included.
+        the batch tail are excluded; replicated vector lanes and repeated
+        frames are included.
 
     Raises
     ------
@@ -312,53 +345,74 @@ def _logical_slot_indices(tensor):
         unsupported.
     """
     logical_shape = tuple(tensor.original_shape)
-    if len(logical_shape) == 0:
-        return [0]
-
     physical_shape = tuple(tensor.shape)
-    if len(logical_shape) == 1:
+
+    if len(logical_shape) == 0:
+        frame_indices = [0]
+    elif len(logical_shape) == 1:
         logical_length = logical_shape[0]
         if len(physical_shape) == 1 or physical_shape[1] == 1:
-            return list(range(logical_length))
+            frame_indices = list(range(logical_length))
+        else:
+            physical_rows, physical_cols = physical_shape
+            if logical_length > physical_rows:
+                raise ONPValueError(
+                    f"logical shape {logical_shape} exceeds physical frame {tensor.shape}."
+                )
 
+            participating_cols = physical_cols
+            if tensor.geometry is not None and tensor.geometry.padding == "zero":
+                participating_cols = tensor.geometry.active[1]
+
+            if tensor.order == ArrayEncodingType.ROW_MAJOR:
+                frame_indices = [
+                    row * physical_cols + col
+                    for row in range(logical_length)
+                    for col in range(participating_cols)
+                ]
+            elif tensor.order == ArrayEncodingType.COL_MAJOR:
+                frame_indices = [
+                    col * physical_rows + row
+                    for col in range(participating_cols)
+                    for row in range(logical_length)
+                ]
+            else:
+                raise ONPValueError(f"Unsupported packing order {tensor.order!r}.")
+    else:
+        if len(logical_shape) != 2 or len(physical_shape) != 2:
+            raise ONPDimensionError(
+                f"Scalar arithmetic supports logical rank zero, one, or two; got {logical_shape}."
+            )
+
+        logical_rows, logical_cols = logical_shape
         physical_rows, physical_cols = physical_shape
-        if logical_length > physical_rows:
+        if logical_rows > physical_rows or logical_cols > physical_cols:
             raise ONPValueError(
                 f"logical shape {logical_shape} exceeds physical frame {tensor.shape}."
             )
+
         if tensor.order == ArrayEncodingType.ROW_MAJOR:
-            return [
+            frame_indices = [
                 row * physical_cols + col
-                for row in range(logical_length)
-                for col in range(physical_cols)
+                for row in range(logical_rows)
+                for col in range(logical_cols)
             ]
-        if tensor.order == ArrayEncodingType.COL_MAJOR:
-            return [
+        elif tensor.order == ArrayEncodingType.COL_MAJOR:
+            frame_indices = [
                 col * physical_rows + row
-                for col in range(physical_cols)
-                for row in range(logical_length)
+                for col in range(logical_cols)
+                for row in range(logical_rows)
             ]
-        raise ONPValueError(f"Unsupported packing order {tensor.order!r}.")
+        else:
+            raise ONPValueError(f"Unsupported packing order {tensor.order!r}.")
 
-    if len(logical_shape) != 2 or len(physical_shape) != 2:
-        raise ONPDimensionError(
-            f"Scalar arithmetic supports logical rank zero, one, or two; got {logical_shape}."
-        )
-
-    logical_rows, logical_cols = logical_shape
-    physical_rows, physical_cols = physical_shape
-    if logical_rows > physical_rows or logical_cols > physical_cols:
-        raise ONPValueError(f"logical shape {logical_shape} exceeds physical frame {tensor.shape}.")
-
-    if tensor.order == ArrayEncodingType.ROW_MAJOR:
-        return [
-            row * physical_cols + col for row in range(logical_rows) for col in range(logical_cols)
-        ]
-    if tensor.order == ArrayEncodingType.COL_MAJOR:
-        return [
-            col * physical_rows + row for col in range(logical_cols) for row in range(logical_rows)
-        ]
-    raise ONPValueError(f"Unsupported packing order {tensor.order!r}.")
+    frame_size = int(np.prod(physical_shape))
+    repeats = 1 if tensor.geometry is None else tensor.geometry.repeats
+    return [
+        repeat_idx * frame_size + frame_idx
+        for repeat_idx in range(repeats)
+        for frame_idx in frame_indices
+    ]
 
 
 def _logical_plaintext(tensor, value, indices):

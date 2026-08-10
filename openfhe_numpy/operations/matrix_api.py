@@ -257,19 +257,19 @@ def transpose(a: ArrayLike) -> ArrayLike:
 
 
 @tensor_function_api("cumsum", binary=False)
-def cumsum(a: ArrayLike, /, *, axis: Optional[int] = None) -> ArrayLike:
-    """
-        Compute the cumulative sum of tensor elements along a specified axis.\
-        - For 1D inputs, axis must be None.
-        - For 2D inputs, axis must be 0 or 1.
-        - The include_initial argument is not supported.
+def cumsum(a: ArrayLike, axis: Optional[int] = None) -> ArrayLike:
+    """Compute cumulative sums using NumPy axis behavior.
 
-        Parameters
-        ----------
-        a : ArrayLike
-            Input tensor.
-        axis : int, optional
-            Axis along which to compute the sum. Default is 0.
+    For vectors, ``None``, ``0``, and ``-1`` scan the vector. For matrices,
+    ``None`` scans the C-order flattened values and returns a vector, while
+    ``0`` and ``1`` scan down rows and across columns respectively.
+
+    Parameters
+    ----------
+    a : ArrayLike
+        Input tensor.
+    axis : int, optional
+        Axis along which to compute the sum. Default is ``None``.
 
     Returns
     -------
@@ -279,6 +279,12 @@ def cumsum(a: ArrayLike, /, *, axis: Optional[int] = None) -> ArrayLike:
     See Also
     --------
     numpy.cumsum : Corresponding NumPy function.
+
+    Notes
+    -----
+    For a block matrix with ``axis=None``, the current implementation assembles
+    logical values in C order one element at a time. It can be
+    expensive for large matrices.
 
     Examples
     --------
