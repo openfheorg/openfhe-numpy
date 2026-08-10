@@ -41,7 +41,7 @@ from openfhe_numpy.utils.errors import (
     ONPValueError,
 )
 from openfhe_numpy.utils.typecheck import Number
-from openfhe_numpy.utils.matlib import _sum_terms
+from openfhe_numpy.utils.matlib import _sum_terms, is_power_of_two
 from openfhe_numpy.operations.arithmetic_utils import (
     _eval_binary,
     _eval_scalar_binary,
@@ -269,10 +269,10 @@ def _assert_block_matmul_compatible(a: BlockFHETensor, b: BlockFHETensor) -> Non
     block_rows, block_cols = a.block_shape
 
     _require(
-        block_rows == block_cols,
+        block_rows == block_cols and is_power_of_two(block_rows),
         a.block_shape,
         b.block_shape,
-        "Block matmul requires square blocks.",
+        "Block matmul requires a square power-of-two block_shape.",
     )
     _require(
         a.batch_size == b.batch_size,
