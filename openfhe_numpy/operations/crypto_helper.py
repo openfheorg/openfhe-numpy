@@ -40,7 +40,6 @@ from typing import Any
 import openfhe
 import openfhe_numpy as backend  # Import from cpp source
 from ..utils.packing import _is_row_major, _is_col_major
-from ..utils.matlib import next_power_of_two
 from ..utils.errors import ONPValueError
 
 
@@ -214,69 +213,6 @@ def gen_transpose_keys(secret_key: openfhe.PrivateKey, ctm_matrix):
         ncols = ctm_matrix.ncols
 
     backend.EvalLinTransKeyGen(secret_key, ncols, backend.LinTransType.TRANSPOSE)
-
-
-def generate_slicing_key(secret_key, original_shape):
-    """
-    Pre-generate all rotation keys needed for any possible slicing
-    of a CTArray with the given original_shape.
-    """
-
-    indices = set()
-
-    if len(original_shape) == 1:
-        n = original_shape[0]
-        for i in range(n):
-            indices.add(i)
-        for i in range(1, n):
-            indices.add(-i)
-
-    elif len(original_shape) == 2:
-        nrow, ncol = original_shape
-        nrow_pow_2 = next_power_of_two(nrow)
-        ncol_pow_2 = next_power_of_two(ncol)
-
-        for r in range(nrow):
-            for c in range(ncol):
-                indices.add(r * ncol_pow_2 + c)
-                indices.add(c * nrow_pow_2 + r)
-
-        for i in range(1, max(nrow, ncol)):
-            indices.add(-i)
-
-        # Rotation indices to collapse any sub-matrix result back to slot 0.
-        #
-        # The naive enumeration scans every (res_nrow, res_ncol) result shape and
-        # every (r, c) offset within it -- Theta(nrow^2 * ncol^2). Each added value
-        # depends on only one of the two result extents (through its power-of-two
-        # padding), so the identical index set is produced in O(nrow * ncol) by
-        # grouping result extents that share a padding and taking the widest offset
-        # range for that group.
-        def _widest_extent_by_padding(size):
-            """Map next_power_of_two(k) -> largest k in 1..size sharing that padding."""
-            widest = {}
-            for k in range(1, size + 1):
-                widest[next_power_of_two(k)] = k  # k ascends, so this stays the max
-            return widest
-
-        # Column-padded offsets: value depends on res_ncol's padding; rows span 0..nrow.
-        for pad_c, max_c in _widest_extent_by_padding(ncol).items():
-            for r in range(nrow):
-                for c in range(max_c):
-                    indices.add(-(pad_c * r + c))
-
-        # Row-padded offsets: value depends on res_nrow's padding; cols span 0..ncol.
-        for pad_r, max_r in _widest_extent_by_padding(nrow).items():
-            for c in range(ncol):
-                for r in range(max_r):
-                    indices.add(-(pad_r * c + r))
-
-    # NOTE: index 0 is intentionally kept. Element extraction rotates the target
-    # element to slot 0 via EvalRotate(ct, 0) for position-0 elements, which needs
-    # the identity-rotation key (OpenFHE automorphism index 1).
-    if indices:
-        cc = secret_key.GetCryptoContext()
-        cc.EvalRotateKeyGen(secret_key, sorted(indices))
 
 
 ##############################################################################

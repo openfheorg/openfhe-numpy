@@ -44,8 +44,7 @@ from .block_tensor import BlockFHETensor
 class BlockCTArray(BlockFHETensor[Ciphertext]):
     """Block tensor of encrypted blocks (CTArray).
 
-    This is a thin subclass. All storage, indexing, and metadata
-    logic lives in BlockFHETensor. BlockCTArray adds only:
+    Storage and metadata logic live in BlockFHETensor. BlockCTArray adds:
 
         - is_encrypted = True
         - decrypt()
@@ -54,6 +53,11 @@ class BlockCTArray(BlockFHETensor[Ciphertext]):
 
     tensor_priority = 40
     is_encrypted = True
+
+    def __getitem__(self, key):
+        from ..operations.slicing import block_ctarray_getitem
+
+        return block_ctarray_getitem(self, key)
 
     def decrypt(
         self,

@@ -315,6 +315,33 @@ class FHETensor(BaseTensor[TPL], Generic[TPL]):
             "ndim": self.ndim,
         }
 
+    def same_layout(
+        self,
+        other: Any,
+        mode: Literal["logical", "physical"] = "logical",
+    ) -> bool:
+        """Return whether two tensors share the requested layout."""
+        if mode not in ("logical", "physical"):
+            raise ValueError("mode must be 'logical' or 'physical'")
+        if not isinstance(other, FHETensor):
+            return False
+
+        if mode == "physical" and self.geometry is not None and other.geometry is not None:
+            same_geometry = (
+                self.geometry.padding == other.geometry.padding
+                and self.geometry.repeats == other.geometry.repeats
+            )
+        else:
+            same_geometry = self.geometry == other.geometry
+
+        return (
+            self.shape == other.shape
+            and self.batch_size == other.batch_size
+            and self.order == other.order
+            and same_geometry
+            and (mode == "physical" or self.original_shape == other.original_shape)
+        )
+
     @property
     def T(self):
         return self.transpose()

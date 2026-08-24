@@ -68,13 +68,13 @@ from .crypto_helper import (
     gen_square_matmult_key,
     gen_accumulate_rows_key,
     gen_accumulate_cols_key,
-    generate_slicing_key,
     attach_block_matvec_keys,
     attach_block_sum_keys,
     attach_matvec_keys,
     gen_block_transpose_keys,
 )
 
+from .slicing import generate_slicing_key
 from .block_broadcast import generate_block_broadcast_key
 from .block_cumsum import gen_cumsum_key, gen_block_cumsum_keys
 

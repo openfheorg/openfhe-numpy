@@ -1,5 +1,7 @@
 from operator import index as operator_index
 
+from openfhe import FIXEDMANUAL
+
 from .packing import _is_col_major, _is_row_major
 
 
@@ -16,6 +18,21 @@ def _get_slot_index(row, col, shape, order) -> int:
     if _is_col_major(order):
         return col * num_rows + row
     raise ValueError(f"unsupported packing order {order!r}.")
+
+
+def _get_packed_slot_index(coord, physical_shape, order) -> int:
+    """Return the packed slot for a rank-0, rank-1, or rank-2 coordinate.
+
+    Rank 0 (``()``) is slot 0; rank 1 (``(i,)``) is contiguous at ``i``; rank 2
+    ``(row, col)`` uses the order-aware matrix formula ``_get_slot_index``.
+    """
+    if not coord:
+        return 0
+    if len(coord) == 1:
+        return coord[0]
+    if len(coord) == 2:
+        return _get_slot_index(coord[0], coord[1], physical_shape, order)
+    raise ValueError(f"packed coordinates support rank 0, 1, or 2; got rank {len(coord)}")
 
 
 def _get_cell_index(slot, shape, order) -> tuple[int, int]:
@@ -50,13 +67,28 @@ def _create_masking(indices, size):
     return mask
 
 
-def _get_single_element(cc, x, idx, batch_size):
-    mask = _create_masking([idx], batch_size)
-    pt_mask = cc.MakeCKKSPackedPlaintext(mask)
-    ct_res = cc.EvalMult(x, pt_mask)
-    if idx:
-        ct_res = cc.EvalRotate(ct_res, idx)
-    return ct_res
+def _get_elements_at_slots(ciphertext, source_slots, batch_size, rotation, mask_cache=None):
+    """Keep selected ciphertext slots and optionally rotate them into position."""
+    cc = ciphertext.GetCryptoContext()
+    source_slots = tuple(sorted(set(source_slots)))
+    if any(slot < 0 or slot >= batch_size for slot in source_slots):
+        raise IndexError("slot mask contains an index outside the ciphertext batch")
+
+    level = ciphertext.GetLevel()
+    cache_key = (id(cc), source_slots, batch_size, level)
+    plaintext = None if mask_cache is None else mask_cache.get(cache_key)
+
+    if plaintext is None:
+        mask = _create_masking(source_slots, batch_size)
+        plaintext = cc.MakeCKKSPackedPlaintext(mask, 1, level, None, batch_size)
+        if mask_cache is not None:
+            mask_cache[cache_key] = plaintext
+
+    result = cc.EvalMult(ciphertext, plaintext)
+    if cc.GetScalingTechnique() == FIXEDMANUAL:
+        cc.ModReduceInPlace(result)
+
+    return result if rotation == 0 else cc.EvalRotate(result, rotation)
 
 
 def _replication_steps(copies: int, stride: int):
