@@ -34,12 +34,12 @@ import numpy as np
 import openfhe
 
 
-from ..openfhe_numpy import EvalCumSum, EvalTranspose, ArrayEncodingType
+from ..openfhe_numpy import EvalCumSum, EvalTranspose
 from ..utils.matlib import is_power_of_two, next_power_of_two
 from ..utils.constants import UnpackType
 from ..utils.errors import ONPDimensionError, ONPError
 from ..utils.packing import process_packed_data
-from ..utils._helper_slots_ops import _get_single_element, _get_slot_index
+from ..utils._helper_slots_ops import _get_elements_at_slots, _get_slot_index
 
 from .tensor import FHETensor, FramePacking
 
@@ -66,87 +66,9 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
         return self._zeros
 
     def __getitem__(self, key):
-        if self.shape == ():
-            raise TypeError("'int' object is not subscriptable")
-        if self.ndim == 1:
-            return self._get_1d(key)
-        else:
-            return self._get_2d(key)
+        from ..operations.slicing import ctarray_getitem
 
-    def _get_1d(self, key):
-        cc = self.crypto_context
-
-        if isinstance(key, int):
-            return self._cta_from_scalar(self._get_element_1D(key))
-
-        if isinstance(key, slice):
-            start, stop, step = key.indices(self.original_shape[0])
-            indices = list(range(start, stop, step))
-
-            if len(indices) == 0:
-                raise IndexError("slice results in empty array")
-
-            # Extract each selected element and pack them into slots [0..N-1]
-            cts = [_get_single_element(cc, self.data, idx, self.batch_size) for idx in indices]
-            return self._cta_from_1d(cts)
-
-        raise TypeError(f"Unsupported index type: {type(key)}")
-
-    def _get_2d(self, key):
-        if not isinstance(key, tuple):
-            key = (key, slice(None))  # a[0] -> a[0, :]
-
-        if len(key) > 2:
-            raise IndexError("too many indices for array")
-
-        row_key = key[0] if len(key) > 0 else slice(None)
-        col_key = key[1] if len(key) > 1 else slice(None)
-
-        row_indices, row_collapsed = self._resolve_key(row_key, axis=0)
-        col_indices, col_collapsed = self._resolve_key(col_key, axis=1)
-
-        if len(row_indices) == 0 or len(col_indices) == 0:
-            return None
-
-        rows = [[self._get_element_2D(r, c) for c in col_indices] for r in row_indices]
-
-        if row_collapsed and col_collapsed:
-            return self._cta_from_scalar(rows[0][0])
-        if row_collapsed:
-            return self._cta_from_1d(rows[0])
-        if col_collapsed:
-            return self._cta_from_1d([r[0] for r in rows])
-        return self._cta_from_2d(rows)
-
-    def _resolve_key(self, key, axis):
-        """
-        Get indices using Python's builtin function
-        """
-        size = self.original_shape[axis]
-        if isinstance(key, int):
-            idx = key if key >= 0 else size + key
-            if not (0 <= idx < size):
-                raise IndexError(f"index {key} out of bounds for axis {axis} with size {size}")
-            return [idx], True
-        if isinstance(key, slice):
-            s, e, step = key.indices(size)
-            return range(s, e, step), False
-        raise TypeError(f"invalid index type: {type(key)}")
-
-    def _cta_from_scalar(self, ct):
-        """Wrap a single ciphertext as a scalar CTArray"""
-        return CTArray(
-            data=ct,
-            original_shape=(),
-            batch_size=self.batch_size,
-            new_shape=(1, 1),
-            order=self.order,
-            geometry=FramePacking(
-                active=(1, 1),
-                padding="zero",
-                repeats=1,
-            ),
-        )
+        return ctarray_getitem(self, key)
 
     def _cta_from_1d(self, cts, *, frame_rows=None):
         """Combine single-slot ciphertexts into one packed 1-D CTArray."""
@@ -180,51 +102,14 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             ),
         )
 
-    def _cta_from_2d(self, matrix):
-        """Combine a matrix of single ciphertexts into one 2D CTArray"""
-        cc = self.crypto_context
-        nrow = len(matrix)
-        ncol = len(matrix[0])
-
-        power_2_r = next_power_of_two(nrow)
-        power_2_c = next_power_of_two(ncol)
-
-        ct_res = self.zeros
-
-        if self.order == ArrayEncodingType.ROW_MAJOR:
-            for r in range(nrow):
-                for c in range(ncol):
-                    k = power_2_c * r + c
-                    ct_res = cc.EvalAdd(ct_res, cc.EvalRotate(matrix[r][c], -k))
-        elif self.order == ArrayEncodingType.COL_MAJOR:
-            for r in range(nrow):
-                for c in range(ncol):
-                    k = power_2_r * c + r
-                    ct_res = cc.EvalAdd(ct_res, cc.EvalRotate(matrix[r][c], -k))
-
-        return CTArray(
-            data=ct_res,
-            original_shape=(nrow, ncol),
-            batch_size=self.batch_size,
-            new_shape=(power_2_r, power_2_c),
-            order=self.order,
-            geometry=FramePacking(
-                active=(nrow, ncol),
-                padding="zero",
-                repeats=1,
-            ),
-        )
-
-    def _get_element_1D(self, key):
-        n = self.original_shape[0]
-        if not (-n <= key < n):
-            raise IndexError(f"index {key} is out of bounds for axis 0 with size {n}")
-        key = key if key >= 0 else key + n
-        return _get_single_element(self.crypto_context, self.data, key, self.batch_size)
-
     def _get_element_2D(self, r, c):
         idx = _get_slot_index(r, c, self.shape, self.order)
-        return _get_single_element(self.crypto_context, self.data, idx, self.batch_size)
+        return _get_elements_at_slots(
+            self.data,
+            (idx,),
+            self.batch_size,
+            idx,
+        )
 
     def decrypt(
         self,

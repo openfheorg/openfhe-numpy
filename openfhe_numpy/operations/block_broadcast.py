@@ -94,28 +94,6 @@ def _broadcast_shape(*shapes: tuple[int, ...]) -> tuple[int, ...]:
         ) from exc
 
 
-def _is_standard_block_layout(tensor: BlockFHETensor) -> bool:
-    """Check whether a tensor uses unexpanded block packing.
-
-    Parameters
-    ----------
-    tensor : BlockFHETensor
-        Block tensor to inspect.
-
-    Returns
-    -------
-    bool
-        ``True`` if the physical block shape matches the logical block shape.
-
-    Notes
-    -----
-    An unexpanded vector block of logical shape ``(b,)`` has physical shape
-    ``(b, 1)``. Expanded vector blocks use a wider physical layout.
-    """
-    block_shape = tensor.block_shape
-    standard = (block_shape[0], 1) if len(block_shape) == 1 else block_shape
-    return tuple(tensor.data[0].shape) == standard
-
 
 def _source_kind(source: BlockFHETensor) -> str:
     """Classify a supported broadcast source.
@@ -262,7 +240,7 @@ def _validate_source_for_layout(
         error_cls=ONPNotImplementedError,
     )
     _require(
-        _is_standard_block_layout(source),
+        source.is_standard_layout(),
         tuple(source.data[0].shape),
         source.block_shape,
         "Block broadcasting requires an unexpanded vector source "
@@ -697,7 +675,7 @@ def generate_block_broadcast_key(secret_key: Any, *operands: BlockFHETensor) -> 
             error_cls=ONPTypeError,
         )
         _require(
-            _is_standard_block_layout(operand),
+            operand.is_standard_layout(),
             tuple(operand.data[0].shape),
             operand.block_shape,
             "Block broadcast key generation requires an unexpanded vector layout.",

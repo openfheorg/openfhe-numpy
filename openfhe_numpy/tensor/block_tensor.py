@@ -32,7 +32,7 @@
 from __future__ import annotations
 
 from math import prod
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 from operator import index as operator_index
 
 from openfhe_numpy.openfhe_numpy import ArrayEncodingType
@@ -609,28 +609,29 @@ class BlockFHETensor(BaseTensor, Generic[TPL]):
             order=self._order,
         )
 
-    def same_layout(self, other: Any) -> bool:
-        """Return ``True`` if block/grid layout metadata match."""
-        attrs = (
-            "original_shape",
-            "shape",
-            "batch_size",
-            "order",
-            "block_shape",
-            "grid_shape",
-        )
-        if not all(hasattr(other, attr) for attr in attrs):
+    def same_layout(self, other: Any, mode: Literal["logical", "physical"] = "logical") -> bool:
+        """Return whether two block tensors share the requested layout."""
+        if mode not in ("logical", "physical"):
+            raise ValueError("mode must be 'logical' or 'physical'")
+
+        if not isinstance(other, BlockFHETensor):
             return False
 
         return (
-            self._original_shape == other.original_shape
-            and self._shape == other.shape
-            and self._batch_size == other.batch_size
+            self._batch_size == other.batch_size
             and self._order == other.order
             and self._block_shape == other.block_shape
             and self._grid_shape == other.grid_shape
-            and tuple(self._data[0].shape) == tuple(other.data[0].shape)
+            and (mode == "physical" or self._original_shape == other.original_shape)
+            and all(
+                left.same_layout(right, mode=mode) for left, right in zip(self._data, other.data)
+            )
         )
+
+    def is_standard_layout(self) -> bool:
+        """Return whether child frames use the unexpanded block shape."""
+        expected = (self._block_shape[0], 1) if self.ndim == 1 else self._block_shape
+        return all(tuple(child.shape) == expected for child in self._data)
 
     def same_metadata(self, other: Any) -> bool:
         """Return ``True`` if layout metadata, encryption status, and dtype match."""

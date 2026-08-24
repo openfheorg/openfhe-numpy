@@ -50,8 +50,8 @@ from ..tensor.block_ctarray import BlockCTArray
 from ..tensor.ctarray import CTArray
 from ..tensor.tensor import FramePacking
 from ..utils._helper_slots_ops import (
-    _create_masking,
-    _get_slot_index,
+    _get_elements_at_slots,
+    _get_packed_slot_index,
     _replicate_pattern,
     _replication_steps,
 )
@@ -166,9 +166,8 @@ def _plan_block_matrix_flatten_moves(
                 col = grid_col * block_cols + cell_col
                 logical_idx = row * cols + col
                 chunk_idx, target_slot = divmod(logical_idx, block_size)
-                source_slot = _get_slot_index(
-                    cell_row,
-                    cell_col,
+                source_slot = _get_packed_slot_index(
+                    (cell_row, cell_col),
                     block.shape,
                     block.order,
                 )
@@ -271,9 +270,8 @@ def _plan_ctarray_cumsum_rotations(
     active_rows, active_cols = tensor.geometry.active
     for row in range(active_rows):
         for col in range(active_cols):
-            slot = _get_slot_index(
-                row,
-                col,
+            slot = _get_packed_slot_index(
+                (row, col),
                 tensor.shape,
                 tensor.order,
             )
@@ -719,24 +717,14 @@ def _flatten_block_matrix_to_c_order_vector(
     blocks = []
     total_cells = prod(block_tensor.original_shape)
     cc = ref_block.crypto_context
-    fixed_manual = cc.GetScalingTechnique() == FIXEDMANUAL
 
     for chunk_idx, chunk in enumerate(chunks):
         data = None
         for (block_idx, rotation), source_slots in chunk.items():
             source = block_tensor.data[block_idx]
-            mask = cc.MakeCKKSPackedPlaintext(
-                _create_masking(source_slots, block_tensor.batch_size),
-                1,
-                source.data.GetLevel(),
-                None,
-                block_tensor.batch_size,
+            term = _get_elements_at_slots(
+                source.data, source_slots, block_tensor.batch_size, rotation
             )
-            term = cc.EvalMult(source.data, mask)
-            if fixed_manual:
-                cc.ModReduceInPlace(term)
-            if rotation:
-                term = cc.EvalRotate(term, rotation)
 
             if data is None:
                 data = term
@@ -822,17 +810,15 @@ def _iter_block_chain_cumsum_with_carry(
                     cell_row, cell_col = lane_idx, last_pos
                 total_slots.append(
                     frame_offset
-                    + _get_slot_index(
-                        cell_row,
-                        cell_col,
+                    + _get_packed_slot_index(
+                        (cell_row, cell_col),
                         ref_block.shape,
                         ref_block.order,
                     )
                 )
 
-    mask_values = _create_masking(total_slots, ref_block.batch_size) if total_slots else None
     total_rotation = (lane_size - 1) * slot_stride
-    masks = {}
+    mask_cache = {}
     carry_total = None
 
     for block_idx in block_chain:
@@ -852,24 +838,13 @@ def _iter_block_chain_cumsum_with_carry(
             result = local_cumsum.clone(data=cc.EvalAdd(local_data, carry))
 
         if not is_last:
-            level = local_cumsum.data.GetLevel()
-            if level not in masks:
-                masks[level] = cc.MakeCKKSPackedPlaintext(
-                    mask_values,
-                    1,
-                    level,
-                    None,
-                    ref_block.batch_size,
-                )
-            total = cc.EvalMult(
+            total = _get_elements_at_slots(
                 local_cumsum.data,
-                masks[level],
+                total_slots,
+                ref_block.batch_size,
+                total_rotation,
+                mask_cache=mask_cache,
             )
-            if cc.GetScalingTechnique() == FIXEDMANUAL:
-                cc.ModReduceInPlace(total)
-
-            if total_rotation:
-                total = cc.EvalRotate(total, total_rotation)
             if carry_total is None:
                 carry_total = total
             else:
