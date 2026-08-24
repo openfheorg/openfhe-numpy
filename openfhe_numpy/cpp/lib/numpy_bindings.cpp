@@ -238,14 +238,29 @@ void bind_matrix_funcs(py::module& m) {
         py::arg("numCols"));
 
     m.def("EvalTranspose",
-        static_cast<Ciphertext<DCRTPoly>(*)(PrivateKey<DCRTPoly>&, ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalTranspose),
-        py::arg("secretKey"),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalTranspose),
         py::arg("ciphertext"),
         py::arg("numCols"));
 
     m.def("EvalTranspose",
-        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t)>(&EvalTranspose),
+        static_cast<Ciphertext<DCRTPoly>(*)(ConstCiphertext<DCRTPoly>&, uint32_t, uint32_t)>(&EvalTranspose),
         py::arg("ciphertext"),
+        py::arg("numRows"),
+        py::arg("numCols"));
+
+    m.def("EvalTransposeKeyGen",
+        [](PrivateKey<DCRTPoly>& secretKey, uint32_t numCols) {
+            EvalTransposeKeyGen(secretKey, numCols);
+        },
+        py::arg("secretKey"),
+        py::arg("numCols"));
+
+    m.def("EvalTransposeKeyGen",
+        [](PrivateKey<DCRTPoly>& secretKey, uint32_t numRows, uint32_t numCols) {
+            EvalTransposeKeyGen(secretKey, numRows, numCols);
+        },
+        py::arg("secretKey"),
+        py::arg("numRows"),
         py::arg("numCols"));
 
     m.def("EvalSquareMatMultRotateKeyGen",

@@ -41,7 +41,7 @@ from typing import Any
 
 import numpy as np
 
-from openfhe_numpy.openfhe_numpy import ArrayEncodingType
+from openfhe_numpy.openfhe_numpy import ArrayEncodingType, EvalTranspose
 from openfhe_numpy.operations.broadcast import (
     _broadcast_to_physical_slots,
     broadcast_to,
@@ -145,17 +145,13 @@ def _normalize_axis(
 
     if isinstance(axis, tuple):
         if "tuple" not in supported:
-            raise ONPNotSupportedError(
-                f"{operation} does not support tuple axes."
-            )
+            raise ONPNotSupportedError(f"{operation} does not support tuple axes.")
         raise ONPNotImplementedError(
             f"tuple-axis normalization is not implemented for {operation}."
         )
 
     if "integer" not in supported:
-        raise ONPNotSupportedError(
-            f"{operation} currently supports only axis=None."
-        )
+        raise ONPNotSupportedError(f"{operation} currently supports only axis=None.")
 
     if isinstance(axis, (bool, np.bool_)):
         raise TypeError("axis must be an integer, not boolean.")
@@ -570,3 +566,21 @@ def _eval_binary(a, b, op_name):
     result = encrypted.clone(result_data)
     result.extra.update(other.extra)
     return result
+
+
+# ------------------------------------------------------------------------------
+# Packing order transform
+# ------------------------------------------------------------------------------
+
+
+def _eval_transform(ciphertext, shape, current_order):
+    """Change the packed order of a matrix."""
+    rows, cols = shape
+
+    if rows == 1 or cols == 1:
+        return ciphertext
+
+    if current_order == ArrayEncodingType.COL_MAJOR:
+        rows, cols = cols, rows
+
+    return EvalTranspose(ciphertext, rows, cols)

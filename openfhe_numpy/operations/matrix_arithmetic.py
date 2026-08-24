@@ -416,7 +416,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
 
     if axis is None:
         # Sum all elements in a packed-encoded matrix ciphertext: fhe_data
-        ct_sum = cc.EvalSum(fhe_data, nrows * ncols - 1)
+        ct_sum = cc.EvalSum(fhe_data, nrows * ncols)
         if keepdims:
             shape, padded_shape = (1, 1), x.shape
         else:
@@ -466,6 +466,9 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
             ct_sum = cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], 0)
+            input_repeats = x.geometry.repeats if x.geometry is not None else 1
+            if input_repeats > 1:
+                ct_sum = cc.EvalMult(ct_sum, 1.0 / input_repeats)
             padded_shape = (ncols, nrows)
             order = ArrayEncodingType.COL_MAJOR
         else:

@@ -30,6 +30,7 @@
 //==============================================================================
 
 #include <limits>
+#include <map>
 #include "numpy_enc_matrix.h"
 #include "numpy_utils.h"
 
@@ -777,6 +778,9 @@ Ciphertext<DCRTPoly> EvalMatMulSquare(ConstPlaintext& ptMatA,
                                      uint32_t numCols) {
     return EvalMatMulSquare(ptMatA->GetRealPackedValue(), ctMatB, numCols);
 }
+// -------------------------------------------------------------
+// TRANSPOSE
+// ------------------------------------------------------------
 /**
  * @brief Computes the transpose of a ciphertext matrix using a private key.
  * @param secretKey The private key used for the operation.
@@ -821,6 +825,106 @@ Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext, uint32
         OPENFHE_THROW("EvalTranspose: Homomorphic operation failed. Details: " + std::string(e.what()));
     }
 };
+
+/**
+ * @brief Computes the transpose of a packed ciphertext matrix.
+ * @param ciphertext The input ciphertext matrix.
+ * @param numRows The number of rows in its row-major physical interpretation.
+ * @param numCols The number of columns in its row-major physical interpretation.
+ * @return The packed transpose, interpreted as a numCols x numRows matrix.
+ */
+Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext,
+                                   uint32_t numRows,
+                                   uint32_t numCols) {
+    try {
+        if (numRows == numCols) {
+            return EvalTranspose(ciphertext, numCols);
+        }
+
+        const auto rotationIndices = GenTransposeRotationIndices(numRows, numCols);
+        const uint32_t matrixSize = numRows * numCols;
+        CryptoContext<DCRTPoly> cc = ciphertext->GetCryptoContext();
+        const uint32_t slots = cc->GetEncodingParams()->GetBatchSize();
+        if (matrixSize > slots || slots % matrixSize != 0) {
+            OPENFHE_THROW("numRows * numCols must divide the ciphertext batch size");
+        }
+
+        Ciphertext<DCRTPoly> ctResult;
+        for (int32_t rotationIndex : rotationIndices) {
+            std::vector<double> diagonalVector(slots, 0.0);
+            for (uint32_t targetSlot = 0; targetSlot < matrixSize; ++targetSlot) {
+                const uint32_t outputRow = targetSlot / numRows;
+                const uint32_t outputCol = targetSlot % numRows;
+                const int32_t sourceSlot = static_cast<int32_t>(outputCol * numCols + outputRow);
+                if (sourceSlot - static_cast<int32_t>(targetSlot) != rotationIndex) {
+                    continue;
+                }
+                for (uint32_t base = 0; base < slots; base += matrixSize) {
+                    diagonalVector[base + targetSlot] = 1.0;
+                }
+            }
+
+            auto ptDiagonal = cc->MakeCKKSPackedPlaintext(diagonalVector);
+            Ciphertext<DCRTPoly> ctProd;
+            if (rotationIndex == 0) {
+                ctProd = cc->EvalMult(ciphertext, ptDiagonal);
+            }
+            else {
+                auto ctRotated = cc->EvalRotate(ciphertext, rotationIndex);
+                ctProd = cc->EvalMult(ctRotated, ptDiagonal);
+            }
+
+            if (!ctResult) {
+                ctResult = ctProd;
+            }
+            else {
+                cc->EvalAddInPlace(ctResult, ctProd);
+            }
+        }
+
+        return ctResult;
+    }
+    catch (const std::exception& e) {
+        OPENFHE_THROW("EvalTranspose: Homomorphic operation failed. Details: " + std::string(e.what()));
+    }
+}
+
+/**
+ * @brief Generates the rotation keys used to transpose square matrices.
+ * @param secretKey The private key used for key generation.
+ * @param numCols The number of rows and columns in each matrix.
+ */
+void EvalTransposeKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols) {
+    EvalLinTransKeyGen(secretKey, numCols, LinTransType::TRANSPOSE);
+}
+
+/**
+ * @brief Generates the rotation keys used to transpose rectangular matrices.
+ * @param secretKey The private key used for key generation.
+ * @param numRows The number of rows in the matrix.
+ * @param numCols The number of columns in the matrix.
+ */
+void EvalTransposeKeyGen(PrivateKey<DCRTPoly>& secretKey,
+                         uint32_t numRows,
+                         uint32_t numCols) {
+    if (numRows == numCols) {
+        EvalTransposeKeyGen(secretKey, numCols);
+        return;
+    }
+
+    const auto transposeRotationIndices = GenTransposeRotationIndices(numRows, numCols);
+    std::vector<int32_t> rotationIndices;
+    rotationIndices.reserve(transposeRotationIndices.size());
+    for (int32_t rotationIndex : transposeRotationIndices) {
+        if (rotationIndex != 0) {
+            rotationIndices.push_back(rotationIndex);
+        }
+    }
+    if (!rotationIndices.empty()) {
+        secretKey->GetCryptoContext()->EvalRotateKeyGen(secretKey, rotationIndices);
+    }
+}
+
 // -------------------------------------------------------------
 // EvalSumAccumulate
 // -------------------------------------------------------------

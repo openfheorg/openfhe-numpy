@@ -41,7 +41,8 @@ std::vector<double> GenSigmaDiag(size_t total_slot, size_t rowsize, int32_t k);
 std::vector<double> GenTauDiag(size_t total_slots, size_t rowsize, int32_t k);
 std::vector<double> GenPhiDiag(size_t total_slot, size_t rowsize, int32_t k, int type);
 std::vector<double> GenPsiDiag(size_t total_slot, size_t rowsize);
-std::vector<double> GenTransposeDiag(size_t total_slots, size_t rowsize, int32_t i);
+std::vector<double> GenTransposeDiag(size_t totalSlots, size_t numCols, int32_t index);
+std::vector<int32_t> GenTransposeRotationIndices(uint32_t numRows, uint32_t numCols);
 void RoundVector(std::vector<double>& vector);
 
 template <typename T>

@@ -277,9 +277,12 @@ void DemoMatrixTranspose() {
 
     TimeVar t;
 
-    // Perform homomorphic transpose
+    // Generate transpose keys separately from evaluation.
+    EvalTransposeKeyGen(keyPair.secretKey, paddedCols);
+
+    // Perform homomorphic transpose.
     TIC(t);
-    auto encryptedTranspose = EvalTranspose(keyPair.secretKey, ctMatA, paddedCols);
+    auto encryptedTranspose = EvalTranspose(ctMatA, paddedCols);
     double timeEval         = TOC(t);
 
     // Decrypt and display results
