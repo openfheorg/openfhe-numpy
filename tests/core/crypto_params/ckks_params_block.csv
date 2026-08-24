@@ -1,0 +1,2 @@
+ptModulus,digitSize,standardDeviation,secretKeyDist,maxRelinSkDeg,ksTech,scalTech,firstModSize,batchSize,numLargeDigits,multiplicativeDepth,scalingModSize,securityLevel,ringDim
+0,0,3.19,UNIFORM_TERNARY,2,HYBRID,FIXEDAUTO,60,256,3,4,59,HEStd_NotSet,512
