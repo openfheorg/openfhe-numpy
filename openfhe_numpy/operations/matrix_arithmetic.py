@@ -47,6 +47,7 @@ from .dispatch import register_tensor_function
 
 from openfhe_numpy.tensor.ctarray import CTArray
 from openfhe_numpy.tensor.tensor import FramePacking
+from openfhe_numpy.utils._helper_slots_ops import _get_elements_at_slots
 from openfhe_numpy.utils.errors import (
     ONPError,
     ONPIncompatibleShapeError,
@@ -160,7 +161,11 @@ def _eval_matvec_ct(lhs, rhs):
 
         elif lhs.order == ArrayEncodingType.COL_MAJOR and rhs.order == ArrayEncodingType.ROW_MAJOR:
             ct_mult = cc.EvalMult(lhs.data, rhs.data)
-            ct_prod = cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], 0)
+            ct_prod = (
+                ct_mult
+                if lhs.nrows == cc.GetBatchSize()
+                else cc.EvalSumRows(ct_mult, lhs.nrows, lhs.extra["rowkey"], 4 * cc.GetBatchSize())
+            )
             return CTArray(
                 ct_prod,
                 (lhs.original_shape[0],),
@@ -228,8 +233,7 @@ def _matmul_ct(lhs, rhs):
         return _eval_matvec_ct(lhs, rhs)
     else:
         raise ValueError(
-            f"Dimension mismatch for multiplication "
-            f"({lhs.original_shape} @ {rhs.original_shape})"
+            f"Dimension mismatch for multiplication ({lhs.original_shape} @ {rhs.original_shape})"
         )
 
 
@@ -418,6 +422,7 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
     """
 
     cc = x.data.GetCryptoContext()
+    batch_size = cc.GetBatchSize()
     rows, cols = x.original_shape
     nrows, ncols = x.shape
     order = x.order
@@ -434,7 +439,11 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
     elif axis == 0:
         # Sum across each row of a packed_encoded matrix ciphertext: fhe_data
         if order == ArrayEncodingType.ROW_MAJOR:
-            ct_sum = cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], 0)
+            ct_sum = (
+                fhe_data
+                if ncols == batch_size
+                else cc.EvalSumRows(fhe_data, ncols, x.extra["rowkey"], 4 * batch_size)
+            )
             input_repeats = x.geometry.repeats if x.geometry is not None else 1
             if input_repeats > 1:
                 ct_sum = cc.EvalMult(ct_sum, 1.0 / input_repeats)
@@ -474,11 +483,15 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
             padded_shape = x.shape
             order = ArrayEncodingType.ROW_MAJOR
         elif order == ArrayEncodingType.COL_MAJOR:
-            ct_sum = cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], 0)
+            ct_sum = (
+                fhe_data
+                if nrows == batch_size
+                else cc.EvalSumRows(fhe_data, nrows, x.extra["rowkey"], 4 * batch_size)
+            )
             input_repeats = x.geometry.repeats if x.geometry is not None else 1
             if input_repeats > 1:
                 ct_sum = cc.EvalMult(ct_sum, 1.0 / input_repeats)
-            padded_shape = (ncols, nrows)
+            padded_shape = x.shape
             order = ArrayEncodingType.COL_MAJOR
         else:
             raise ONPNotSupportedError(f"Not support the current encoding [{order}]")
@@ -491,7 +504,18 @@ def _ct_sum_matrix(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = Tr
     else:
         raise ONPValueError(f"Invalid axis [{axis}]")
 
-    return CTArray(ct_sum, shape, x.batch_size, padded_shape, order)
+    geometry = None
+    if axis is not None and not keepdims and x.geometry is not None:
+        if order == ArrayEncodingType.COL_MAJOR:
+            repeats = x.batch_size // (nrows * ncols)
+        else:
+            repeats = x.geometry.repeats
+        geometry = FramePacking(
+            active=(shape[0], padded_shape[1]),
+            padding="zero",
+            repeats=repeats,
+        )
+    return CTArray(ct_sum, shape, x.batch_size, padded_shape, order, geometry=geometry)
 
 
 def _ct_sum_vector(
@@ -501,7 +525,19 @@ def _ct_sum_vector(
     crypto_context = x.data.GetCryptoContext()
     if axis not in (None, 0):
         raise ONPDimensionError(f"The dimension is invalid axis = {axis}")
-    ct_sum = crypto_context.EvalSum(x.data, x.shape[0])
+    fhe_data = x.data
+    size = x.shape[0]
+    copies = 1
+    if x.order == ArrayEncodingType.ROW_MAJOR and len(x.shape) == 2 and x.shape[1] > 1:
+        size *= x.shape[1]
+        if x.geometry is None:
+            slots = range(0, x.original_shape[0] * x.shape[1], x.shape[1])
+            fhe_data = _get_elements_at_slots(fhe_data, slots, x.batch_size, 0)
+        else:
+            copies = x.shape[1] if x.geometry.padding == "tile" else x.geometry.active[1]
+    ct_sum = crypto_context.EvalSum(fhe_data, size)
+    if copies > 1:
+        ct_sum = crypto_context.EvalMult(ct_sum, 1.0 / copies)
     return CTArray(ct_sum, (), x.batch_size, x.shape, x.order)
 
 
@@ -509,11 +545,26 @@ def _ct_sum_vector(
 def sum_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
     if x.ndim not in (1, 2):
         raise ONPDimensionError(f"sum requires a vector or matrix; got {x.ndim}D.")
+    if x.batch_size != x.data.GetCryptoContext().GetBatchSize():
+        raise ONPValueError("sum requires batch_size to match the context batch size.")
 
     axis = _normalize_axis("sum", axis, x.ndim)
     if x.ndim == 2:
-        return _ct_sum_matrix(x, axis, keepdims)
-    return _ct_sum_vector(x, axis)
+        result = _ct_sum_matrix(x, axis, keepdims)
+    else:
+        result = _ct_sum_vector(x, axis)
+    if result.ndim == 0:
+        # Keep only the scalar total; the other slots can contain partial sums.
+        ct_sum = _get_elements_at_slots(result.data, (0,), x.batch_size, 0)
+        return CTArray(
+            ct_sum,
+            (),
+            x.batch_size,
+            (1, 1),
+            result.order,
+            geometry=FramePacking(active=(1, 1), padding="zero", repeats=1),
+        )
+    return result
 
 
 # ------------------------------------------------------------------------------
@@ -543,13 +594,7 @@ def mean_ct(x: ArrayLike, axis: Optional[int] = None, keepdims: bool = False):
 
     ct_mean = cc.EvalMult(sum_x.data, 1.0 / count)
 
-    return CTArray(
-        ct_mean,
-        sum_x.original_shape,
-        sum_x.batch_size,
-        sum_x.shape,
-        sum_x.order,
-    )
+    return sum_x.clone(ct_mean)
 
 
 # ------------------------------------------------------------------------------
@@ -571,9 +616,7 @@ def roll(x: ArrayLike, shift: int, axis: Optional[int] = None) -> ArrayLike:
 
     axis = _normalize_axis("roll", axis, x.ndim)
     if axis is not None:
-        raise ONPNotSupportedError(
-            "roll currently supports only packed vectors with axis=None."
-        )
+        raise ONPNotSupportedError("roll currently supports only packed vectors with axis=None.")
     return _ct_vector_rotation(x, -shift)
 
 

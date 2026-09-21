@@ -51,10 +51,7 @@ class TestMatrixCumulativeSumRow(MainUnittest):
                                     public_key=keys.publicKey,
                                 )
 
-                                if order_value == onp.ROW_MAJOR:
-                                    onp.gen_accumulate_rows_key(keys.secretKey, ctm.ncols)
-                                else:
-                                    onp.gen_accumulate_cols_key(keys.secretKey, ctm.ncols)
+                                onp.gen_cumsum_key(keys.secretKey, ctm, axis=0)
 
                                 ctm_result = onp.cumsum(ctm, axis=0)
                                 result = ctm_result.decrypt(keys.secretKey, unpack_type="original")
@@ -114,10 +111,7 @@ class TestMatrixCumulativeSumCol(MainUnittest):
                                     public_key=keys.publicKey,
                                 )
 
-                                if order_value == onp.ROW_MAJOR:
-                                    onp.gen_accumulate_cols_key(keys.secretKey, ctm.ncols)
-                                else:
-                                    onp.gen_accumulate_rows_key(keys.secretKey, ctm.ncols)
+                                onp.gen_cumsum_key(keys.secretKey, ctm, axis=1)
 
                                 ctm_result = onp.cumsum(ctm, axis=1)
                                 result = ctm_result.decrypt(keys.secretKey, unpack_type="original")

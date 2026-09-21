@@ -75,15 +75,23 @@ def sum_row_keys(secret_key: openfhe.PrivateKey, ncols: int = 0, slots: int = 0)
     ncols : int, optional
         Number of cols for the matrix, by default 0
     slots: int
-        The total plaintext slots
+        The total plaintext slots; if provided, must match the context batch size
 
     Returns
     -------
     object
-        Generated sum keys
+        Generated sum keys, or None when no row rotation is needed
     """
     context = secret_key.GetCryptoContext()
-    return context.EvalSumRowsKeyGen(secret_key, None, ncols, 0)
+    batch_size = context.GetBatchSize()
+    if slots not in (0, batch_size):
+        raise ONPValueError("slots must match the context batch size.")
+    if not 0 < ncols <= batch_size:
+        raise ONPValueError("ncols must be positive and no larger than the batch size.")
+    if ncols == batch_size:
+        return None
+    # EvalSumRows takes a cyclotomic order, which is four times the CKKS slot count.
+    return context.EvalSumRowsKeyGen(secret_key, None, ncols, 4 * batch_size)
 
 
 def sum_col_keys(secret_key: openfhe.PrivateKey, ncols: int = 0):
