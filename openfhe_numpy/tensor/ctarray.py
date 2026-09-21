@@ -34,7 +34,7 @@ import numpy as np
 import openfhe
 
 
-from ..openfhe_numpy import EvalCumSum, EvalTranspose
+from ..openfhe_numpy import EvalCumSum, EvalTranspose, ArrayEncodingType
 from ..utils.matlib import is_power_of_two, next_power_of_two
 from ..utils.constants import UnpackType
 from ..utils.errors import ONPDimensionError, ONPError
@@ -191,7 +191,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             return self
         else:
             raise NotImplementedError("This function is not implemented with dimension > 2")
-        return CTArray(
+        result = CTArray(
             ciphertext,
             pre_padded_shape,
             self.batch_size,
@@ -199,6 +199,9 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.order,
             geometry=geometry,
         )
+        if "colkey" in self.extra:
+            result.extra["colkey"] = self.extra["colkey"]
+        return result
 
     def transform(self, order: int) -> "CTArray":
         """Convert COL_MAJOR to ROW_MAJOR and vice versal"""
@@ -217,7 +220,7 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             self.shape,
             self.order,
         )
-        return CTArray(
+        result = CTArray(
             ciphertext,
             self.original_shape,
             self.batch_size,
@@ -225,6 +228,9 @@ class CTArray(FHETensor[openfhe.Ciphertext]):
             order,
             geometry=self.geometry,
         )
+        if "colkey" in self.extra:
+            result.extra["colkey"] = self.extra["colkey"]
+        return result
 
     def cumsum(self, axis=None) -> "CTArray":
         """Compute cumulative sums using the logical tensor geometry.

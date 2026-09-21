@@ -118,7 +118,7 @@ class TestMatrixBinaryOps(MainUnittest):
         self._run(*OPS_BINARY[2])
 
     def test_dot(self):
-        self._run(*OPS_BINARY[2])
+        self._run(*OPS_BINARY[3])
 
     def _run(self, tag, np_fn, fhe_fn):
 
@@ -138,8 +138,8 @@ class TestMatrixBinaryOps(MainUnittest):
                     A = generate_random_array(rows=size, cols=size)
                     B = generate_random_array(rows=size, cols=size)
                     expected = np_fn(A, B)
-                    if tag == "mul":
-                        onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, size)
+                    if tag == "dot":
+                        onp.EvalSquareMatMultRotateKeyGen(keys.secretKey, onp.next_power_of_two(size))
 
                     for order_name, order_value in ORDERS:
                         for mode in MODES_BINARY:

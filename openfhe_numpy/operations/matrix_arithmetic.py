@@ -196,6 +196,15 @@ def _matmul_ct(lhs, rhs):
             "Matrix multiplication requires matching square physical frames.",
             error_cls=ONPValueError,
         )
+        if lhs.order != rhs.order:
+            raise ONPValueError("Matrix multiplication requires matching packing orders.")
+
+        if lhs.order == ArrayEncodingType.COL_MAJOR:
+            # The row-major kernel computes B.T @ A.T, stored as column-major A @ B.
+            ciphertext = EvalMatMulSquare(rhs.data, lhs.data, lhs.ncols)
+        else:
+            ciphertext = EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols)
+
         result_shape = (lhs.original_shape[0], rhs.original_shape[1])
         geometry = None
         if lhs.geometry is not None and rhs.geometry is not None:
@@ -206,7 +215,7 @@ def _matmul_ct(lhs, rhs):
             )
 
         return CTArray(
-            EvalMatMulSquare(lhs.data, rhs.data, lhs.ncols),
+            ciphertext,
             result_shape,
             lhs.batch_size,
             lhs.shape,
