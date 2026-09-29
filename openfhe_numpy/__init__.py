@@ -1,4 +1,7 @@
-# import os
+# Import openfhe first to preload its bundled shared libraries. The
+# openfhe_numpy extension's RUNPATH applies to its direct dependencies but is
+# not used when libOPENFHEpke resolves libOPENFHEbinfhe transitively.
+import openfhe as _openfhe
 
 # import from the cpp backend
 from .openfhe_numpy import *
