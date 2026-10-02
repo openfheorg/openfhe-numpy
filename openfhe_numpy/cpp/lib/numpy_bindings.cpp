@@ -50,6 +50,11 @@ PYBIND11_MODULE(openfhe_numpy, m) {
     m.attr("__description__") = "Python bindings for OpenFHE-Numpy homomorphic operations";
     m.attr("__license__")     = "MIT";
 
+// Package version comes from CMakeLists.txt (OPENFHE_NUMPY_VERSION)
+#ifdef OPENFHE_NUMPY_VERSION
+    m.attr("__version__") = OPENFHE_NUMPY_VERSION;
+#endif
+
 // Add OpenFHE version if available
 #ifdef OPENFHE_VERSION
     // Different OpenFHE versions define the version differently

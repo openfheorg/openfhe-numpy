@@ -7,7 +7,7 @@ Prerequisites
 -------------
 
 - Python 3.10+
-- OpenFHE library (version 1.5.1+)
+- OpenFHE library (version |openfhe_min_version|+)
 - NumPy
 - CMake (for building from source)
 

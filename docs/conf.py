@@ -1,5 +1,6 @@
 # conf.py
 import os
+import re
 import sys
 
 this_dir = os.path.dirname(__file__)
@@ -7,11 +8,31 @@ repo_root = os.path.abspath(os.path.join(this_dir, ".."))
 if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
+# Versions are defined once in CMakeLists.txt; parse them from there.
+with open(os.path.join(repo_root, "CMakeLists.txt")) as _f:
+    _cmake = _f.read()
+
+
+def _cmake_version_part(part):
+    return re.search(rf"set\(OPENFHE_NUMPY_VERSION_{part}\s+(\d+)\)", _cmake).group(1)
+
+
+openfhe_min_version = re.search(
+    r'set\(OPENFHE_REQUIRED_VERSION\s+"([^"]+)"', _cmake
+).group(1)
+
 # -- Project information -----------------------------------------------------
 project = "OpenFHE-Numpy"
 author = "Ahmad Al Badawi, Tran Ngo, Yuriy Polyakov, Dmitriy Suponitskiy"
 copyright = f"2025, {author}"
-version = release = "1.5.1.0"
+version = release = ".".join(
+    _cmake_version_part(p) for p in ("MAJOR", "MINOR", "PATCH", "TWEAK")
+)
+
+# Substitution usable in any .rst file (|version| and |release| are built in)
+rst_prolog = f"""
+.. |openfhe_min_version| replace:: {openfhe_min_version}
+"""
 language = "en"
 
 extensions = [
