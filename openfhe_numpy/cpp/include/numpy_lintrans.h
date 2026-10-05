@@ -56,8 +56,10 @@ using namespace lbcrypto;
 //            extended basis Q_l*P (EvalFastRotationExt/EvalMultExt), giant steps
 //            via EvalHornerGiantRotate, and a single KeySwitchDown at the end
 //
-// AUTO picks BSGS_DH when the parameters support it (HYBRID key switching,
-// FLEXIBLEAUTO/FLEXIBLEAUTOEXT/FIXEDAUTO, no composite scaling), BSGS otherwise.
+// AUTO picks BSGS. BSGS_DH needs HYBRID key switching, FLEXIBLEAUTO/FLEXIBLEAUTOEXT/FIXEDAUTO
+// and no composite scaling (it falls back to BSGS otherwise). Because diagonals are encoded on
+// the fly here (bootstrapping precomputes them), encoding in the larger Q_l*P basis outweighs the
+// saved ModDowns: at BERT shapes (ring 2^16, d = 128, 72 cores) BSGS was 1.1-1.2x faster.
 // The global default can be set with SetLinTransAlgo() or the environment
 // variable OPENFHE_NUMPY_LT_ALGO=naive|bsgs|dh|auto.
 //

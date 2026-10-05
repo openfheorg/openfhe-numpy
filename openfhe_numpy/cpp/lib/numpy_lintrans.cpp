@@ -252,9 +252,12 @@ struct Plan {
     std::vector<int32_t> cell;         // size G * b, index into terms or -1
 };
 
+// Baby steps are hoisted and evaluated in parallel, giant steps are sequential full key switches,
+// so a few large groups (G ~ 4) beat the classic sqrt(span) balance on many-core machines
+// (BERT shapes, ring 2^16, 72 cores: b = 64 vs 16 is 1.7x faster for 255 diagonals).
 uint32_t DefaultBabyStep(int64_t span) {
     uint32_t b = 1;
-    const double target = std::sqrt(static_cast<double>(span));
+    const double target = std::max(std::sqrt(static_cast<double>(span)), static_cast<double>(span) / 4.0);
     while (static_cast<double>(b) < target)
         b <<= 1;
     return b;
@@ -609,8 +612,10 @@ void RequireRelinearized(ConstCiphertext<DCRTPoly>& ciphertext) {
 
 LinTransAlgo ResolveLinTransAlgo(ConstCiphertext<DCRTPoly>& ciphertext, LinTransAlgo requested) {
     LinTransAlgo algo = (requested == LinTransAlgo::AUTO) ? GetLinTransAlgo() : requested;
+    // Measured faster than BSGS_DH when diagonals are encoded on the fly (the extended-basis
+    // plaintexts cost more to encode than the saved ModDowns), see numpy_lintrans.h.
     if (algo == LinTransAlgo::AUTO)
-        algo = LinTransAlgo::BSGS_DH;
+        algo = LinTransAlgo::BSGS;
     if (algo == LinTransAlgo::BSGS_DH && !DoubleHoistingSupported(CkksParams(ciphertext)))
         algo = LinTransAlgo::BSGS;
     return algo;
