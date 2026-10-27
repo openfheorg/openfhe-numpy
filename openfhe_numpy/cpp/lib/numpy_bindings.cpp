@@ -374,11 +374,10 @@ void bind_lintrans(py::module& m) {
     py::enum_<LinTransAlgo>(m, "LinTransAlgo")
         .value("AUTO", LinTransAlgo::AUTO)
         .value("NAIVE", LinTransAlgo::NAIVE)
-        .value("BSGS", LinTransAlgo::BSGS)
-        .value("BSGS_DH", LinTransAlgo::BSGS_DH);
+        .value("BSGS", LinTransAlgo::BSGS);
 
     m.def("SetLinTransAlgo", &SetLinTransAlgo, py::arg("algo"),
-          "Select the linear-transform strategy: AUTO, NAIVE, BSGS or BSGS_DH (double-hoisted BSGS).");
+          "Select the linear-transform strategy: AUTO, NAIVE or BSGS.");
     m.def("GetLinTransAlgo", &GetLinTransAlgo, "Return the configured linear-transform strategy.");
     m.def("SetLinTransBabyStep", &SetLinTransBabyStep, py::arg("bStep"),
           "Baby-step size for BSGS linear transforms (0 = heuristic).");

@@ -45,23 +45,22 @@ using namespace lbcrypto;
 // Generic homomorphic linear transform (issue #41)
 // -----------------------------------------------------------------------------
 // Computes  y = sum_t diag_t (.) Rot_{offset_t}(x),  Rot_r(x)[i] = x[(i + r) mod S],
-// with S the context batch size. Three evaluation strategies are available:
+// with S the context batch size. Two evaluation strategies are available:
 //
 //   NAIVE    one full EvalRotate + EvalMult per diagonal (legacy behaviour)
 //   BSGS     baby-step giant-step: baby rotations hoisted from a single digit
 //            decomposition (EvalFastRotationPrecompute/EvalFastRotation), Horner
 //            accumulation over a single giant stride
-//   BSGS_DH  double-hoisted BSGS, as in OpenFHE's CKKS bootstrapping linear
-//            transforms: baby rotations and plaintext products stay in the
-//            extended basis Q_l*P (EvalFastRotationExt/EvalMultExt), giant steps
-//            via EvalHornerGiantRotate, and a single KeySwitchDown at the end
 //
-// AUTO picks BSGS. BSGS_DH needs HYBRID key switching, FLEXIBLEAUTO/FLEXIBLEAUTOEXT/FIXEDAUTO
-// and no composite scaling (it falls back to BSGS otherwise). Because diagonals are encoded on
-// the fly here (bootstrapping precomputes them), encoding in the larger Q_l*P basis outweighs the
-// saved ModDowns: at BERT shapes (ring 2^16, d = 128, 72 cores) BSGS was 1.1-1.2x faster.
-// The global default can be set with SetLinTransAlgo() or the environment
-// variable OPENFHE_NUMPY_LT_ALGO=naive|bsgs|dh|auto.
+// AUTO picks BSGS. The global default can be set with SetLinTransAlgo() or the environment
+// variable OPENFHE_NUMPY_LT_ALGO=naive|bsgs|auto.
+//
+// Double hoisting (keeping baby rotations and plaintext products in the extended basis Q_l*P
+// with one ModDown at the end, as CKKS bootstrapping does) is deliberately not offered. It costs
+// a lot of memory and saves little latency. Encoded on every call, the Q_l*P diagonals made it
+// 1.1-1.3x slower than BSGS. Cached across calls, it was only 3-5% faster per matmul, but needed
+// about 9 MB per diagonal (2.3 GB per 128x128 ct @ pt at ring 2^16, about 70 GB for BERT-Tiny).
+// Measured on BERT-Tiny, secure profile, 72 cores.
 //
 // The baby/giant split is only ever chosen among rotations whose keys exist,
 // falling back to hoisting-only (a single giant group) when no split is
@@ -74,7 +73,6 @@ enum class LinTransAlgo : uint8_t {
     AUTO    = 0,
     NAIVE   = 1,
     BSGS    = 2,
-    BSGS_DH = 3,
 };
 
 void SetLinTransAlgo(LinTransAlgo algo);
@@ -119,20 +117,15 @@ std::vector<int32_t> LinearTransformRotationIndices(const std::vector<int32_t>& 
 // The input is rescaled once if its noise-scale degree is above one (auto rescaling modes only).
 class HoistedCiphertext {
 public:
-    HoistedCiphertext(ConstCiphertext<DCRTPoly>& ciphertext, bool extended);
+    explicit HoistedCiphertext(ConstCiphertext<DCRTPoly>& ciphertext);
 
     const Ciphertext<DCRTPoly>& Get() const {
         return m_ct;
     }
-    bool IsExtended() const {
-        return m_extended;
-    }
 
-    Ciphertext<DCRTPoly> Rotate(int32_t index) const;     // Q_l basis
-    Ciphertext<DCRTPoly> RotateExt(int32_t index) const;  // Q_l*P basis (requires extended)
+    Ciphertext<DCRTPoly> Rotate(int32_t index) const;
 
     Plaintext Encode(const std::vector<double>& values) const;     // at the ciphertext level
-    Plaintext EncodeExt(const std::vector<double>& values) const;  // at the ciphertext level, Q_l*P basis
 
     // sum_t diag_t (.) Rot_{offset_t}(x), all rotations hoisted, no giant steps
     Ciphertext<DCRTPoly> MaskedRotationSum(const std::vector<int32_t>& offsets,
@@ -141,8 +134,6 @@ public:
 private:
     Ciphertext<DCRTPoly> m_ct;
     std::shared_ptr<std::vector<DCRTPoly>> m_digits;
-    std::shared_ptr<ILDCRTParams<DCRTPoly::Integer>> m_paramsQlP;
-    bool m_extended;
     uint32_t m_m;
     uint32_t m_slots;
 };

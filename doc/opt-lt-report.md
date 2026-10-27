@@ -18,16 +18,13 @@ OpenFHE C++ v1.6.0 and the `openfhe` 1.6.0 Python wheel were used unchanged; onl
 
 ## Optimizations
 
-1. **One linear-transform subroutine.** `EvalLinearTransform(ct, offsets, diagonals, algo)` in `numpy_lintrans.{h,cpp}` computes y = Σ diag_t ⊙ Rot(offset_t)(x). Sigma, Tau, Phi, Psi and transpose (square and rectangular) are now thin wrappers that build their diagonals and call it. Three strategies are available:
+1. **One linear-transform subroutine.** `EvalLinearTransform(ct, offsets, diagonals, algo)` in `numpy_lintrans.{h,cpp}` computes y = Σ diag_t ⊙ Rot(offset_t)(x). Sigma, Tau, Phi, Psi and transpose (square and rectangular) are now thin wrappers that build their diagonals and call it. Two strategies are available:
    - **NAIVE:** one `EvalRotate` plus one `EvalMult` per diagonal. This is the legacy behaviour.
    - **BSGS:** baby-step giant-step.
      - Every baby rotation is hoisted from one digit decomposition (`EvalFastRotationPrecompute` / `EvalFastRotation`).
      - Diagonals are pre-rotated in the clear.
      - Giant steps use Horner accumulation over a single stride, so only one giant key is needed.
-   - **BSGS_DH:** double-hoisted BSGS, modeled on the CKKS-bootstrapping linear transforms (`SWITCHCKKSRNS::EvalLTWithPrecomputeSwitch`).
-     - Baby rotations and plaintext products stay in the extended basis Q_l·P (`EvalFastRotationExt`, `EvalMultExt`).
-     - Giant steps use `EvalHornerGiantRotate`.
-     - A single `KeySwitchDown` runs at the end.
+   - Double-hoisted BSGS (BSGS_DH) was implemented, measured and then removed. See "Why double hoisting was removed" below.
    - **Planner:** finds the arithmetic progression of the offsets and picks a baby/giant split. It uses only rotations whose keys already exist, and only when the split saves key switches; otherwise every rotation is hoisted in a single group. As a result, existing key-generation calls keep working unchanged.
    - **Diagonal encoding:** diagonals are encoded at the ciphertext's level, which avoids the legacy level-0 encode followed by an adjust step.
    - **Parallelism:** baby rotations and per-group products run in parallel under OpenMP.
@@ -53,7 +50,7 @@ OpenFHE C++ v1.6.0 and the `openfhe` 1.6.0 Python wheel were used unchanged; onl
 
 | Control | Default | Notes |
 |---|---|---|
-| `SetLinTransAlgo` / `OPENFHE_NUMPY_LT_ALGO` = `naive\|bsgs\|dh\|auto` | `auto` → BSGS | BSGS_DH needs HYBRID and FLEXIBLEAUTO/FLEXIBLEAUTOEXT/FIXEDAUTO; otherwise it falls back to BSGS |
+| `SetLinTransAlgo` / `OPENFHE_NUMPY_LT_ALGO` = `naive\|bsgs\|auto` | `auto` → BSGS | any other value is rejected with a warning and `auto` is used |
 | `SetLinTransBabyStep` / `OPENFHE_NUMPY_LT_BSTEP` | next power of two ≥ max(√span, span/4) | 64 for 255 diagonals, 32 for Tau at d = 128 |
 | `SetLinTransThreads` / `OPENFHE_NUMPY_LT_THREADS` | OpenMP maximum | upper bound for the outer parallel loops |
 | `OPENFHE_NUMPY_LT_PAR_MIN` | 4 | smaller loops run sequentially, so OpenFHE's own per-tower threads stay active |
@@ -74,7 +71,7 @@ Parameters:
 | original wheel | 24.44 s | 48.52 s | 3 | 68.9 GB |
 | opt-lt NAIVE | 24.65 s | 36.63 s | 3 | 52.7 GB |
 | opt-lt BSGS, b = 16 / 32 / 64 | 1.00 / 0.69 / 0.60 s | 3.25 / 2.75 / 2.66 s | 1 | 52.7 GB |
-| opt-lt BSGS_DH, b = 16 / 32 / 64 | 1.16 / 0.83 / 0.73 s | 3.65 / 3.12 / 3.04 s | 1 | 52.7 GB |
+| BSGS_DH (removed), b = 16 / 32 / 64 | 1.16 / 0.83 / 0.73 s | 3.65 / 3.12 / 3.04 s | 1 | 52.7 GB |
 | **opt-lt default (BSGS, tuned b)** | **0.62 s (39×)** | **2.70 s (18×)** | 1 | 52.7 GB |
 
 ct @ ct versus thread count, at the then-default baby step b = 16:
@@ -82,17 +79,23 @@ ct @ ct versus thread count, at the then-default baby step b = 16:
 | Strategy | T = 16 | T = 36 | T = 72 |
 |---|---|---|---|
 | BSGS | 5.04 s | 3.70 s | 3.25 s |
-| DH | 5.14 s | 4.02 s | 3.65 s |
+| DH (removed) | 5.14 s | 4.02 s | 3.65 s |
 
 T = 72 is fastest, so the default stays at the OpenMP maximum.
 
-**Why BSGS beats BSGS_DH here.** Bootstrapping precomputes its diagonal plaintexts once. openfhe-numpy encodes them on every call, and encoding in the larger Q_l·P basis costs more than the ModDowns that double hoisting saves. BSGS_DH would pay off if diagonals were cached across calls, for example fixed weights reused over many inferences.
+**Why double hoisting was removed.** Double hoisting keeps the baby rotations and the plaintext products in the extended basis Q_l·P and runs one ModDown at the end, as CKKS bootstrapping does. It costs a lot of memory and saves little latency:
+- Encoded on every call, the Q_l·P diagonals made BSGS_DH 1.1–1.3× slower than BSGS (table above).
+- A follow-up experiment cached the encoded Q_l·P diagonals across calls, as bootstrapping does. With a warm cache, ct @ pt took 0.66 s against 0.68 s for BSGS, and ct @ ct took 2.96 s against 3.10 s: only 3–5% faster.
+- Each cached diagonal is about 9 MB at ring 2^16. One 128 × 128 ct @ pt needs 2.3 GB, so all of BERT-Tiny would need about 70 GB on top of the 76 GB the run already uses.
+- End to end with a 20 GB cache budget (second of two passes in one process), BERT-Tiny took 431.3 s against 414.5 s for BSGS under the same host load.
+
+The strategy was therefore removed. Single hoisting (one digit decomposition shared by all baby rotations) is kept.
 
 ## End-to-end: enc-bert-tiny-onp
 
 Command: `run_fhe.py --profile secure`, run from an unmodified copy of the app. VmRSS and VmHWM were sampled every 2 s.
 
-| Operation | Before: count, time | After (BSGS): count, time | After (DH): count, time |
+| Operation | Before: count, time | After (BSGS): count, time | DH (removed): count, time |
 |---|---|---|---|
 | matmul_ctpt | 26, 696.59 s | 26, 16.90 s | 26, — |
 | matmul_ctct | 8, 471.78 s | 8, 28.16 s | 8, — |
@@ -123,7 +126,8 @@ ICE-Lake is a shared host: the load average was about 15 when the default run st
   | `dev` baseline | 61/61 | 473 s |
   | opt-lt NAIVE | 61/61 | 474 s |
   | opt-lt BSGS | 61/61 | 453 s |
-  | opt-lt DH | 61/61 | 454 s |
+  | opt-lt DH (before removal) | 61/61 | 454 s |
+  | opt-lt BSGS, DH removed | 61/61 | 462 s |
 
 - **Examples:** 19/23 Python examples and both C++ demos pass under every strategy. The other four fail identically on unmodified `dev`, so they were already broken:
   - `simple_matrix_vector_product`
@@ -131,7 +135,7 @@ ICE-Lake is a shared host: the load average was about 15 when the default run st
   - `simple_slicing`
   - `simple_vector_operations`
 - **Smoke test against numpy:** 264 checks, all passing. It covers:
-  - NAIVE, BSGS and DH.
+  - NAIVE, BSGS and DH (DH before its removal).
   - Batch sizes S = d² < N/2, S = 2d², S = 4d² and S = d² = N/2.
   - Scaling: FLEXIBLEAUTO, FLEXIBLEAUTOEXT, FIXEDAUTO, FIXEDMANUAL.
   - Key switching: HYBRID and BV.
@@ -142,6 +146,6 @@ ICE-Lake is a shared host: the load average was about 15 when the default run st
 
 ## Behaviour changes to note
 
-- ct @ pt and pt @ ct consume 1 level instead of 3. This applies under BSGS and DH; NAIVE and FIXEDMANUAL are unchanged.
+- ct @ pt and pt @ ct consume 1 level instead of 3. This applies under BSGS; NAIVE and FIXEDMANUAL are unchanged.
 - When batch = d², `EvalSquareMatMultRotateKeyGen` and `EvalLinTransKeyGen(TAU/PSI)` generate fewer keys. Code that rotates by d·k − d² using those keys must either use d·k or set `OPENFHE_NUMPY_CANONICAL_KEYS=0`.
 - ct @ ct holds up to about 1.3 GB of extra transient memory at BERT sizes, from its parallel k-loop.

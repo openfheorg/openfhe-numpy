@@ -707,14 +707,12 @@ Ciphertext<DCRTPoly> EvalMatMulSquareLegacy(ConstCiphertext<DCRTPoly>& matrixA,
 }
 
 // JKLS with hoisting: Sigma(A) and Tau(B) are BSGS linear transforms; every Phi_k(Sigma(A))
-// rotation shares one digit decomposition of Sigma(A) (in the extended basis for BSGS_DH, one
-// KeySwitchDown per k), every Psi_k(Tau(B)) rotation shares one decomposition of Tau(B) (a bare
-// rotation when the batch size is d^2), products are accumulated without relinearization, and
-// the k-loop runs in parallel.
+// rotation shares one digit decomposition of Sigma(A), every Psi_k(Tau(B)) rotation shares one
+// decomposition of Tau(B) (a bare rotation when the batch size is d^2), products are accumulated
+// without relinearization, and the k-loop runs in parallel.
 Ciphertext<DCRTPoly> EvalMatMulSquareHoisted(ConstCiphertext<DCRTPoly>& matrixA,
                                              ConstCiphertext<DCRTPoly>& matrixB,
-                                             uint32_t numCols,
-                                             LinTransAlgo algo) {
+                                             uint32_t numCols) {
     CryptoContext<DCRTPoly> cc = matrixA->GetCryptoContext();
     const size_t slots = cc->GetEncodingParams()->GetBatchSize();
     ValidateCompactSquareTransform(slots, numCols);
@@ -722,7 +720,6 @@ Ciphertext<DCRTPoly> EvalMatMulSquareHoisted(ConstCiphertext<DCRTPoly>& matrixA,
     const int32_t nCols = static_cast<int32_t>(numCols);
     const int32_t blockSize = nCols * nCols;
     const bool canonical = UseCanonicalRowShifts(matrixB, numCols);
-    const bool extended = (algo == LinTransAlgo::BSGS_DH);
 
     // every rotation of the k-loop, checked before entering the parallel region
     std::vector<int32_t> phiPsiKeys;
@@ -739,8 +736,8 @@ Ciphertext<DCRTPoly> EvalMatMulSquareHoisted(ConstCiphertext<DCRTPoly>& matrixA,
     Ciphertext<DCRTPoly> ctSigmaA = EvalLinTransSigma(matrixA, numCols);
     Ciphertext<DCRTPoly> ctTauB   = EvalLinTransTau(matrixB, numCols);
 
-    HoistedCiphertext hoistedA(ctSigmaA, extended);
-    HoistedCiphertext hoistedB(ctTauB, extended && !canonical);
+    HoistedCiphertext hoistedA(ctSigmaA);
+    HoistedCiphertext hoistedB(ctTauB);
     ctSigmaA.reset();
     ctTauB.reset();
 
@@ -900,7 +897,7 @@ Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& matrixA,
     if (UseLegacyMatMul(matrixA, algo)) {
         return EvalMatMulSquareLegacy(matrixA, matrixB, numCols);
     }
-    return EvalMatMulSquareHoisted(matrixA, matrixB, numCols, algo);
+    return EvalMatMulSquareHoisted(matrixA, matrixB, numCols);
 }
 
 

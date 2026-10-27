@@ -75,9 +75,7 @@ LinTransAlgo ParseAlgo(const std::string& value) {
         return LinTransAlgo::NAIVE;
     if (v == "bsgs")
         return LinTransAlgo::BSGS;
-    if (v == "dh" || v == "bsgs_dh" || v == "double" || v == "double-hoisted")
-        return LinTransAlgo::BSGS_DH;
-    OPENFHE_THROW("OPENFHE_NUMPY_LT_ALGO must be one of naive|bsgs|dh|auto, got [" + value + "]");
+    OPENFHE_THROW("OPENFHE_NUMPY_LT_ALGO must be one of naive|bsgs|auto, got [" + value + "]");
 }
 
 struct Settings {
@@ -133,26 +131,6 @@ bool AutoRescale(ScalingTechnique st) {
     return st == FLEXIBLEAUTO || st == FLEXIBLEAUTOEXT || st == FIXEDAUTO || st == COMPOSITESCALINGAUTO;
 }
 
-// Parameters that allow the extended-basis (Ext) primitives at all.
-bool DoubleHoistingSupported(const std::shared_ptr<CryptoParametersCKKSRNS>& cp) {
-    const auto st = cp->GetScalingTechnique();
-    return cp->GetKeySwitchTechnique() == HYBRID &&
-           (st == FLEXIBLEAUTO || st == FLEXIBLEAUTOEXT || st == FIXEDAUTO) && cp->GetCompositeDegree() == 1;
-}
-
-// A prepared (rescaled) input that the Ext path can consume.
-bool DoubleHoistingFeasible(ConstCiphertext<DCRTPoly>& prepared) {
-    auto cp = CkksParams(prepared);
-    if (!DoubleHoistingSupported(cp))
-        return false;
-    if (prepared->GetNoiseScaleDeg() != 1)
-        return false;
-    // FLEXIBLEAUTOEXT plaintexts at level 0 are encoded with noise-scale degree 2 (cryptocontext.h)
-    if (cp->GetScalingTechnique() == FLEXIBLEAUTOEXT && prepared->GetLevel() == 0)
-        return false;
-    return true;
-}
-
 // out[p] = v[(p + r) mod S]   (same convention as EvalRotate)
 std::vector<double> RotateLeftCyclic(const std::vector<double>& v, int64_t r) {
     const int64_t S = static_cast<int64_t>(v.size());
@@ -170,26 +148,6 @@ bool AllZero(const std::vector<double>& v) {
     return std::all_of(v.begin(), v.end(), [](double x) { return x == 0.0; });
 }
 
-std::shared_ptr<ILDCRTParams<DCRTPoly::Integer>> MakeParamsQlP(ConstCiphertext<DCRTPoly>& ct) {
-    auto cp       = CkksParams(ct);
-    const auto& q = ct->GetElements()[0].GetParams()->GetParams();
-    const auto& p = cp->GetParamsP()->GetParams();
-    std::vector<NativeInteger> moduli;
-    std::vector<NativeInteger> roots;
-    moduli.reserve(q.size() + p.size());
-    roots.reserve(q.size() + p.size());
-    for (const auto& e : q) {
-        moduli.emplace_back(e->GetModulus());
-        roots.emplace_back(e->GetRootOfUnity());
-    }
-    for (const auto& e : p) {
-        moduli.emplace_back(e->GetModulus());
-        roots.emplace_back(e->GetRootOfUnity());
-    }
-    return std::make_shared<ILDCRTParams<DCRTPoly::Integer>>(ct->GetCryptoContext()->GetCyclotomicOrder(), moduli,
-                                                             roots);
-}
-
 size_t NumTowers(ConstPlaintext& pt) {
     return pt->GetElement<DCRTPoly>().GetNumOfElements();
 }
@@ -204,26 +162,6 @@ Plaintext EncodeAtLevel(ConstCiphertext<DCRTPoly>& ct, const std::vector<double>
     if (lvl != 0 && NumTowers(pt) != ct->GetElements()[0].GetNumOfElements())
         pt = cc->MakeCKKSPackedPlaintext(values, 1, 0, nullptr, slots);
     return pt;
-}
-
-// Diagonal plaintext in the extended basis Q_l*P (for EvalMultExt).
-Plaintext EncodeExtended(ConstCiphertext<DCRTPoly>& ct, const std::shared_ptr<ILDCRTParams<DCRTPoly::Integer>>& paramsQlP,
-                         const std::vector<double>& values, uint32_t slots) {
-    auto cc = ct->GetCryptoContext();
-    Plaintext pt =
-        cc->MakeCKKSPackedPlaintext(values, 1, static_cast<uint32_t>(ct->GetLevel()), paramsQlP, slots);
-    if (NumTowers(pt) != paramsQlP->GetParams().size())
-        OPENFHE_THROW("EncodeExtended: plaintext tower count does not match the extended basis.");
-    return pt;
-}
-
-// After KeySwitchDown of an Ext product: the same scaling-factor bookkeeping as
-// LeveledSHECKKSRNS::EvalMultInPlace(ct, pt) does for the non-extended product.
-void FixProductScalingFactor(Ciphertext<DCRTPoly>& ct) {
-    auto cp       = CkksParams(ct);
-    const auto st = cp->GetScalingTechnique();
-    if (st == FLEXIBLEAUTO || st == FLEXIBLEAUTOEXT)
-        ct->SetScalingFactor(cp->GetScalingFactorRealBig(ct->GetLevel()));
 }
 
 const std::map<uint32_t, EvalKey<DCRTPoly>>* TryGetKeyMap(ConstCiphertext<DCRTPoly>& ct) {
@@ -393,16 +331,13 @@ Ciphertext<DCRTPoly> EvalNaive(ConstCiphertext<DCRTPoly>& ct, const std::vector<
     return result;
 }
 
-Ciphertext<DCRTPoly> SumInPlace(std::vector<Ciphertext<DCRTPoly>>& parts, bool extended) {
+Ciphertext<DCRTPoly> SumInPlace(std::vector<Ciphertext<DCRTPoly>>& parts) {
     Ciphertext<DCRTPoly> acc;
     for (auto& p : parts) {
         if (!p)
             continue;
         if (!acc) {
             acc = p;
-        }
-        else if (extended) {
-            FHECKKSRNS::EvalAddExtInPlace(acc, p);
         }
         else {
             acc->GetCryptoContext()->EvalAddInPlace(acc, p);
@@ -413,25 +348,18 @@ Ciphertext<DCRTPoly> SumInPlace(std::vector<Ciphertext<DCRTPoly>>& parts, bool e
 }
 
 Ciphertext<DCRTPoly> RotateHoisted(const CryptoContext<DCRTPoly>& cc, const Ciphertext<DCRTPoly>& x, int32_t r,
-                                   const std::shared_ptr<std::vector<DCRTPoly>>& digits, bool extended) {
-    if (extended)
-        return (r == 0) ? cc->KeySwitchExt(x, true) : cc->EvalFastRotationExt(x, static_cast<uint32_t>(r), digits, true);
+                                   const std::shared_ptr<std::vector<DCRTPoly>>& digits) {
     return (r == 0) ? x : cc->EvalFastRotation(x, static_cast<uint32_t>(r), cc->GetCyclotomicOrder(), digits);
 }
 
 Ciphertext<DCRTPoly> MultDiagonal(const Ciphertext<DCRTPoly>& rotated, const Ciphertext<DCRTPoly>& x,
-                                  const std::shared_ptr<ILDCRTParams<DCRTPoly::Integer>>& paramsQlP,
-                                  const std::vector<double>& diag, bool extended, uint32_t slots) {
-    if (extended)
-        return FHECKKSRNS::EvalMultExt(rotated, EncodeExtended(x, paramsQlP, diag, slots));
+                                  const std::vector<double>& diag, uint32_t slots) {
     return rotated->GetCryptoContext()->EvalMult(rotated, EncodeAtLevel(x, diag, slots));
 }
 
-void AddTo(Ciphertext<DCRTPoly>& acc, const Ciphertext<DCRTPoly>& term, bool extended) {
+void AddTo(Ciphertext<DCRTPoly>& acc, const Ciphertext<DCRTPoly>& term) {
     if (!acc)
         acc = term;
-    else if (extended)
-        FHECKKSRNS::EvalAddExtInPlace(acc, term);
     else
         acc->GetCryptoContext()->EvalAddInPlace(acc, term);
 }
@@ -439,9 +367,7 @@ void AddTo(Ciphertext<DCRTPoly>& acc, const Ciphertext<DCRTPoly>& term, bool ext
 // Single group (no giant steps): every rotation is hoisted from one digit decomposition;
 // terms are streamed into per-thread partial sums so only O(threads) ciphertexts are alive.
 Ciphertext<DCRTPoly> EvalSingleGroup(const Ciphertext<DCRTPoly>& x, const std::vector<Term>& terms,
-                                     const std::shared_ptr<std::vector<DCRTPoly>>& digits,
-                                     const std::shared_ptr<ILDCRTParams<DCRTPoly::Integer>>& paramsQlP,
-                                     bool extended, uint32_t slots) {
+                                     const std::shared_ptr<std::vector<DCRTPoly>>& digits, uint32_t slots) {
     auto cc                   = x->GetCryptoContext();
     const uint32_t numThreads = LinTransThreadLimit(static_cast<uint32_t>(terms.size()));
     std::vector<Ciphertext<DCRTPoly>> partial(numThreads);
@@ -454,28 +380,25 @@ Ciphertext<DCRTPoly> EvalSingleGroup(const Ciphertext<DCRTPoly>& x, const std::v
 #else
             const size_t tid = 0;
 #endif
-            auto rotated = RotateHoisted(cc, x, terms[t].offset, digits, extended);
-            AddTo(partial[tid], MultDiagonal(rotated, x, paramsQlP, terms[t].diag, extended, slots), extended);
+            auto rotated = RotateHoisted(cc, x, terms[t].offset, digits);
+            AddTo(partial[tid], MultDiagonal(rotated, x, terms[t].diag, slots));
         });
     }
     guard.Rethrow();
-    return SumInPlace(partial, extended);
+    return SumInPlace(partial);
 }
 
 Ciphertext<DCRTPoly> EvalHoisted(const Ciphertext<DCRTPoly>& x, const std::vector<Term>& terms, const Plan& plan,
-                                 bool extended, uint32_t slots) {
+                                 uint32_t slots) {
     auto cc          = x->GetCryptoContext();
     const uint32_t b = plan.b;
     const uint32_t G = plan.G;
 
     auto digits = cc->EvalFastRotationPrecompute(x);
-    std::shared_ptr<ILDCRTParams<DCRTPoly::Integer>> paramsQlP;
-    if (extended)
-        paramsQlP = MakeParamsQlP(x);
 
     Ciphertext<DCRTPoly> acc;
     if (G == 1) {
-        acc = EvalSingleGroup(x, terms, digits, paramsQlP, extended, slots);
+        acc = EvalSingleGroup(x, terms, digits, slots);
     }
     else {
         std::vector<char> used(b, 0);
@@ -490,16 +413,10 @@ Ciphertext<DCRTPoly> EvalHoisted(const Ciphertext<DCRTPoly>& x, const std::vecto
         for (int32_t i = 0; i < static_cast<int32_t>(b); ++i) {
             if (!used[i])
                 continue;
-            babyGuard.Run([&] { baby[i] = RotateHoisted(cc, x, plan.babyOffsets[i], digits, extended); });
+            babyGuard.Run([&] { baby[i] = RotateHoisted(cc, x, plan.babyOffsets[i], digits); });
         }
         babyGuard.Rethrow();
         digits.reset();
-
-        uint32_t autoIndex = 0;
-        std::vector<uint32_t> autoMap;
-        EvalKey<DCRTPoly> giantKey;
-        if (extended)
-            giantKey = FHECKKSRNS::GetGiantStepRotation(x, plan.giant, autoIndex, autoMap);
 
         // Giant steps: Horner accumulation from the top group down, with diagonals pre-rotated
         // by -j*giant so that Rot_{j*giant}(Rot_{-j*giant}(d) . Rot_baby(x)) = d . Rot_{j*giant+baby}(x).
@@ -515,24 +432,17 @@ Ciphertext<DCRTPoly> EvalHoisted(const Ciphertext<DCRTPoly>& x, const std::vecto
                 groupGuard.Run([&] {
                     const std::vector<double> diag =
                         (shift == 0) ? terms[t].diag : RotateLeftCyclic(terms[t].diag, shift);
-                    prods[i] = MultDiagonal(baby[i], x, paramsQlP, diag, extended, slots);
+                    prods[i] = MultDiagonal(baby[i], x, diag, slots);
                 });
             }
             groupGuard.Rethrow();
-            Ciphertext<DCRTPoly> inner = SumInPlace(prods, extended);
+            Ciphertext<DCRTPoly> inner = SumInPlace(prods);
 
-            if (acc) {
-                acc = extended ? FHECKKSRNS::EvalHornerGiantRotate(acc, autoIndex, autoMap, giantKey)
-                               : cc->EvalRotate(acc, plan.giant);
-            }
+            if (acc)
+                acc = cc->EvalRotate(acc, plan.giant);
             if (inner)
-                AddTo(acc, inner, extended);
+                AddTo(acc, inner);
         }
-    }
-
-    if (extended) {
-        acc = cc->KeySwitchDown(acc);
-        FixProductScalingFactor(acc);
     }
     return acc;
 }
@@ -612,11 +522,7 @@ void RequireRelinearized(ConstCiphertext<DCRTPoly>& ciphertext) {
 
 LinTransAlgo ResolveLinTransAlgo(ConstCiphertext<DCRTPoly>& ciphertext, LinTransAlgo requested) {
     LinTransAlgo algo = (requested == LinTransAlgo::AUTO) ? GetLinTransAlgo() : requested;
-    // Measured faster than BSGS_DH when diagonals are encoded on the fly (the extended-basis
-    // plaintexts cost more to encode than the saved ModDowns), see numpy_lintrans.h.
     if (algo == LinTransAlgo::AUTO)
-        algo = LinTransAlgo::BSGS;
-    if (algo == LinTransAlgo::BSGS_DH && !DoubleHoistingSupported(CkksParams(ciphertext)))
         algo = LinTransAlgo::BSGS;
     return algo;
 }
@@ -657,7 +563,6 @@ Ciphertext<DCRTPoly> EvalLinearTransform(ConstCiphertext<DCRTPoly>& ciphertext, 
     const bool periodic    = (ctSlots == 0 || slots % ctSlots == 0);
 
     Ciphertext<DCRTPoly> x = PrepareLinTransInput(ciphertext);
-    const bool extended    = (resolved == LinTransAlgo::BSGS_DH) && DoubleHoistingFeasible(x);
 
     const auto* keyMap = TryGetKeyMap(x);
     const uint32_t M   = cc->GetCyclotomicOrder();
@@ -666,7 +571,7 @@ Ciphertext<DCRTPoly> EvalLinearTransform(ConstCiphertext<DCRTPoly>& ciphertext, 
     };
     const uint32_t b = bStep ? bStep : GetLinTransBabyStep();
     Plan plan        = MakePlan(terms, periodic && keyMap != nullptr, b, keyOk);
-    LogPlan(extended ? "BSGS_DH" : "BSGS", plan, terms.size(), x->GetLevel());
+    LogPlan("BSGS", plan, terms.size(), x->GetLevel());
 
     // check every key serially: an error inside the parallel loops would only be rethrown later
     std::vector<int32_t> needed;
@@ -682,7 +587,7 @@ Ciphertext<DCRTPoly> EvalLinearTransform(ConstCiphertext<DCRTPoly>& ciphertext, 
     }
     RequireRotationKeys(x, needed);
 
-    return EvalHoisted(x, terms, plan, extended, slots);
+    return EvalHoisted(x, terms, plan, slots);
 }
 
 std::vector<int32_t> LinearTransformRotationIndices(const std::vector<int32_t>& offsets, uint32_t bStep) {
@@ -714,16 +619,13 @@ std::vector<int32_t> LinearTransformRotationIndices(const std::vector<int32_t>& 
 // HoistedCiphertext
 // -----------------------------------------------------------------------------
 
-HoistedCiphertext::HoistedCiphertext(ConstCiphertext<DCRTPoly>& ciphertext, bool extended)
-    : m_ct(PrepareLinTransInput(ciphertext)), m_extended(false), m_m(0), m_slots(0) {
+HoistedCiphertext::HoistedCiphertext(ConstCiphertext<DCRTPoly>& ciphertext)
+    : m_ct(PrepareLinTransInput(ciphertext)), m_m(0), m_slots(0) {
     RequireRelinearized(m_ct);
     auto cc   = m_ct->GetCryptoContext();
     m_m       = cc->GetCyclotomicOrder();
     m_slots   = cc->GetEncodingParams()->GetBatchSize();
     m_digits  = cc->EvalFastRotationPrecompute(m_ct);
-    m_extended = extended && DoubleHoistingFeasible(m_ct);
-    if (m_extended)
-        m_paramsQlP = MakeParamsQlP(m_ct);
 }
 
 Ciphertext<DCRTPoly> HoistedCiphertext::Rotate(int32_t index) const {
@@ -732,23 +634,8 @@ Ciphertext<DCRTPoly> HoistedCiphertext::Rotate(int32_t index) const {
     return m_ct->GetCryptoContext()->EvalFastRotation(m_ct, static_cast<uint32_t>(index), m_m, m_digits);
 }
 
-Ciphertext<DCRTPoly> HoistedCiphertext::RotateExt(int32_t index) const {
-    if (!m_extended)
-        OPENFHE_THROW("HoistedCiphertext::RotateExt requires an extended (double-hoisted) input.");
-    auto cc = m_ct->GetCryptoContext();
-    if (index == 0)
-        return cc->KeySwitchExt(m_ct, true);
-    return cc->EvalFastRotationExt(m_ct, static_cast<uint32_t>(index), m_digits, true);
-}
-
 Plaintext HoistedCiphertext::Encode(const std::vector<double>& values) const {
     return EncodeAtLevel(m_ct, values, m_slots);
-}
-
-Plaintext HoistedCiphertext::EncodeExt(const std::vector<double>& values) const {
-    if (!m_extended)
-        OPENFHE_THROW("HoistedCiphertext::EncodeExt requires an extended (double-hoisted) input.");
-    return EncodeExtended(m_ct, m_paramsQlP, values, m_slots);
 }
 
 Ciphertext<DCRTPoly> HoistedCiphertext::MaskedRotationSum(const std::vector<int32_t>& offsets,
@@ -760,21 +647,14 @@ Ciphertext<DCRTPoly> HoistedCiphertext::MaskedRotationSum(const std::vector<int3
     for (size_t t = 0; t < offsets.size(); ++t) {
         if (AllZero(diagonals[t]))
             continue;
-        Ciphertext<DCRTPoly> term = m_extended ? FHECKKSRNS::EvalMultExt(RotateExt(offsets[t]), EncodeExt(diagonals[t]))
-                                               : cc->EvalMult(Rotate(offsets[t]), Encode(diagonals[t]));
+        Ciphertext<DCRTPoly> term = cc->EvalMult(Rotate(offsets[t]), Encode(diagonals[t]));
         if (!acc)
             acc = term;
-        else if (m_extended)
-            FHECKKSRNS::EvalAddExtInPlace(acc, term);
         else
             cc->EvalAddInPlace(acc, term);
     }
     if (!acc)
         acc = cc->EvalMult(m_ct, Encode(diagonals.front()));  // all-zero masks
-    else if (m_extended) {
-        acc = cc->KeySwitchDown(acc);
-        FixProductScalingFactor(acc);
-    }
     return acc;
 }
 
