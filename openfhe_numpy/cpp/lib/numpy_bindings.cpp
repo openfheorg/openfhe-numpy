@@ -385,6 +385,11 @@ void bind_lintrans(py::module& m) {
     m.def("SetLinTransThreads", &SetLinTransThreads, py::arg("numThreads"),
           "Upper bound on threads used by linear-transform outer loops (0 = OpenMP maximum).");
     m.def("GetLinTransThreads", &GetLinTransThreads);
+    m.def("SetCanonicalRowShiftKeys", &SetCanonicalRowShiftKeys, py::arg("prune"),
+          "Skip the d*k - d^2 wrap rotation keys in TAU/PSI/square-matmul key generation when the batch "
+          "size is d^2. On by default (env OPENFHE_NUMPY_CANONICAL_KEYS=0 turns it off). A ciphertext "
+          "with more slots than the batch size needs the wrap keys and raises an error that says so.");
+    m.def("GetCanonicalRowShiftKeys", &GetCanonicalRowShiftKeys);
 
     m.def("EvalLinearTransform",
         [](ConstCiphertext<DCRTPoly>& ciphertext, const py::sequence& offsets, const py::sequence& diagonals,

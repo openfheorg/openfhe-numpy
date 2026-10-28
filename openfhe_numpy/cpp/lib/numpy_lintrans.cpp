@@ -83,7 +83,7 @@ struct Settings {
     std::atomic<uint32_t> bStep;
     std::atomic<uint32_t> threads;
     uint32_t parallelMin;
-    bool canonical;
+    std::atomic<bool> canonical;
     bool verbose;
 
     Settings() {
@@ -104,8 +104,10 @@ struct Settings {
         parallelMin = EnvUInt("OPENFHE_NUMPY_LT_PAR_MIN");
         if (parallelMin == 0)
             parallelMin = 4;
+        // Automatic wrap-key pruning, on unless OPENFHE_NUMPY_CANONICAL_KEYS=0. A ciphertext with more
+        // slots than the batch size needs the d*k - d^2 keys and raises an error that says so.
         const char* c = std::getenv("OPENFHE_NUMPY_CANONICAL_KEYS");
-        canonical = !(c && std::string(c) == "0");
+        canonical.store(!(c && std::string(c) == "0"));
         const char* vb = std::getenv("OPENFHE_NUMPY_LT_VERBOSE");
         verbose = (vb && *vb && std::string(vb) != "0");
     }
@@ -179,7 +181,8 @@ const std::map<uint32_t, EvalKey<DCRTPoly>>* TryGetKeyMap(ConstCiphertext<DCRTPo
 
 struct Term {
     int32_t offset;
-    std::vector<double> diag;
+    std::vector<double> diag;  // empty when `zero`
+    bool zero = false;         // the merged diagonal is all zero: planned, never evaluated
 };
 
 struct Plan {
@@ -214,39 +217,89 @@ Plan SingleGroupPlan(const std::vector<Term>& terms) {
     return plan;
 }
 
-size_t NonZeroOffsets(const std::vector<Term>& terms) {
-    return static_cast<size_t>(
-        std::count_if(terms.begin(), terms.end(), [](const Term& t) { return t.offset != 0; }));
+// The baby steps and giant groups that the non-zero terms of a plan actually use.
+struct PlanUsage {
+    std::vector<char> baby;  // size plan.b
+    uint32_t maxGroup   = 0;  // highest group index holding a non-zero term
+    size_t keySwitches  = 0;  // used non-zero baby rotations + maxGroup giant rotations
+};
+
+PlanUsage UsageOf(const Plan& plan, const std::vector<Term>& terms) {
+    PlanUsage u;
+    u.baby.assign(plan.b, 0);
+    for (size_t c = 0; c < plan.cell.size(); ++c) {
+        const int32_t t = plan.cell[c];
+        if (t < 0 || terms[static_cast<size_t>(t)].zero)
+            continue;
+        u.baby[c % plan.b] = 1;
+        u.maxGroup         = std::max(u.maxGroup, static_cast<uint32_t>(c / plan.b));
+    }
+    u.keySwitches = u.maxGroup;
+    for (uint32_t i = 0; i < plan.b; ++i)
+        if (u.baby[i] && plan.babyOffsets[i] != 0)
+            ++u.keySwitches;
+    return u;
 }
 
-// terms: unique offsets in increasing order. keyOk(r) tells whether rotation r is available.
-// A baby/giant split is accepted only when every rotation it needs has a key and it needs fewer
-// key switches (used non-zero babies + G - 1 giant steps) than rotating every diagonal.
+// The non-zero rotation indices a plan performs for these terms (unsorted, may repeat).
+std::vector<int32_t> RotationsOf(const Plan& plan, const std::vector<Term>& terms) {
+    const PlanUsage u = UsageOf(plan, terms);
+    std::vector<int32_t> out;
+    for (uint32_t i = 0; i < plan.b; ++i)
+        if (u.baby[i] && plan.babyOffsets[i] != 0)
+            out.push_back(plan.babyOffsets[i]);
+    if (u.maxGroup > 0)
+        out.push_back(plan.giant);
+    return out;
+}
+
+// terms: unique offsets in increasing order, zero diagonals included, so that the plan depends on
+// the offsets alone and matches LinearTransformRotationIndices for the same offsets and baby step.
+// keyOk(r) tells whether rotation r is available. The single hoisted group costs one key switch
+// per non-zero term with a non-zero offset and is infeasible when one of those keys is missing.
+// A baby/giant split is accepted when every rotation it performs has a key and it needs fewer key
+// switches than that. Candidates start at the requested (or default) baby step and go down, then
+// up, so that a key set generated for another baby step is still found.
 template <typename KeyOk>
 Plan MakePlan(const std::vector<Term>& terms, bool allowGiant, uint32_t bRequested, KeyOk keyOk) {
     const size_t m = terms.size();
+    Plan single    = SingleGroupPlan(terms);
     if (m <= 2 || !allowGiant)
-        return SingleGroupPlan(terms);
+        return single;
 
     const int64_t kmin = terms.front().offset;
     int64_t s          = 0;
     for (const auto& t : terms)
         s = std::gcd(s, static_cast<int64_t>(t.offset) - kmin);
     if (s <= 0)
-        return SingleGroupPlan(terms);
+        return single;
     const int64_t span = (static_cast<int64_t>(terms.back().offset) - kmin) / s + 1;
     // the offsets must fill their progression reasonably densely for giant steps to pay off
     if (span > 8 * static_cast<int64_t>(m) + 64)
-        return SingleGroupPlan(terms);
-    const size_t singleCost = NonZeroOffsets(terms);
+        return single;
 
-    const uint32_t b0 = bRequested ? bRequested : DefaultBabyStep(span);
-    for (int64_t b = std::min<int64_t>(b0, span - 1); b >= 2; --b) {
-        const int64_t G = (span + b - 1) / b;
-        if (G < 2)
+    size_t singleCost = 0;
+    for (const auto& t : terms) {
+        if (t.zero || t.offset == 0)
             continue;
+        if (!keyOk(t.offset)) {
+            singleCost = std::numeric_limits<size_t>::max();
+            break;
+        }
+        ++singleCost;
+    }
+
+    const int64_t b0 = std::min<int64_t>(bRequested ? bRequested : DefaultBabyStep(span), span - 1);
+    std::vector<int64_t> candidates;
+    for (int64_t b = b0; b >= 2; --b)
+        candidates.push_back(b);
+    for (int64_t b = b0 + 1; b < span; ++b)
+        candidates.push_back(b);
+
+    for (const int64_t b : candidates) {
+        const int64_t G     = (span + b - 1) / b;
         const int64_t giant = s * b;
-        if (giant > std::numeric_limits<int32_t>::max() || !keyOk(static_cast<int32_t>(giant)))
+        if (G < 2 || giant > std::numeric_limits<int32_t>::max())
             continue;
 
         Plan plan;
@@ -257,32 +310,27 @@ Plan MakePlan(const std::vector<Term>& terms, bool allowGiant, uint32_t bRequest
         for (uint32_t i = 0; i < plan.b; ++i)
             plan.babyOffsets[i] = static_cast<int32_t>(kmin + s * static_cast<int64_t>(i));
         plan.cell.assign(static_cast<size_t>(plan.G) * plan.b, -1);
-
-        std::vector<int8_t> babyOk(plan.b, -1);
-        bool ok = true;
-        for (size_t t = 0; t < m && ok; ++t) {
-            const int64_t idx         = (static_cast<int64_t>(terms[t].offset) - kmin) / s;
-            const uint32_t i          = static_cast<uint32_t>(idx % b);
-            const uint32_t j          = static_cast<uint32_t>(idx / b);
-            plan.cell[j * plan.b + i] = static_cast<int32_t>(t);
-            if (babyOk[i] < 0)
-                babyOk[i] = keyOk(plan.babyOffsets[i]) ? 1 : 0;
-            ok = (babyOk[i] == 1);
+        for (size_t t = 0; t < m; ++t) {
+            const int64_t idx = (static_cast<int64_t>(terms[t].offset) - kmin) / s;
+            plan.cell[static_cast<size_t>(idx / b) * plan.b + static_cast<size_t>(idx % b)] =
+                static_cast<int32_t>(t);
         }
-        if (!ok)
-            continue;
 
-        size_t cost = plan.G - 1;
-        for (uint32_t i = 0; i < plan.b; ++i)
-            cost += (babyOk[i] == 1 && plan.babyOffsets[i] != 0) ? 1 : 0;
-        if (cost < singleCost)
+        const PlanUsage usage = UsageOf(plan, terms);
+        if (usage.keySwitches >= singleCost)
+            continue;
+        bool ok = (usage.maxGroup == 0) || keyOk(plan.giant);
+        for (uint32_t i = 0; i < plan.b && ok; ++i)
+            ok = !usage.baby[i] || keyOk(plan.babyOffsets[i]);
+        if (ok)
             return plan;
     }
-    return SingleGroupPlan(terms);
+    return single;
 }
 
-// Merge equal offsets, zero-pad diagonals to the batch size (as encoding does), drop all-zero
-// diagonals, sort by offset.
+// Merge equal offsets, zero-pad diagonals to the batch size (as encoding does), sort by offset.
+// A merged diagonal that is all zero (or cancels out) stays as a zero term: it takes part in
+// planning but is never rotated or multiplied.
 std::vector<Term> NormalizeTerms(const std::vector<int32_t>& offsets,
                                  const std::vector<std::vector<double>>& diagonals, uint32_t slots) {
     std::map<int32_t, std::vector<double>> merged;
@@ -298,8 +346,10 @@ std::vector<Term> NormalizeTerms(const std::vector<int32_t>& offsets,
     std::vector<Term> terms;
     terms.reserve(merged.size());
     for (auto& kv : merged) {
-        if (!AllZero(kv.second))
-            terms.push_back(Term{kv.first, std::move(kv.second)});
+        Term term{kv.first, {}, AllZero(kv.second)};
+        if (!term.zero)
+            term.diag = std::move(kv.second);
+        terms.push_back(std::move(term));
     }
     return terms;
 }
@@ -374,6 +424,8 @@ Ciphertext<DCRTPoly> EvalSingleGroup(const Ciphertext<DCRTPoly>& x, const std::v
     ParallelExceptionGuard guard;
 #pragma omp parallel for schedule(dynamic) num_threads(numThreads)
     for (int32_t t = 0; t < static_cast<int32_t>(terms.size()); ++t) {
+        if (terms[t].zero)
+            continue;
         guard.Run([&] {
 #ifdef _OPENMP
             const size_t tid = static_cast<size_t>(omp_get_thread_num());
@@ -401,10 +453,8 @@ Ciphertext<DCRTPoly> EvalHoisted(const Ciphertext<DCRTPoly>& x, const std::vecto
         acc = EvalSingleGroup(x, terms, digits, slots);
     }
     else {
-        std::vector<char> used(b, 0);
-        for (size_t c = 0; c < plan.cell.size(); ++c)
-            if (plan.cell[c] >= 0)
-                used[c % b] = 1;
+        const PlanUsage usage         = UsageOf(plan, terms);
+        const std::vector<char>& used = usage.baby;
 
         // Baby steps: all hoisted from the single digit decomposition
         std::vector<Ciphertext<DCRTPoly>> baby(b);
@@ -420,14 +470,14 @@ Ciphertext<DCRTPoly> EvalHoisted(const Ciphertext<DCRTPoly>& x, const std::vecto
 
         // Giant steps: Horner accumulation from the top group down, with diagonals pre-rotated
         // by -j*giant so that Rot_{j*giant}(Rot_{-j*giant}(d) . Rot_baby(x)) = d . Rot_{j*giant+baby}(x).
-        for (int32_t j = static_cast<int32_t>(G) - 1; j >= 0; --j) {
+        for (int32_t j = static_cast<int32_t>(usage.maxGroup); j >= 0; --j) {
             const int64_t shift = -static_cast<int64_t>(j) * plan.giant;
             std::vector<Ciphertext<DCRTPoly>> prods(b);
             ParallelExceptionGuard groupGuard;
 #pragma omp parallel for schedule(dynamic) num_threads(LinTransThreadLimit(b))
             for (int32_t i = 0; i < static_cast<int32_t>(b); ++i) {
                 const int32_t t = plan.cell[static_cast<size_t>(j) * b + i];
-                if (t < 0)
+                if (t < 0 || terms[t].zero)
                     continue;
                 groupGuard.Run([&] {
                     const std::vector<double> diag =
@@ -492,7 +542,15 @@ uint32_t LinTransThreadLimit(uint32_t work) {
 
 bool UseCanonicalRowShifts(size_t slots, uint32_t numCols) {
     const size_t d = static_cast<size_t>(numCols);
-    return GetSettings().canonical && d > 0 && slots == d * d;
+    return GetSettings().canonical.load() && d > 0 && slots == d * d;
+}
+
+void SetCanonicalRowShiftKeys(bool prune) {
+    GetSettings().canonical.store(prune);
+}
+
+bool GetCanonicalRowShiftKeys() {
+    return GetSettings().canonical.load();
 }
 
 bool UseCanonicalRowShifts(ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols) {
@@ -553,15 +611,14 @@ Ciphertext<DCRTPoly> EvalLinearTransform(ConstCiphertext<DCRTPoly>& ciphertext, 
 
     RequireRelinearized(ciphertext);
     std::vector<Term> terms = NormalizeTerms(offsets, diagonals, slots);
-    if (terms.empty()) {
-        // every diagonal is zero: keep the legacy output shape (a zero product)
-        return EvalNaive(ciphertext, {0}, {diagonals.front()});
+    if (std::all_of(terms.begin(), terms.end(), [](const Term& t) { return t.zero; })) {
+        // every diagonal is zero, or the diagonals cancel: an explicit zero product keeps the
+        // legacy output shape (one level consumed) without reusing any input mask
+        return EvalNaive(ciphertext, {0}, {std::vector<double>(slots, 0.0)});
     }
 
-    // Pre-rotating diagonals relies on the packed data repeating with a period dividing `slots`.
-    const uint32_t ctSlots = ciphertext->GetSlots();
-    const bool periodic    = (ctSlots == 0 || slots % ctSlots == 0);
-
+    // Pre-rotating diagonals for the giant steps is valid for any ciphertext slot count: a
+    // diagonal encoded at the batch size repeats with that period in the full slot layout.
     Ciphertext<DCRTPoly> x = PrepareLinTransInput(ciphertext);
 
     const auto* keyMap = TryGetKeyMap(x);
@@ -570,22 +627,11 @@ Ciphertext<DCRTPoly> EvalLinearTransform(ConstCiphertext<DCRTPoly>& ciphertext, 
         return r == 0 || (keyMap && keyMap->count(FindAutomorphismIndex2nComplex(r, M)) > 0);
     };
     const uint32_t b = bStep ? bStep : GetLinTransBabyStep();
-    Plan plan        = MakePlan(terms, periodic && keyMap != nullptr, b, keyOk);
+    Plan plan        = MakePlan(terms, keyMap != nullptr, b, keyOk);
     LogPlan("BSGS", plan, terms.size(), x->GetLevel());
 
     // check every key serially: an error inside the parallel loops would only be rethrown later
-    std::vector<int32_t> needed;
-    if (plan.G == 1) {
-        for (const auto& t : terms)
-            needed.push_back(t.offset);
-    }
-    else {
-        for (size_t c = 0; c < plan.cell.size(); ++c)
-            if (plan.cell[c] >= 0)
-                needed.push_back(plan.babyOffsets[c % plan.b]);
-        needed.push_back(plan.giant);
-    }
-    RequireRotationKeys(x, needed);
+    RequireRotationKeys(x, RotationsOf(plan, terms));
 
     return EvalHoisted(x, terms, plan, slots);
 }
@@ -600,16 +646,7 @@ std::vector<int32_t> LinearTransformRotationIndices(const std::vector<int32_t>& 
     if (terms.empty())
         return {};
     Plan plan = MakePlan(terms, true, bStep ? bStep : GetLinTransBabyStep(), [](int32_t) { return true; });
-    std::vector<int32_t> indices;
-    std::vector<char> used(plan.b, 0);
-    for (size_t c = 0; c < plan.cell.size(); ++c)
-        if (plan.cell[c] >= 0)
-            used[c % plan.b] = 1;
-    for (uint32_t i = 0; i < plan.b; ++i)
-        if (used[i] && plan.babyOffsets[i] != 0)
-            indices.push_back(plan.babyOffsets[i]);
-    if (plan.G > 1)
-        indices.push_back(plan.giant);
+    std::vector<int32_t> indices = RotationsOf(plan, terms);
     std::sort(indices.begin(), indices.end());
     indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
     return indices;
@@ -653,8 +690,8 @@ Ciphertext<DCRTPoly> HoistedCiphertext::MaskedRotationSum(const std::vector<int3
         else
             cc->EvalAddInPlace(acc, term);
     }
-    if (!acc)
-        acc = cc->EvalMult(m_ct, Encode(diagonals.front()));  // all-zero masks
+    if (!acc)  // all-zero masks: an explicit zero product
+        acc = cc->EvalMult(m_ct, Encode(std::vector<double>(m_slots, 0.0)));
     return acc;
 }
 

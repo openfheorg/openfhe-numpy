@@ -44,27 +44,19 @@ using namespace lbcrypto;
 // -----------------------------------------------------------------------------
 // Generic homomorphic linear transform (issue #41)
 // -----------------------------------------------------------------------------
-// Computes  y = sum_t diag_t (.) Rot_{offset_t}(x),  Rot_r(x)[i] = x[(i + r) mod S],
-// with S the context batch size. Two evaluation strategies are available:
-//
-//   NAIVE    one full EvalRotate + EvalMult per diagonal (legacy behaviour)
-//   BSGS     baby-step giant-step: baby rotations hoisted from a single digit
-//            decomposition (EvalFastRotationPrecompute/EvalFastRotation), Horner
-//            accumulation over a single giant stride
-//
-// AUTO picks BSGS. The global default can be set with SetLinTransAlgo() or the environment
-// variable OPENFHE_NUMPY_LT_ALGO=naive|bsgs|auto.
-//
-// Double hoisting (keeping baby rotations and plaintext products in the extended basis Q_l*P
-// with one ModDown at the end, as CKKS bootstrapping does) is deliberately not offered. It costs
-// a lot of memory and saves little latency. Encoded on every call, the Q_l*P diagonals made it
-// 1.1-1.3x slower than BSGS. Cached across calls, it was only 3-5% faster per matmul, but needed
-// about 9 MB per diagonal (2.3 GB per 128x128 ct @ pt at ring 2^16, about 70 GB for BERT-Tiny).
-// Measured on BERT-Tiny, secure profile, 72 cores.
-//
-// The baby/giant split is only ever chosen among rotations whose keys exist,
-// falling back to hoisting-only (a single giant group) when no split is
-// covered by the available rotation keys.
+// Linear transforms: y = sum_t diag_t (.) Rot_{offset_t}(x)
+// Default: BSGS (baby-step giant-step) with hoisted rotations. No setup is needed.
+// Matrix products under FIXEDMANUAL scaling keep the legacy JKLS method.
+// Optional controls:
+//   SetLinTransAlgo(NAIVE) or OPENFHE_NUMPY_LT_ALGO=naive  legacy method: one rotation per diagonal
+//   SetLinTransBabyStep(b) or OPENFHE_NUMPY_LT_BSTEP=b     fixed baby step (default: heuristic)
+//   SetLinTransThreads(t)  or OPENFHE_NUMPY_LT_THREADS=t   upper limit on the outer threads
+//   LinearTransformRotationIndices(offsets, b)             minimal rotation keys for EvalLinearTransform
+//   OPENFHE_NUMPY_CANONICAL_KEYS=0                         keep the wrap keys d*k - d^2. By default they
+//   or SetCanonicalRowShiftKeys(false)                     are skipped when the batch size is d^2. A
+//                                                          ciphertext with more slots than the batch size
+//                                                          then raises an error that says how to resolve it
+//   OPENFHE_NUMPY_LT_VERBOSE=1                             print the chosen plan
 // -----------------------------------------------------------------------------
 
 namespace openfhe_numpy {
@@ -78,7 +70,7 @@ enum class LinTransAlgo : uint8_t {
 void SetLinTransAlgo(LinTransAlgo algo);
 LinTransAlgo GetLinTransAlgo();
 
-// Baby-step size used by BSGS/BSGS_DH; 0 selects the heuristic (env OPENFHE_NUMPY_LT_BSTEP).
+// Baby-step size used by BSGS; 0 selects the heuristic (env OPENFHE_NUMPY_LT_BSTEP).
 void SetLinTransBabyStep(uint32_t bStep);
 uint32_t GetLinTransBabyStep();
 
@@ -90,10 +82,16 @@ uint32_t GetLinTransThreads();
 // Strategy that will actually run for this ciphertext when `requested` is asked for.
 LinTransAlgo ResolveLinTransAlgo(ConstCiphertext<DCRTPoly>& ciphertext, LinTransAlgo requested = LinTransAlgo::AUTO);
 
-// When the batch size equals numCols^2, rotations by d*k and d*k - d^2 act identically on
-// the packed data, so only the canonical d*k keys are needed.
-// Key generation: skip the d*k - d^2 keys (OPENFHE_NUMPY_CANONICAL_KEYS=0 keeps generating them).
+// When the batch size equals numCols^2 and the ciphertext data repeats with a period dividing it,
+// rotations by d*k and d*k - d^2 act identically on the packed data, so only the canonical d*k
+// keys are needed.
+// Key generation: when the batch size is d^2, skip the d*k - d^2 keys by default (automatic
+// wrap-key pruning: d - 2 fewer keys for square matmul, 126 keys and about 16 GB at d = 128,
+// ring 2^16). A ciphertext with more slots than the batch size needs them and raises an error that
+// says how to resolve it. OPENFHE_NUMPY_CANONICAL_KEYS=0 or SetCanonicalRowShiftKeys(false) keeps them.
 bool UseCanonicalRowShifts(size_t slots, uint32_t numCols);
+void SetCanonicalRowShiftKeys(bool prune);
+bool GetCanonicalRowShiftKeys();
 // Evaluation: rotate by d*k whenever the batch size is d^2 and the ciphertext data repeats with a
 // period dividing it. The d*k keys exist under both key-generation modes.
 bool UseCanonicalRowShifts(ConstCiphertext<DCRTPoly>& ciphertext, uint32_t numCols);
@@ -110,7 +108,9 @@ Ciphertext<DCRTPoly> EvalLinearTransform(ConstCiphertext<DCRTPoly>& ciphertext,
                                          uint32_t bStep    = 0);
 
 // Rotation indices the BSGS plan for these offsets needs (babies plus the giant stride),
-// ignoring key availability. Useful for generating a minimal key set.
+// ignoring key availability. Useful for generating a minimal key set: EvalLinearTransform plans
+// from the same offsets, so these keys suffice whichever diagonals turn out to be zero, provided
+// the same baby step is passed to both (or a split with these keys is found by the search).
 std::vector<int32_t> LinearTransformRotationIndices(const std::vector<int32_t>& offsets, uint32_t bStep = 0);
 
 // One digit decomposition of a ciphertext shared by many hoisted rotations.

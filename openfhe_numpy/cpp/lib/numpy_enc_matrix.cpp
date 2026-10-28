@@ -531,6 +531,39 @@ void GenPsiTerms(size_t slots,
                         hasWrap, nCols * nCols, canonical);
 }
 
+// The wrap rotations d*k - d^2 are needed whenever the batch size is d^2 but the ciphertext does
+// not repeat with that period (it has more slots than the batch size). Key sets generated with
+// wrap-key pruning on (the default) lack them, so when a rotation key is reported missing in that
+// situation, say why and how to resolve it. Call from inside a catch handler.
+[[noreturn]] void RethrowWithWrapKeyHint(const std::exception& e, ConstCiphertext<DCRTPoly>& ct, uint32_t numCols) {
+    const size_t slots = ct->GetCryptoContext()->GetEncodingParams()->GetBatchSize();
+    const size_t d     = static_cast<size_t>(numCols);
+    const std::string what(e.what());
+    if (what.find("EvalKey") != std::string::npos && slots == d * d && GetCanonicalRowShiftKeys() &&
+        !UseCanonicalRowShifts(ct, numCols)) {
+        OPENFHE_THROW(what + " The ciphertext has " + std::to_string(ct->GetSlots()) +
+                      " slots but the batch size is " + std::to_string(slots) +
+                      ", so this transform needs the wrap rotations d*k - d^2. Automatic wrap-key pruning "
+                      "skipped their keys. To resolve: set OPENFHE_NUMPY_CANONICAL_KEYS=0 before the program "
+                      "starts or call SetCanonicalRowShiftKeys(False), then generate the rotation keys again; "
+                      "or encrypt with a slot count equal to the batch size.");
+    }
+    throw;
+}
+
+Ciphertext<DCRTPoly> EvalRowShiftTransform(ConstCiphertext<DCRTPoly>& ct,
+                                           uint32_t numCols,
+                                           const std::vector<int32_t>& offsets,
+                                           const std::vector<std::vector<double>>& diagonals,
+                                           LinTransAlgo algo = LinTransAlgo::AUTO) {
+    try {
+        return EvalLinearTransform(ct, offsets, diagonals, algo);
+    }
+    catch (const std::exception& e) {
+        RethrowWithWrapKeyHint(e, ct, numCols);
+    }
+}
+
 }  // namespace
 
 Ciphertext<DCRTPoly> EvalLinTransTau(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols) {
@@ -540,7 +573,7 @@ Ciphertext<DCRTPoly> EvalLinTransTau(ConstCiphertext<DCRTPoly>& ctVector, uint32
     std::vector<int32_t> offsets;
     std::vector<std::vector<double>> diagonals;
     GenTauTerms(slots, numCols, UseCanonicalRowShifts(ctVector, numCols), offsets, diagonals);
-    return EvalLinearTransform(ctVector, offsets, diagonals);
+    return EvalRowShiftTransform(ctVector, numCols, offsets, diagonals);
 }
 
 /**
@@ -671,7 +704,7 @@ Ciphertext<DCRTPoly> EvalLinTransPsi(ConstCiphertext<DCRTPoly>& ctVector, uint32
     std::vector<int32_t> offsets;
     std::vector<std::vector<double>> diagonals;
     GenPsiTerms(slots, numCols, numRepeats, UseCanonicalRowShifts(ctVector, numCols), offsets, diagonals);
-    return EvalLinearTransform(ctVector, offsets, diagonals);
+    return EvalRowShiftTransform(ctVector, numCols, offsets, diagonals);
 }
 /**
  * @brief Multiplies two square matrices: CT x CT.
@@ -731,7 +764,12 @@ Ciphertext<DCRTPoly> EvalMatMulSquareHoisted(ConstCiphertext<DCRTPoly>& matrixA,
             phiPsiKeys.push_back(nCols * k - blockSize);
         }
     }
-    RequireRotationKeys(matrixA, phiPsiKeys);
+    try {
+        RequireRotationKeys(matrixA, phiPsiKeys);
+    }
+    catch (const std::exception& e) {
+        RethrowWithWrapKeyHint(e, matrixB, numCols);
+    }
 
     Ciphertext<DCRTPoly> ctSigmaA = EvalLinTransSigma(matrixA, numCols);
     Ciphertext<DCRTPoly> ctTauB   = EvalLinTransTau(matrixB, numCols);
@@ -885,7 +923,7 @@ Ciphertext<DCRTPoly> EvalMatMulSquarePtCtDirect(const std::vector<double>& rMatA
         offsets.push_back(shift);
         diagonals.push_back(std::move(diag));
     }
-    return EvalLinearTransform(ctMatB, offsets, diagonals, algo);
+    return EvalRowShiftTransform(ctMatB, numCols, offsets, diagonals, algo);
 }
 
 }  // namespace
