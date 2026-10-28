@@ -29,10 +29,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //==============================================================================
 
+#include <algorithm>
 #include <limits>
 #include <map>
 #include "numpy_enc_matrix.h"
+#include "numpy_lintrans.h"
 #include "numpy_utils.h"
+
+#ifdef _OPENMP
+    #include <omp.h>
+#endif
 
 using namespace lbcrypto;
 
@@ -87,12 +93,15 @@ std::vector<double> GenCumsumStageMask(
 * @param numCols   The row size (number of columns) of the matrix.
 * @param type The linear transformation type (SIGMA, TAU, PHI, PSI, TRANSPOSE).
 * @param numRepeats   Optional offset used by PHI and PSI types.
+* @param slots   Batch size; when it equals numCols^2 only the canonical row-shift
+*                indices numCols*k are needed for TAU and PSI (see UseCanonicalRowShifts).
 * @return std::vector<int32_t> List of rotation indices to be used for EvalRotateKeyGen.
 **/
 static std::vector<int32_t> GenLinTransIndices(
     uint32_t numCols,
     LinTransType type,
-    uint32_t numRepeats = 0
+    uint32_t numRepeats = 0,
+    size_t slots = 0
 ) {
     if (numCols == 0) {
         OPENFHE_THROW("numCols must be positive");
@@ -111,6 +120,7 @@ static std::vector<int32_t> GenLinTransIndices(
     }
 
     const int32_t blockSize = nCols * nCols;
+    const bool canonical = UseCanonicalRowShifts(slots, numCols);
 
     std::vector<int32_t> rotationIndices;
 
@@ -128,7 +138,7 @@ static std::vector<int32_t> GenLinTransIndices(
             rotationIndices.reserve(2 * nCols - 1);
             for (int32_t k = 0; k < nCols; ++k) {
                 rotationIndices.push_back(nCols * k);
-                if (k != 0) {
+                if (k != 0 && !canonical) {
                     rotationIndices.push_back(nCols * k - blockSize);
                 }
             }
@@ -146,7 +156,7 @@ static std::vector<int32_t> GenLinTransIndices(
             // Generate a single index based on offset
             rotationIndices.reserve(2);
             rotationIndices.push_back(nCols * repeats);
-            if (repeats != 0) {
+            if (repeats != 0 && !canonical) {
                 rotationIndices.push_back(nCols * repeats - blockSize);
             }
             break;
@@ -180,31 +190,40 @@ static std::vector<int32_t> GenLinTransIndices(
 **/
 
 void EvalLinTransKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols, LinTransType type, uint32_t numRepeats) {
-    std::vector<int32_t> rotationIndices = GenLinTransIndices(numCols, type, numRepeats);
-    // CryptoContext<DCRTPoly>  cc   = secretKey->GetCryptoContext();
-    secretKey->GetCryptoContext()->EvalRotateKeyGen(secretKey, rotationIndices);
+    CryptoContext<DCRTPoly> cc = secretKey->GetCryptoContext();
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
+    std::vector<int32_t> rotationIndices = GenLinTransIndices(numCols, type, numRepeats, slots);
+    cc->EvalRotateKeyGen(secretKey, rotationIndices);
 }
 
 /**
  * @brief Generates rotation keys for square matrix multiplication.
+ *
+ * The PHI and PSI index sets are subsets of SIGMA and TAU, so a single deduplicated
+ * EvalRotateKeyGen call over SIGMA u TAU u PHI u PSI is made. These keys also cover every
+ * baby and giant step the BSGS linear transforms choose (see numpy_lintrans.h).
+ *
  * @param secretKey The private key used for key generation.
  * @param numCols The number of columns in the square matrix.
  */
 void EvalSquareMatMultRotateKeyGen(PrivateKey<DCRTPoly>& secretKey, uint32_t numCols) {
-    std::vector<int32_t> indicesSigma = GenLinTransIndices(numCols, LinTransType::SIGMA);
-    std::vector<int32_t> indicesTau   = GenLinTransIndices(numCols, LinTransType::TAU);
+    CryptoContext<DCRTPoly> cc = secretKey->GetCryptoContext();
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
 
-    CryptoContext<DCRTPoly>  cc = secretKey->GetCryptoContext();
-    cc->EvalRotateKeyGen(secretKey, indicesSigma);
-    cc->EvalRotateKeyGen(secretKey, indicesTau);
+    std::vector<int32_t> indices = GenLinTransIndices(numCols, LinTransType::SIGMA, 0, slots);
+    std::vector<int32_t> indicesTau = GenLinTransIndices(numCols, LinTransType::TAU, 0, slots);
+    indices.insert(indices.end(), indicesTau.begin(), indicesTau.end());
 
     for (uint32_t numRepeats = 1; numRepeats < numCols; ++numRepeats) {
-        std::vector<int32_t> indicesPhi = GenLinTransIndices(numCols, LinTransType::PHI, numRepeats);
-        std::vector<int32_t> indicesPsi = GenLinTransIndices(numCols, LinTransType::PSI, numRepeats);
-
-        cc->EvalRotateKeyGen(secretKey, indicesPhi);
-        cc->EvalRotateKeyGen(secretKey, indicesPsi);
+        std::vector<int32_t> indicesPhi = GenLinTransIndices(numCols, LinTransType::PHI, numRepeats, slots);
+        std::vector<int32_t> indicesPsi = GenLinTransIndices(numCols, LinTransType::PSI, numRepeats, slots);
+        indices.insert(indices.end(), indicesPhi.begin(), indicesPhi.end());
+        indices.insert(indices.end(), indicesPsi.begin(), indicesPsi.end());
     }
+
+    std::sort(indices.begin(), indices.end());
+    indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+    cc->EvalRotateKeyGen(secretKey, indices);
 }
 
 /**
@@ -302,23 +321,14 @@ Ciphertext<DCRTPoly> EvalLinTransSigma(ConstCiphertext<DCRTPoly>& ciphertext, ui
     CryptoContext<DCRTPoly>  cc  = ciphertext->GetCryptoContext();
     size_t slots                = cc->GetEncodingParams()->GetBatchSize();
     int32_t nCols = static_cast<int32_t>(numCols);
-    bool flag                    = true;
-    Ciphertext<DCRTPoly> ctResult;
 
+    std::vector<int32_t> offsets;
+    std::vector<std::vector<double>> diagonals;
     for (int32_t k = -nCols; k < nCols; ++k) {
-        std::vector<double> diag        = GenSigmaDiag(slots,nCols, k);
-        Plaintext ptDiagonal            = cc->MakeCKKSPackedPlaintext(diag);
-        Ciphertext<DCRTPoly> ctRotated  = cc->EvalRotate(ciphertext, k);
-        Ciphertext<DCRTPoly> ctProd     = cc->EvalMult(ctRotated, ptDiagonal);
-        if (flag) {
-            ctResult = ctProd;
-            flag     = false;
-        }
-        else
-            cc->EvalAddInPlace(ctResult, ctProd);
+        offsets.push_back(k);
+        diagonals.push_back(GenSigmaDiag(slots, nCols, k));
     }
-
-    return ctResult;
+    return EvalLinearTransform(ciphertext, offsets, diagonals);
 }
 
 
@@ -463,49 +473,107 @@ std::vector<double> EvalCompactRowShift(const std::vector<double>& vector, uint3
 
 }  // namespace
 
+namespace {
+
+// Diagonals of a "row shift by k" (Psi_k) or Tau column-k term: a no-wrap mask applied to the
+// rotation by d*k and a wrap mask applied to the rotation by d*k - d^2. When the batch size is
+// d^2 both rotations are the same permutation of the data, so the two masks (which have disjoint
+// supports) are merged onto the canonical rotation d*k.
+void AppendRowShiftTerms(std::vector<int32_t>& offsets,
+                         std::vector<std::vector<double>>& diagonals,
+                         int32_t shift,
+                         std::vector<double>&& noWrap,
+                         std::vector<double>&& wrap,
+                         bool hasWrap,
+                         int32_t blockSize,
+                         bool canonical) {
+    if (hasWrap && canonical) {
+        for (size_t i = 0; i < noWrap.size(); ++i) {
+            noWrap[i] += wrap[i];
+        }
+    }
+    offsets.push_back(shift);
+    diagonals.push_back(std::move(noWrap));
+    if (hasWrap && !canonical) {
+        offsets.push_back(shift - blockSize);
+        diagonals.push_back(std::move(wrap));
+    }
+}
+
+void GenTauTerms(size_t slots,
+                 uint32_t numCols,
+                 bool canonical,
+                 std::vector<int32_t>& offsets,
+                 std::vector<std::vector<double>>& diagonals) {
+    ValidateCompactSquareTransform(slots, numCols);
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    for (uint32_t k = 0; k < numCols; ++k) {
+        const bool hasWrap = (k != 0);
+        AppendRowShiftTerms(offsets, diagonals, nCols * static_cast<int32_t>(k),
+                            GenCompactTauDiag(slots, numCols, k, false),
+                            hasWrap ? GenCompactTauDiag(slots, numCols, k, true) : std::vector<double>(),
+                            hasWrap, nCols * nCols, canonical);
+    }
+}
+
+void GenPsiTerms(size_t slots,
+                 uint32_t numCols,
+                 uint32_t numRepeats,
+                 bool canonical,
+                 std::vector<int32_t>& offsets,
+                 std::vector<std::vector<double>>& diagonals) {
+    ValidateCompactSquareTransform(slots, numCols);
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const bool hasWrap = (numRepeats != 0);
+    AppendRowShiftTerms(offsets, diagonals, nCols * static_cast<int32_t>(numRepeats),
+                        GenCompactRowShiftDiag(slots, numCols, numRepeats, false),
+                        hasWrap ? GenCompactRowShiftDiag(slots, numCols, numRepeats, true) : std::vector<double>(),
+                        hasWrap, nCols * nCols, canonical);
+}
+
+// The wrap rotations d*k - d^2 are needed whenever the batch size is d^2 but the ciphertext does
+// not repeat with that period (it has more slots than the batch size). Key sets generated with
+// wrap-key pruning on (the default) lack them, so when a rotation key is reported missing in that
+// situation, say why and how to resolve it. Call from inside a catch handler.
+[[noreturn]] void RethrowWithWrapKeyHint(const std::exception& e, ConstCiphertext<DCRTPoly>& ct, uint32_t numCols) {
+    const size_t slots = ct->GetCryptoContext()->GetEncodingParams()->GetBatchSize();
+    const size_t d     = static_cast<size_t>(numCols);
+    const std::string what(e.what());
+    if (what.find("EvalKey") != std::string::npos && slots == d * d && GetCanonicalRowShiftKeys() &&
+        !UseCanonicalRowShifts(ct, numCols)) {
+        OPENFHE_THROW(what + " The ciphertext has " + std::to_string(ct->GetSlots()) +
+                      " slots but the batch size is " + std::to_string(slots) +
+                      ", so this transform needs the wrap rotations d*k - d^2. Automatic wrap-key pruning "
+                      "skipped their keys. To resolve: set OPENFHE_NUMPY_CANONICAL_KEYS=0 before the program "
+                      "starts or call SetCanonicalRowShiftKeys(False), then generate the rotation keys again; "
+                      "or encrypt with a slot count equal to the batch size.");
+    }
+    throw;
+}
+
+Ciphertext<DCRTPoly> EvalRowShiftTransform(ConstCiphertext<DCRTPoly>& ct,
+                                           uint32_t numCols,
+                                           const std::vector<int32_t>& offsets,
+                                           const std::vector<std::vector<double>>& diagonals,
+                                           LinTransAlgo algo = LinTransAlgo::AUTO) {
+    try {
+        return EvalLinearTransform(ct, offsets, diagonals, algo);
+    }
+    catch (const std::exception& e) {
+        RethrowWithWrapKeyHint(e, ct, numCols);
+    }
+}
+
+}  // namespace
+
 Ciphertext<DCRTPoly> EvalLinTransTau(ConstCiphertext<DCRTPoly>& ctVector, uint32_t numCols) {
     CryptoContext<DCRTPoly> cc = ctVector->GetCryptoContext();
     const size_t slots = cc->GetEncodingParams()->GetBatchSize();
 
-    ValidateCompactSquareTransform(slots, numCols);
-
-    const int32_t nCols = static_cast<int32_t>(numCols);
-    const int32_t blockSize = nCols * nCols;
-
-    bool flag = true;
-    Ciphertext<DCRTPoly> ctResult;
-
-    for (uint32_t k = 0; k < numCols; ++k) {
-        const int32_t kk = static_cast<int32_t>(k);
-
-        Plaintext ptNoWrap = cc->MakeCKKSPackedPlaintext(
-            GenCompactTauDiag(slots, numCols, k, false)
-        );
-        Ciphertext<DCRTPoly> ctNoWrap = cc->EvalMult(
-            cc->EvalRotate(ctVector, nCols * kk),
-            ptNoWrap
-        );
-
-        if (flag) {
-            ctResult = ctNoWrap;
-            flag = false;
-        } else {
-            cc->EvalAddInPlace(ctResult, ctNoWrap);
-        }
-
-        if (k != 0) {
-            Plaintext ptWrap = cc->MakeCKKSPackedPlaintext(
-                GenCompactTauDiag(slots, numCols, k, true)
-            );
-            Ciphertext<DCRTPoly> ctWrap = cc->EvalMult(
-                cc->EvalRotate(ctVector, nCols * kk - blockSize),
-                ptWrap
-            );
-            cc->EvalAddInPlace(ctResult, ctWrap);
-        }
-    }
-
-    return ctResult;
+    std::vector<int32_t> offsets;
+    std::vector<std::vector<double>> diagonals;
+    GenTauTerms(slots, numCols, UseCanonicalRowShifts(ctVector, numCols), offsets, diagonals);
+    return EvalRowShiftTransform(ctVector, numCols, offsets, diagonals);
 }
 
 /**
@@ -575,28 +643,13 @@ Ciphertext<DCRTPoly> EvalLinTransPhi(
     const int32_t nCols = static_cast<int32_t>(numCols);
     const int32_t repeats = static_cast<int32_t>(numRepeats);
 
-    bool flag = true;
-    Ciphertext<DCRTPoly> ctResult;
-
+    std::vector<int32_t> offsets;
+    std::vector<std::vector<double>> diagonals;
     for (int32_t i = 0; i < 2; ++i) {
-        const int32_t rotateIdx = repeats - i * nCols;
-
-        Plaintext ptDiagonal = cc->MakeCKKSPackedPlaintext(
-            GenPhiDiag(slots, numCols, repeats, i)
-        );
-
-        Ciphertext<DCRTPoly> ctRotated = cc->EvalRotate(ctVector, rotateIdx);
-        Ciphertext<DCRTPoly> ctProd = cc->EvalMult(ctRotated, ptDiagonal);
-
-        if (flag) {
-            ctResult = ctProd;
-            flag = false;
-        } else {
-            cc->EvalAddInPlace(ctResult, ctProd);
-        }
+        offsets.push_back(repeats - i * nCols);
+        diagonals.push_back(GenPhiDiag(slots, numCols, repeats, i));
     }
-
-    return ctResult;
+    return EvalLinearTransform(ctVector, offsets, diagonals);
 }
 
 std::vector<double> EvalLinTransPhi(const std::vector<double>& vector, uint32_t numCols, uint32_t numRepeats) {
@@ -648,32 +701,10 @@ Ciphertext<DCRTPoly> EvalLinTransPsi(ConstCiphertext<DCRTPoly>& ctVector, uint32
     CryptoContext<DCRTPoly> cc = ctVector->GetCryptoContext();
     const size_t slots = cc->GetEncodingParams()->GetBatchSize();
 
-    ValidateCompactSquareTransform(slots, numCols);
-
-    const int32_t nCols = static_cast<int32_t>(numCols);
-    const int32_t repeats = static_cast<int32_t>(numRepeats);
-    const int32_t blockSize = nCols * nCols;
-
-    Plaintext ptNoWrap = cc->MakeCKKSPackedPlaintext(
-        GenCompactRowShiftDiag(slots, numCols, numRepeats, false)
-    );
-    Ciphertext<DCRTPoly> ctResult = cc->EvalMult(
-        cc->EvalRotate(ctVector, nCols * repeats),
-        ptNoWrap
-    );
-
-    if (numRepeats != 0) {
-        Plaintext ptWrap = cc->MakeCKKSPackedPlaintext(
-            GenCompactRowShiftDiag(slots, numCols, numRepeats, true)
-        );
-        Ciphertext<DCRTPoly> ctWrap = cc->EvalMult(
-            cc->EvalRotate(ctVector, nCols * repeats - blockSize),
-            ptWrap
-        );
-        cc->EvalAddInPlace(ctResult, ctWrap);
-    }
-
-    return ctResult;
+    std::vector<int32_t> offsets;
+    std::vector<std::vector<double>> diagonals;
+    GenPsiTerms(slots, numCols, numRepeats, UseCanonicalRowShifts(ctVector, numCols), offsets, diagonals);
+    return EvalRowShiftTransform(ctVector, numCols, offsets, diagonals);
 }
 /**
  * @brief Multiplies two square matrices: CT x CT.
@@ -683,9 +714,17 @@ Ciphertext<DCRTPoly> EvalLinTransPsi(ConstCiphertext<DCRTPoly>& ctVector, uint32
  * @param numCols The number of columns in the matrices.
  * @return The resulting ciphertext after the matrix multiplication.
  */
-Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& matrixA,
-                                      ConstCiphertext<DCRTPoly>& matrixB,
-                                      uint32_t numCols) {
+namespace {
+
+bool UseLegacyMatMul(ConstCiphertext<DCRTPoly>& ct, LinTransAlgo algo) {
+    const auto cp = std::dynamic_pointer_cast<CryptoParametersRNS>(ct->GetCryptoParameters());
+    // FIXEDMANUAL callers rescale by hand and expect the legacy JKLS depth.
+    return algo == LinTransAlgo::NAIVE || !cp || cp->GetScalingTechnique() == FIXEDMANUAL;
+}
+
+Ciphertext<DCRTPoly> EvalMatMulSquareLegacy(ConstCiphertext<DCRTPoly>& matrixA,
+                                            ConstCiphertext<DCRTPoly>& matrixB,
+                                            uint32_t numCols) {
     CryptoContext<DCRTPoly> cc      = matrixA->GetCryptoContext();
     Ciphertext<DCRTPoly> ctSigmaA   = EvalLinTransSigma(matrixA, numCols);
     Ciphertext<DCRTPoly> ctTauB     = EvalLinTransTau(matrixB, numCols);
@@ -700,6 +739,205 @@ Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& matrixA,
     return ctProd;
 }
 
+// JKLS with hoisting: Sigma(A) and Tau(B) are BSGS linear transforms; every Phi_k(Sigma(A))
+// rotation shares one digit decomposition of Sigma(A), every Psi_k(Tau(B)) rotation shares one
+// decomposition of Tau(B) (a bare rotation when the batch size is d^2), products are accumulated
+// without relinearization, and the k-loop runs in parallel.
+Ciphertext<DCRTPoly> EvalMatMulSquareHoisted(ConstCiphertext<DCRTPoly>& matrixA,
+                                             ConstCiphertext<DCRTPoly>& matrixB,
+                                             uint32_t numCols) {
+    CryptoContext<DCRTPoly> cc = matrixA->GetCryptoContext();
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
+    ValidateCompactSquareTransform(slots, numCols);
+
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const int32_t blockSize = nCols * nCols;
+    const bool canonical = UseCanonicalRowShifts(matrixB, numCols);
+
+    // every rotation of the k-loop, checked before entering the parallel region
+    std::vector<int32_t> phiPsiKeys;
+    for (int32_t k = 1; k < nCols; ++k) {
+        phiPsiKeys.push_back(k);
+        phiPsiKeys.push_back(k - nCols);
+        phiPsiKeys.push_back(nCols * k);
+        if (!canonical) {
+            phiPsiKeys.push_back(nCols * k - blockSize);
+        }
+    }
+    try {
+        RequireRotationKeys(matrixA, phiPsiKeys);
+    }
+    catch (const std::exception& e) {
+        RethrowWithWrapKeyHint(e, matrixB, numCols);
+    }
+
+    Ciphertext<DCRTPoly> ctSigmaA = EvalLinTransSigma(matrixA, numCols);
+    Ciphertext<DCRTPoly> ctTauB   = EvalLinTransTau(matrixB, numCols);
+
+    HoistedCiphertext hoistedA(ctSigmaA);
+    HoistedCiphertext hoistedB(ctTauB);
+    ctSigmaA.reset();
+    ctTauB.reset();
+
+    Ciphertext<DCRTPoly> ctProd = cc->EvalMult(hoistedA.Get(), hoistedB.Get());
+    if (numCols == 1) {
+        return ctProd;
+    }
+
+    const uint32_t numThreads = LinTransThreadLimit(numCols - 1);
+    std::vector<Ciphertext<DCRTPoly>> partial(numThreads);
+    ParallelExceptionGuard guard;
+
+#pragma omp parallel for schedule(dynamic) num_threads(numThreads)
+    for (int32_t k = 1; k < nCols; ++k) {
+#ifdef _OPENMP
+        const size_t tid = static_cast<size_t>(omp_get_thread_num());
+#else
+        const size_t tid = 0;
+#endif
+        guard.Run([&] {
+            Ciphertext<DCRTPoly> ctPhiAk = hoistedA.MaskedRotationSum(
+                {k, k - nCols},
+                {GenPhiDiag(slots, numCols, k, 0), GenPhiDiag(slots, numCols, k, 1)});
+
+            Ciphertext<DCRTPoly> ctPsiBk;
+            if (canonical) {
+                ctPsiBk = hoistedB.Rotate(nCols * k);
+            }
+            else {
+                ctPsiBk = hoistedB.MaskedRotationSum(
+                    {nCols * k, nCols * k - blockSize},
+                    {GenCompactRowShiftDiag(slots, numCols, static_cast<uint32_t>(k), false),
+                     GenCompactRowShiftDiag(slots, numCols, static_cast<uint32_t>(k), true)});
+            }
+
+            Ciphertext<DCRTPoly> term = cc->EvalMultNoRelin(ctPhiAk, ctPsiBk);
+            if (!partial[tid]) {
+                partial[tid] = term;
+            }
+            else {
+                cc->EvalAddInPlace(partial[tid], term);
+            }
+        });
+    }
+    guard.Rethrow();
+
+    Ciphertext<DCRTPoly> ctSum;
+    for (auto& p : partial) {
+        if (!p) {
+            continue;
+        }
+        if (!ctSum) {
+            ctSum = p;
+        }
+        else {
+            cc->EvalAddInPlace(ctSum, p);
+        }
+    }
+    return cc->EvalAdd(ctProd, cc->Relinearize(ctSum));
+}
+
+// X @ W for a plaintext W is the slot-linear map with 2d-1 diagonals:
+//   Y[i][j] = sum_delta X[i][j + delta] * W[j + delta][j],  delta in [-(d-1), d-1],
+// and Rot_delta stays inside row i whenever 0 <= j + delta < d. One BSGS linear transform,
+// one multiplicative level (the legacy JKLS evaluation uses three).
+Ciphertext<DCRTPoly> EvalMatMulSquareCtPtDirect(ConstCiphertext<DCRTPoly>& ctMatA,
+                                                const std::vector<double>& rMatB,
+                                                uint32_t numCols,
+                                                LinTransAlgo algo) {
+    CryptoContext<DCRTPoly> cc = ctMatA->GetCryptoContext();
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
+    ValidateCompactSquareTransform(slots, numCols);
+    ValidateCompactSquareTransform(rMatB.size(), numCols);
+    if (rMatB.size() > slots) {
+        OPENFHE_THROW("The plaintext matrix holds more values than the batch size.");
+    }
+
+    const size_t d = numCols;
+    const size_t n = d * d;
+    const size_t frames = rMatB.size() / n;
+    const int32_t nCols = static_cast<int32_t>(numCols);
+
+    std::vector<int32_t> offsets;
+    std::vector<std::vector<double>> diagonals;
+    for (int32_t delta = -(nCols - 1); delta < nCols; ++delta) {
+        std::vector<double> diag(slots, 0.0);
+        for (size_t t = 0; t < frames; ++t) {
+            const size_t base = t * n;
+            for (size_t j = 0; j < d; ++j) {
+                const int64_t src = static_cast<int64_t>(j) + delta;
+                if (src < 0 || src >= nCols) {
+                    continue;
+                }
+                const double w = rMatB[base + static_cast<size_t>(src) * d + j];
+                for (size_t i = 0; i < d; ++i) {
+                    diag[base + i * d + j] = w;
+                }
+            }
+        }
+        offsets.push_back(delta);
+        diagonals.push_back(std::move(diag));
+    }
+    return EvalLinearTransform(ctMatA, offsets, diagonals, algo);
+}
+
+// A @ X for a plaintext A: Y[i][j] = sum_e A[i][i + e] * X[i + e][j], i.e. the rotation by d*e
+// with diagonal A[i][i + e] on row i, e in [-(d-1), d-1]. With batch size d^2 the rotation by
+// d*e (e < 0) is the canonical rotation d*(e + d), and the merged diagonals have disjoint support.
+Ciphertext<DCRTPoly> EvalMatMulSquarePtCtDirect(const std::vector<double>& rMatA,
+                                                ConstCiphertext<DCRTPoly>& ctMatB,
+                                                uint32_t numCols,
+                                                LinTransAlgo algo) {
+    CryptoContext<DCRTPoly> cc = ctMatB->GetCryptoContext();
+    const size_t slots = cc->GetEncodingParams()->GetBatchSize();
+    ValidateCompactSquareTransform(slots, numCols);
+    ValidateCompactSquareTransform(rMatA.size(), numCols);
+    if (rMatA.size() > slots) {
+        OPENFHE_THROW("The plaintext matrix holds more values than the batch size.");
+    }
+
+    const size_t d = numCols;
+    const size_t n = d * d;
+    const size_t frames = rMatA.size() / n;
+    const int32_t nCols = static_cast<int32_t>(numCols);
+    const bool canonical = UseCanonicalRowShifts(ctMatB, numCols);
+
+    std::vector<int32_t> offsets;
+    std::vector<std::vector<double>> diagonals;
+    for (int32_t e = -(nCols - 1); e < nCols; ++e) {
+        std::vector<double> diag(slots, 0.0);
+        for (size_t t = 0; t < frames; ++t) {
+            const size_t base = t * n;
+            for (size_t i = 0; i < d; ++i) {
+                const int64_t src = static_cast<int64_t>(i) + e;
+                if (src < 0 || src >= nCols) {
+                    continue;
+                }
+                const double a = rMatA[base + i * d + static_cast<size_t>(src)];
+                for (size_t j = 0; j < d; ++j) {
+                    diag[base + i * d + j] = a;
+                }
+            }
+        }
+        const int32_t shift = (canonical && e < 0) ? nCols * (e + nCols) : nCols * e;
+        offsets.push_back(shift);
+        diagonals.push_back(std::move(diag));
+    }
+    return EvalRowShiftTransform(ctMatB, numCols, offsets, diagonals, algo);
+}
+
+}  // namespace
+
+Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& matrixA,
+                                      ConstCiphertext<DCRTPoly>& matrixB,
+                                      uint32_t numCols) {
+    const LinTransAlgo algo = ResolveLinTransAlgo(matrixA);
+    if (UseLegacyMatMul(matrixA, algo)) {
+        return EvalMatMulSquareLegacy(matrixA, matrixB, numCols);
+    }
+    return EvalMatMulSquareHoisted(matrixA, matrixB, numCols);
+}
+
 
 /**
  * @brief Multiplies two square matrices: CT @ Raw Packed Array
@@ -711,6 +949,10 @@ Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& matrixA,
 Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& ctMatA,
                                       const std::vector<double>& rMatB,
                                       uint32_t numCols) {
+    const LinTransAlgo algo = ResolveLinTransAlgo(ctMatA);
+    if (!UseLegacyMatMul(ctMatA, algo)) {
+        return EvalMatMulSquareCtPtDirect(ctMatA, rMatB, numCols, algo);
+    }
 
     CryptoContext<DCRTPoly> cc          = ctMatA->GetCryptoContext();
     Ciphertext<DCRTPoly> ctSigmaA       = EvalLinTransSigma(ctMatA, numCols);
@@ -738,6 +980,11 @@ Ciphertext<DCRTPoly> EvalMatMulSquare(ConstCiphertext<DCRTPoly>& ctMatA,
 Ciphertext<DCRTPoly> EvalMatMulSquare(const std::vector<double>& rMatA,
                                       ConstCiphertext<DCRTPoly>& ctMatB,
                                       uint32_t numCols) {
+    const LinTransAlgo algo = ResolveLinTransAlgo(ctMatB);
+    if (!UseLegacyMatMul(ctMatB, algo)) {
+        return EvalMatMulSquarePtCtDirect(rMatA, ctMatB, numCols, algo);
+    }
+
     CryptoContext<DCRTPoly> cc      = ctMatB->GetCryptoContext();
     std::vector<double>rSigmaA      = EvalLinTransSigma(rMatA, numCols);
     Plaintext ptSigmaA              = cc->MakeCKKSPackedPlaintext(rSigmaA);
@@ -801,25 +1048,15 @@ Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext, uint32
         }
         CryptoContext<DCRTPoly>  cc = ciphertext->GetCryptoContext();
         uint32_t slots     = cc->GetEncodingParams()->GetBatchSize();
-        bool flag          = true;
-        Ciphertext<DCRTPoly> ctResult;
         const int32_t nCols = static_cast<int32_t>(numCols);
 
+        std::vector<int32_t> offsets;
+        std::vector<std::vector<double>> diagonals;
         for (int32_t index = -nCols + 1; index < nCols; ++index) {
-            int32_t rotationIndex = (nCols - 1) * index;
-            auto diagonalVector   = GenTransposeDiag(slots, numCols, index);
-            auto ptDiagonal       = cc->MakeCKKSPackedPlaintext(diagonalVector);
-            auto ctRotated        = cc->EvalRotate(ciphertext, rotationIndex);
-            auto ctProd           = cc->EvalMult(ctRotated, ptDiagonal);
-            if (flag) {
-                ctResult = ctProd;
-                flag     = false;
-            }
-            else
-                cc->EvalAddInPlace(ctResult, ctProd);
+            offsets.push_back((nCols - 1) * index);
+            diagonals.push_back(GenTransposeDiag(slots, numCols, index));
         }
-
-        return ctResult;
+        return EvalLinearTransform(ciphertext, offsets, diagonals);
     }
     catch (const std::exception& e) {
         OPENFHE_THROW("EvalTranspose: Homomorphic operation failed. Details: " + std::string(e.what()));
@@ -849,7 +1086,8 @@ Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext,
             OPENFHE_THROW("numRows * numCols must divide the ciphertext batch size");
         }
 
-        Ciphertext<DCRTPoly> ctResult;
+        std::vector<std::vector<double>> diagonals;
+        diagonals.reserve(rotationIndices.size());
         for (int32_t rotationIndex : rotationIndices) {
             std::vector<double> diagonalVector(slots, 0.0);
             for (uint32_t targetSlot = 0; targetSlot < matrixSize; ++targetSlot) {
@@ -863,26 +1101,10 @@ Ciphertext<DCRTPoly> EvalTranspose(ConstCiphertext<DCRTPoly>& ciphertext,
                     diagonalVector[base + targetSlot] = 1.0;
                 }
             }
-
-            auto ptDiagonal = cc->MakeCKKSPackedPlaintext(diagonalVector);
-            Ciphertext<DCRTPoly> ctProd;
-            if (rotationIndex == 0) {
-                ctProd = cc->EvalMult(ciphertext, ptDiagonal);
-            }
-            else {
-                auto ctRotated = cc->EvalRotate(ciphertext, rotationIndex);
-                ctProd = cc->EvalMult(ctRotated, ptDiagonal);
-            }
-
-            if (!ctResult) {
-                ctResult = ctProd;
-            }
-            else {
-                cc->EvalAddInPlace(ctResult, ctProd);
-            }
+            diagonals.push_back(std::move(diagonalVector));
         }
 
-        return ctResult;
+        return EvalLinearTransform(ciphertext, rotationIndices, diagonals);
     }
     catch (const std::exception& e) {
         OPENFHE_THROW("EvalTranspose: Homomorphic operation failed. Details: " + std::string(e.what()));

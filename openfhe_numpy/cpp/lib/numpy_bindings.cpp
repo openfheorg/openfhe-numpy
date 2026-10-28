@@ -31,6 +31,7 @@
 #include <pybind11/pybind11.h>
 
 #include "numpy_enc_matrix.h"
+#include "numpy_lintrans.h"
 
 using namespace openfhe_numpy;
 using namespace lbcrypto;
@@ -39,6 +40,7 @@ using namespace lbcrypto;
 namespace py = pybind11;
 void bind_enums_and_constants(py::module& m);
 void bind_matrix_funcs(py::module& m);
+void bind_lintrans(py::module& m);
 
 //  [tango] Since the current versions of openfhe_python and OpenFHE don’t support this binding, I’ve included it here for testing purposes.
 void bind_ciphertext(py::module& m);
@@ -63,6 +65,7 @@ PYBIND11_MODULE(openfhe_numpy, m) {
 
     bind_enums_and_constants(m);
     bind_matrix_funcs(m);
+    bind_lintrans(m);
     bind_ciphertext(m);
     bind_privatekey(m);
 }
@@ -362,4 +365,69 @@ void bind_privatekey(py::module& m) {
     py::object pyClsObj       = existingModule.attr("PrivateKey");
     auto cls                  = py::reinterpret_borrow<py::class_<PrivateKey<DCRTPoly>>>(pyClsObj);
     cls.def("GetCryptoContext", [](const PrivateKey<DCRTPoly>& ct) { return ct->GetCryptoContext(); });
+}
+
+// Linear-transform strategy controls and the generic linear transform (issue #41).
+// Python sequences are converted by hand so that pybind11/stl.h is not pulled into this
+// translation unit (it would change overload resolution of the existing bindings).
+void bind_lintrans(py::module& m) {
+    py::enum_<LinTransAlgo>(m, "LinTransAlgo")
+        .value("AUTO", LinTransAlgo::AUTO)
+        .value("NAIVE", LinTransAlgo::NAIVE)
+        .value("BSGS", LinTransAlgo::BSGS);
+
+    m.def("SetLinTransAlgo", &SetLinTransAlgo, py::arg("algo"),
+          "Select the linear-transform strategy: AUTO, NAIVE or BSGS.");
+    m.def("GetLinTransAlgo", &GetLinTransAlgo, "Return the configured linear-transform strategy.");
+    m.def("SetLinTransBabyStep", &SetLinTransBabyStep, py::arg("bStep"),
+          "Baby-step size for BSGS linear transforms (0 = heuristic).");
+    m.def("GetLinTransBabyStep", &GetLinTransBabyStep);
+    m.def("SetLinTransThreads", &SetLinTransThreads, py::arg("numThreads"),
+          "Upper bound on threads used by linear-transform outer loops (0 = OpenMP maximum).");
+    m.def("GetLinTransThreads", &GetLinTransThreads);
+    m.def("SetCanonicalRowShiftKeys", &SetCanonicalRowShiftKeys, py::arg("prune"),
+          "Skip the d*k - d^2 wrap rotation keys in TAU/PSI/square-matmul key generation when the batch "
+          "size is d^2. On by default (env OPENFHE_NUMPY_CANONICAL_KEYS=0 turns it off). A ciphertext "
+          "with more slots than the batch size needs the wrap keys and raises an error that says so.");
+    m.def("GetCanonicalRowShiftKeys", &GetCanonicalRowShiftKeys);
+
+    m.def("EvalLinearTransform",
+        [](ConstCiphertext<DCRTPoly>& ciphertext, const py::sequence& offsets, const py::sequence& diagonals,
+           LinTransAlgo algo, uint32_t bStep) {
+            std::vector<int32_t> offs;
+            offs.reserve(py::len(offsets));
+            for (auto item : offsets)
+                offs.push_back(py::cast<int32_t>(item));
+            std::vector<std::vector<double>> diags;
+            diags.reserve(py::len(diagonals));
+            for (auto item : diagonals) {
+                py::sequence seq = py::reinterpret_borrow<py::sequence>(item);
+                std::vector<double> diag;
+                diag.reserve(py::len(seq));
+                for (auto v : seq)
+                    diag.push_back(py::cast<double>(v));
+                diags.push_back(std::move(diag));
+            }
+            return EvalLinearTransform(ciphertext, offs, diags, algo, bStep);
+        },
+        py::arg("ciphertext").none(false),
+        py::arg("offsets"),
+        py::arg("diagonals"),
+        py::arg("algo") = LinTransAlgo::AUTO,
+        py::arg("bStep") = 0,
+        "y = sum_t diagonals[t] * Rot(offsets[t])(x), evaluated with the selected strategy.");
+
+    m.def("LinearTransformRotationIndices",
+        [](const py::sequence& offsets, uint32_t bStep) {
+            std::vector<int32_t> offs;
+            for (auto item : offsets)
+                offs.push_back(py::cast<int32_t>(item));
+            py::list out;
+            for (int32_t r : LinearTransformRotationIndices(offs, bStep))
+                out.append(r);
+            return out;
+        },
+        py::arg("offsets"),
+        py::arg("bStep") = 0,
+        "Rotation indices (baby steps and giant stride) a BSGS linear transform over these offsets uses.");
 }
