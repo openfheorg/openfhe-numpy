@@ -55,10 +55,12 @@ add_library(openfhe_numpy_cpp STATIC
     ${OpenFHE_Numpy_INCLUDES}/numpy_array_metadata.h
     ${OpenFHE_Numpy_INCLUDES}/numpy_enc_matrix.h
     ${OpenFHE_Numpy_INCLUDES}/numpy_helper_functions.h
+    ${OpenFHE_Numpy_INCLUDES}/numpy_lintrans.h
     ${OpenFHE_Numpy_INCLUDES}/numpy_utils.h
     ${OpenFHE_Numpy_SOURCE}/numpy_array_metadata.cpp
     ${OpenFHE_Numpy_SOURCE}/numpy_enc_matrix.cpp
     ${OpenFHE_Numpy_SOURCE}/numpy_helper_functions.cpp
+    ${OpenFHE_Numpy_SOURCE}/numpy_lintrans.cpp
     ${OpenFHE_Numpy_SOURCE}/numpy_utils.cpp
 )
 pybind11_add_module(openfhe_numpy ${OpenFHE_Numpy_SOURCE}/numpy_bindings.cpp)
